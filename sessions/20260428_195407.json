@@ -1,0 +1,56 @@
+{
+  "session_id": "20260428_195407",
+  "history": [
+    {
+      "role": "assistant",
+      "content": "Hey there! I'm Sunny, your personal sunglasses assistant at SunStore. How can I help you today?",
+      "timestamp": "2026-04-28T19:54:07.557261"
+    },
+    {
+      "role": "user",
+      "content": "What sunglasses do you have?",
+      "timestamp": "2026-04-28T19:54:21.766685"
+    },
+    {
+      "role": "assistant",
+      "content": "We have 10 sunglasses models available, including Aviator, Round, Wayfarer and more. Check our full collection for details!",
+      "timestamp": "2026-04-28T19:54:30.585057"
+    },
+    {
+      "role": "user",
+      "content": "I want to buy 1 Aviator",
+      "timestamp": "2026-04-28T19:57:57.159269"
+    },
+    {
+      "role": "assistant",
+      "content": "Sorry, no 'None' found in our inventory.",
+      "timestamp": "2026-04-28T19:58:24.817089"
+    },
+    {
+      "role": "user",
+      "content": "I want to buy 1 Aviator",
+      "timestamp": "2026-04-28T19:58:25.259435"
+    },
+    {
+      "role": "assistant",
+      "content": "Successfully purchased 1 Aviator(s).",
+      "timestamp": "2026-04-28T19:58:39.932217"
+    },
+    {
+      "role": "user",
+      "content": "What is my transaction history?",
+      "timestamp": "2026-04-28T19:59:23.843167"
+    },
+    {
+      "role": "assistant",
+      "content": "Your transaction history: 1 records found. Here's a brief overview: \n- Purchased 1 Aviator(s) (ID: TXN002, Amount: -80.0, Balance: 420.0)",
+      "timestamp": "2026-04-28T19:59:43.568733"
+    }
+  ],
+  "context_summary": "",
+  "customer_name": null,
+  "preferences": {
+    "style": "aviator"
+  },
+  "pending_action": null
+}

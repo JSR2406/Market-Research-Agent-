@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens ───────────────────────────────────────────── */
+:root {
+  --bg-base: #080c14;
+  --bg-surface: #0f1623;
+  --bg-card: #141d2e;
+  --bg-card-hover: #192235;
+  --border: #1e2d45;
+  --border-bright: #2a3f60;
+  --accent: #4f8ef7;
+  --accent-dim: #3a6fd4;
+  --accent-glow: rgba(79, 142, 247, 0.15);
+  --accent2: #8b5cf6;
+  --accent2-glow: rgba(139, 92, 246, 0.15);
+  --text-primary: #e8edf5;
+  --text-secondary: #7a8fa8;
+  --text-muted: #4a5f7a;
+  --success: #22d3a5;
+  --error: #f87171;
+  --warn: #fb923c;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+@theme inline {
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+}
+
+/* ─── Base ────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  /* Subtle grid background */
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79, 142, 247, 0.12) 0%, transparent 60%),
+    linear-gradient(rgba(30, 45, 69, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 45, 69, 0.3) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── Prose (Markdown) ────────────────────────────────────────── */
+.prose {
+  color: var(--text-primary);
+  max-width: none;
+}
+.prose h1 { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin: 1.4rem 0 0.6rem; }
+.prose h2 { font-size: 1.2rem; font-weight: 650; color: var(--accent); margin: 1.2rem 0 0.5rem; }
+.prose h3 { font-size: 1rem; font-weight: 600; color: var(--text-secondary); margin: 1rem 0 0.4rem; }
+.prose p { margin: 0.6rem 0; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.75; }
+.prose ul, .prose ol { padding-left: 1.4rem; margin: 0.6rem 0; }
+.prose li { color: var(--text-secondary); font-size: 0.92rem; margin: 0.25rem 0; }
+.prose strong { color: var(--text-primary); font-weight: 600; }
+.prose em { color: var(--accent); font-style: italic; }
+.prose code {
+  background: rgba(79, 142, 247, 0.1);
+  color: var(--accent);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.prose pre {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  overflow-x: auto;
+}
+.prose pre code { background: none; padding: 0; }
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin: 1rem 0;
+}
+.prose th {
+  background: rgba(79, 142, 247, 0.1);
+  color: var(--accent);
+  font-weight: 600;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-bright);
+}
+.prose td {
+  padding: 0.5rem 0.8rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.prose tr:hover td { background: rgba(79, 142, 247, 0.04); }
+.prose blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 0.5rem 1rem;
+  margin: 0.8rem 0;
+  background: rgba(79, 142, 247, 0.05);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.prose blockquote p { color: var(--text-secondary); }
+.prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.prose hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+
+/* ─── Utility animations ──────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 12px var(--accent-glow); }
+  50%       { box-shadow: 0 0 28px rgba(79, 142, 247, 0.35); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }

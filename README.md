@@ -1,37 +1,100 @@
-# Market Research Agent
+# 🚀 Market Research Agent
 
-This is a full-stack AI market research assistant built with Next.js 15, FastAPI, and OpenRouter AI. It features real-time, step-by-step market research capabilities using various sub-agents for planning, research, analysis, opportunity generation, and editing.
+A hyper-modern, full-stack AI orchestration platform that performs deep-dive market research in real-time. Built with **Next.js 15**, **FastAPI**, and **OpenRouter AI**, it utilizes a multi-agent system to plan, research, analyze, and generate professional reports.
 
-## Structure
-- `/frontend`: Next.js 15 App Router frontend using Tailwind CSS and Framer Motion.
-- `/backend`: FastAPI Python backend acting as a WebSocket server, orchestrating multiple AI agents.
+![Market Research Dashboard](./assets/dashboard.png)
 
-## Setup Instructions
+## ✨ Features
 
-### 1. Backend
-Open a terminal in the root `Market Research Agent` directory (not inside `/backend`).
+- **🤖 Multi-Agent Orchestration**: Specialized agents for Planning, Researching, Analyzing, Opportunity Discovery, Writing, and Editing.
+- **⚡ Real-time Updates**: Live WebSocket streaming shows the agent's progress step-by-step.
+- **🎨 Premium UI/UX**: Built with Tailwind CSS and Framer Motion for a smooth, glassmorphic design.
+- **🔍 Deep Analysis**: Leverages state-of-the-art LLMs (via OpenRouter) to provide actionable market insights.
+- **📄 Professional Reports**: Generates comprehensive reports with structured findings and strategic recommendations.
 
-1. Ensure the virtual environment is set up: `python -m venv backend/.venv`
-2. Activate it: `.\backend\.venv\Scripts\activate`
-3. Install dependencies: `pip install -r backend/requirements.txt`
-4. Set up your `.env` file inside `backend/.env` with your `OPENROUTER_API_KEY`.
-5. Run the FastAPI server from the root directory:
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS, Framer Motion, Lucide React.
+- **Backend**: FastAPI (Python), WebSockets, HTTPX, Pydantic.
+- **AI Engine**: OpenRouter API (Nemotron models).
+- **Communication**: Real-time bidirectional WebSockets.
+
+## 📂 Project Structure
+
+```text
+market-research-agent/
+├── backend/            # FastAPI WebSocket Server
+│   ├── agents/         # Agent logic (Planner, Research, Analyst, etc.)
+│   ├── api/            # WebSocket endpoints
+│   └── core/           # LLM client & configuration
+├── frontend/           # Next.js 15 Application
+│   ├── app/            # App Router pages
+│   └── components/     # UI components (Timeline, Input, Viewer)
+└── assets/             # Project media & screenshots
+```
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+
+- Python 3.9+
+- Node.js 18+
+- OpenRouter API Key
+
+### 2. Backend Setup
+
+1. **Navigate to the root directory.**
+2. **Create and activate a virtual environment:**
+   ```bash
+   python -m venv backend/.venv
+   # Windows
+   .\backend\.venv\Scripts\activate
+   # Linux/macOS
+   source backend/.venv/bin/activate
+   ```
+3. **Install dependencies:**
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
+4. **Configure Environment Variables:**
+   Create a `backend/.env` file:
+   ```env
+   OPENROUTER_API_KEY=your_key_here
+   ```
+5. **Run the server:**
    ```bash
    uvicorn backend.main:app --reload --port 8000
    ```
 
-*(Note: It is crucial to run uvicorn from the root directory so the `backend` module can be resolved correctly.)*
+### 3. Frontend Setup
 
-### 2. Frontend
-Open another terminal in the `/frontend` directory.
-
-1. Install dependencies: `npm install`
-2. Start the development server:
+1. **Navigate to the `frontend` directory:**
+   ```bash
+   cd frontend
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Run the development server:**
    ```bash
    npm run dev
    ```
+4. **Open your browser:** Go to `http://localhost:3000`.
 
-Visit the displayed localhost address (usually `http://localhost:3000` or `3001`) to interact with the Market Research Agent.
+## 🧠 Agentic Workflow
 
-## Stack Details
-Check `AGENTS.md` for architectural rules and specific models configured.
+1. **Planner**: Breaks down the research topic into logical steps.
+2. **Researcher**: Gathers real-time data and market trends.
+3. **Analyst**: Processes the raw data into meaningful insights.
+4. **Opportunity Agent**: Identifies gaps and potential market entries.
+5. **Writer**: Drafts the initial comprehensive report.
+6. **Editor**: Polishes the report for professional quality and formatting.
+
+## 📄 License
+
+This project is open-source and available under the [MIT License](LICENSE).
+
+---
+
+Built with ❤️ by [Janmejay Singh](https://github.com/JSR2406)

@@ -1,6 +1,9 @@
 # 🚀 Market Research Agent
 
+**Live Demo:** [https://market-research-agent-jsr2406.vercel.app](https://market-research-agent-jsr2406.vercel.app)
+
 A hyper-modern, full-stack AI orchestration platform that performs deep-dive market research in real-time. Built with **Next.js 15**, **FastAPI**, and **OpenRouter AI**, it utilizes a multi-agent system to plan, research, analyze, and generate professional reports.
+
 
 ![Market Research Dashboard](./assets/dashboard.png)
 

@@ -6,8 +6,19 @@ import ReportViewer from "@/components/ReportViewer";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 
-const WS_URL =
+// Use wss:// in production (HTTPS pages block ws://)
+const rawWsUrl =
   process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/ws/market";
+
+const WS_URL =
+  typeof window !== "undefined" &&
+  window.location.protocol === "https:" &&
+  rawWsUrl.startsWith("ws://")
+    ? rawWsUrl.replace("ws://", "wss://")
+    : rawWsUrl;
+
+const WS_RECONNECT_DELAY_MS = 1500;
+const WS_MAX_RETRIES = 3;
 
 type Step = {
   step: string;
@@ -18,6 +29,9 @@ type Step = {
 
 export default function ResearchPage() {
   const wsRef = useRef<WebSocket | null>(null);
+  const retriesRef = useRef(0);
+  const pendingStartRef = useRef<{ topic: string; maxSteps: number } | null>(null);
+
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<Step[]>([]);
   const [finalReport, setFinalReport] = useState<string | null>(null);
@@ -71,42 +85,76 @@ export default function ResearchPage() {
         setFinalReport(data.final_report as string);
         setIsRunning(false);
         setStatusMessage("Research complete ✓");
+        retriesRef.current = 0;
         break;
       case "cancelled":
         setIsRunning(false);
         setStatusMessage("Research cancelled.");
+        retriesRef.current = 0;
         break;
       case "error":
         setIsRunning(false);
         setErrorMessage(data.message as string);
         setStatusMessage("");
+        retriesRef.current = 0;
         break;
     }
   }, []);
 
-  const ensureConnected = useCallback((): Promise<WebSocket> => {
-    return new Promise((resolve, reject) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        resolve(wsRef.current);
+  // ── WebSocket with reconnect ───────────────────────────────────
+  const connectWs = useCallback(
+    (onOpenCallback?: (ws: WebSocket) => void) => {
+      if (
+        wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING
+      ) {
+        if (onOpenCallback && wsRef.current.readyState === WebSocket.OPEN) {
+          onOpenCallback(wsRef.current);
+        }
         return;
       }
+
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
-      ws.onopen = () => resolve(ws);
-      ws.onerror = reject;
+
+      ws.onopen = () => {
+        retriesRef.current = 0;
+        if (onOpenCallback) onOpenCallback(ws);
+      };
+
+      ws.onerror = () => {
+        // onclose fires after onerror — let onclose handle retry
+      };
+
       ws.onmessage = (e) => {
         try {
           handleMessage(JSON.parse(e.data));
         } catch (err) {
-          console.error(err);
+          console.error("WS parse error:", err);
         }
       };
-      ws.onclose = () => {
-        setIsRunning(false);
-        setStatusMessage("");
+
+      ws.onclose = (ev) => {
+        // Unexpected close while running — attempt reconnect
+        if (isRunning && retriesRef.current < WS_MAX_RETRIES && !ev.wasClean) {
+          retriesRef.current += 1;
+          setStatusMessage(
+            `Connection lost. Retrying (${retriesRef.current}/${WS_MAX_RETRIES})…`
+          );
+          setTimeout(() => {
+            connectWs();
+          }, WS_RECONNECT_DELAY_MS * retriesRef.current);
+        } else if (isRunning) {
+          setIsRunning(false);
+          setErrorMessage(
+            "Backend connection closed unexpectedly. Please try again."
+          );
+          setStatusMessage("");
+        }
       };
-    });
-  }, [handleMessage]);
+    },
+    [handleMessage, isRunning]
+  );
 
   const handleStart = async (topic: string, maxSteps: number) => {
     setIsRunning(true);
@@ -115,14 +163,34 @@ export default function ResearchPage() {
     setCurrentTopic(topic);
     setStatusMessage("Connecting…");
     setErrorMessage("");
-    try {
-      const ws = await ensureConnected();
-      ws.send(JSON.stringify({ type: "start", topic, max_steps: maxSteps }));
-    } catch {
-      setStatusMessage("");
-      setErrorMessage("Could not connect to the backend. Is the server running?");
-      setIsRunning(false);
+    retriesRef.current = 0;
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "start", topic, max_steps: maxSteps }));
+      return;
     }
+
+    pendingStartRef.current = { topic, maxSteps };
+    connectWs((ws) => {
+      const pending = pendingStartRef.current;
+      if (pending) {
+        ws.send(
+          JSON.stringify({ type: "start", topic: pending.topic, max_steps: pending.maxSteps })
+        );
+        pendingStartRef.current = null;
+      }
+    });
+
+    // Timeout fallback if connection never opens
+    setTimeout(() => {
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        setStatusMessage("");
+        setErrorMessage(
+          "Could not connect to the backend. Is the server running? Check that NEXT_PUBLIC_WS_URL is set correctly."
+        );
+        setIsRunning(false);
+      }
+    }, 5000);
   };
 
   const handleCancel = () => {
@@ -131,6 +199,7 @@ export default function ResearchPage() {
       ws.send(JSON.stringify({ type: "cancel" }));
     }
     setIsRunning(false);
+    setStatusMessage("");
   };
 
   useEffect(() => () => { wsRef.current?.close(); }, []);
@@ -162,7 +231,7 @@ export default function ResearchPage() {
             marginBottom: "10px",
           }}
         >
-          Powered by Nemotron LLM via OpenRouter
+          Powered by Gemini 2.5 Flash via OpenRouter
         </h2>
         <p
           style={{
@@ -171,7 +240,8 @@ export default function ResearchPage() {
             color: "var(--text-primary)",
             letterSpacing: "-0.03em",
             lineHeight: 1.2,
-            background: "linear-gradient(135deg, var(--text-primary) 40%, var(--accent))",
+            background:
+              "linear-gradient(135deg, var(--text-primary) 40%, var(--accent))",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}
@@ -187,7 +257,8 @@ export default function ResearchPage() {
             margin: "8px auto 0",
           }}
         >
-          Multi-agent research pipeline that generates comprehensive market reports in minutes.
+          Multi-agent research pipeline that generates comprehensive market
+          reports in minutes.
         </p>
       </motion.div>
 
@@ -220,8 +291,14 @@ export default function ResearchPage() {
               borderRadius: "var(--radius-md)",
             }}
           >
-            <AlertTriangle size={16} color="var(--error)" style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: "0.86rem", color: "var(--error)" }}>{errorMessage}</span>
+            <AlertTriangle
+              size={16}
+              color="var(--error)"
+              style={{ flexShrink: 0 }}
+            />
+            <span style={{ fontSize: "0.86rem", color: "var(--error)" }}>
+              {errorMessage}
+            </span>
           </motion.div>
         )}
       </AnimatePresence>

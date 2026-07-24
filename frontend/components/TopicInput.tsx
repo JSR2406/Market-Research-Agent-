@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Square, ChevronDown, Sparkles, Zap } from "lucide-react";
+import { Search, Square, Zap, Sparkles } from "lucide-react";
 
 interface Props {
   onStart: (topic: string, maxSteps: number) => void;
@@ -32,7 +32,8 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
         background: "var(--bg-card)",
         borderRadius: "var(--radius-xl)",
         border: "1px solid var(--border-bright)",
-        boxShadow: "0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(79,142,247,0.05)",
+        boxShadow:
+          "0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(79,142,247,0.05)",
         overflow: "hidden",
       }}
     >
@@ -41,10 +42,18 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
         style={{
           padding: "28px 32px 20px",
           borderBottom: "1px solid var(--border)",
-          background: "linear-gradient(135deg, rgba(79,142,247,0.06) 0%, transparent 60%)",
+          background:
+            "linear-gradient(135deg, rgba(79,142,247,0.06) 0%, transparent 60%)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "6px",
+          }}
+        >
           <div
             style={{
               width: "36px",
@@ -69,8 +78,14 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
             >
               Market Research Agent
             </h1>
-            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "1px" }}>
-              Autonomous AI-powered intelligence • Nemotron LLM
+            <p
+              style={{
+                fontSize: "0.78rem",
+                color: "var(--text-muted)",
+                marginTop: "1px",
+              }}
+            >
+              Autonomous AI-powered intelligence • Gemini 2.5 Flash
             </p>
           </div>
         </div>
@@ -84,7 +99,12 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !isRunning && topic.trim()) {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !isRunning &&
+                topic.trim()
+              ) {
                 e.preventDefault();
                 onStart(topic.trim(), maxSteps);
               }
@@ -130,7 +150,15 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
 
         {/* Example topics */}
         <div style={{ marginBottom: "20px" }}>
-          <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <p
+            style={{
+              fontSize: "0.72rem",
+              color: "var(--text-muted)",
+              marginBottom: "8px",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
             Quick examples
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -168,11 +196,21 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
         </div>
 
         {/* Footer row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
           {/* Steps selector */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Zap size={13} color="var(--text-muted)" />
-            <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Research depth:</span>
+            <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+              Research depth:
+            </span>
             <div style={{ display: "flex", gap: "4px" }}>
               {[3, 4, 5, 6].map((n) => (
                 <button
@@ -184,8 +222,11 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
                     borderRadius: "8px",
                     fontSize: "0.8rem",
                     fontWeight: 600,
-                    border: `1px solid ${maxSteps === n ? "var(--accent)" : "var(--border)"}`,
-                    background: maxSteps === n ? "var(--accent)" : "transparent",
+                    border: `1px solid ${
+                      maxSteps === n ? "var(--accent)" : "var(--border)"
+                    }`,
+                    background:
+                      maxSteps === n ? "var(--accent)" : "transparent",
                     color: maxSteps === n ? "#fff" : "var(--text-muted)",
                     cursor: "pointer",
                     transition: "all 0.15s",
@@ -195,7 +236,9 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
                 </button>
               ))}
             </div>
-            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>steps</span>
+            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+              steps
+            </span>
           </div>
 
           {/* Action button */}
@@ -248,7 +291,9 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
                   fontSize: "0.86rem",
                   fontWeight: 700,
                   cursor: topic.trim() ? "pointer" : "not-allowed",
-                  boxShadow: topic.trim() ? "0 4px 20px rgba(79,142,247,0.3)" : "none",
+                  boxShadow: topic.trim()
+                    ? "0 4px 20px rgba(79,142,247,0.3)"
+                    : "none",
                   transition: "all 0.2s",
                 }}
               >

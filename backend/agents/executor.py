@@ -18,23 +18,42 @@ AGENT_REGISTRY = {
     "editor_agent": editor_agent,
 }
 
+
 def _extract_json(content: str) -> Dict:
-    """Robustly extract JSON from LLM output."""
+    """Robustly extract JSON from LLM output, including nested objects."""
     content = content.strip()
     # Strip markdown code fences
-    content = re.sub(r"^```(?:json)?\s*", "", content)
-    content = re.sub(r"\s*```$", "", content)
+    content = re.sub(r"^```(?:json)?\s*", "", content, flags=re.MULTILINE)
+    content = re.sub(r"```\s*$", "", content, flags=re.MULTILINE)
     content = content.strip()
+
     # Try direct parse first
     try:
         return json.loads(content)
     except json.JSONDecodeError:
         pass
-    # Try finding JSON object within text
-    match = re.search(r'\{[^{}]+\}', content, re.DOTALL)
-    if match:
-        return json.loads(match.group())
-    raise ValueError(f"Could not parse JSON from: {content[:200]}")
+
+    # Find the outermost JSON object (handles nested keys correctly)
+    # Walk character by character to find balanced braces
+    depth = 0
+    start = None
+    for idx, ch in enumerate(content):
+        if ch == "{":
+            if depth == 0:
+                start = idx
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                candidate = content[start : idx + 1]
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    # keep searching for another object
+                    start = None
+
+    raise ValueError(f"Could not parse JSON from LLM output: {content[:300]}")
+
 
 async def decide_agent(step: str) -> Dict[str, str]:
     prompt = f"""You are managing a market research workflow.
@@ -48,6 +67,7 @@ Step: "{step}"
 """
     content = await call_llm([{"role": "user", "content": prompt}], temperature=0.0)
     return _extract_json(content)
+
 
 async def run_research_workflow(
     topic: str,
@@ -77,7 +97,6 @@ async def run_research_workflow(
             agent_info = await decide_agent(step)
             agent_name = agent_info.get("agent", "writer_agent")
             task = agent_info.get("task", step)
-            # Validate agent name
             if agent_name not in AGENT_REGISTRY:
                 agent_name = "writer_agent"
         except Exception:
@@ -93,7 +112,7 @@ async def run_research_workflow(
         })
 
         context = "\n\n".join(
-            f"### {a} (step {j+1}):\n{r}"
+            f"### {a} (step {j + 1}):\n{r}"
             for j, (s, a, r) in enumerate(history)
         )
         enriched_task = (
@@ -119,7 +138,6 @@ async def run_research_workflow(
         })
 
     if not cancel_flag["cancelled"] and history:
-        # The final report is the last agent's output (usually writer/editor)
         final_output = history[-1][2]
         await websocket.send_json({
             "type": "done",

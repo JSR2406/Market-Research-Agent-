@@ -1,5 +1,8 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_WS_URL": "@next_public_ws_url"
+  }
 }

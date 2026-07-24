@@ -2,17 +2,17 @@
 
 /* ─── Design Tokens ───────────────────────────────────────────── */
 :root {
-  --bg-base: #080c14;
+  --bg-main: #0d0d10;
   --bg-surface: #0f1623;
-  --bg-card: #141d2e;
+  --bg-card: #16161c;
   --bg-card-hover: #192235;
   --border: #1e2d45;
   --border-bright: #2a3f60;
   --accent: #4f8ef7;
   --accent-dim: #3a6fd4;
   --accent-glow: rgba(79, 142, 247, 0.15);
-  --accent2: #8b5cf6;
-  --accent2-glow: rgba(139, 92, 246, 0.15);
+  --accent2: #9b87f5;
+  --accent2-glow: rgba(155, 135, 245, 0.15);
   --text-primary: #e8edf5;
   --text-secondary: #7a8fa8;
   --text-muted: #4a5f7a;
@@ -27,7 +27,7 @@
 }
 
 @theme inline {
-  --color-background: var(--bg-base);
+  --color-background: var(--bg-main);
   --color-foreground: var(--text-primary);
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
 }
@@ -43,25 +43,38 @@ html {
   scroll-behavior: smooth;
 }
 
+@keyframes drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-2%, 3%) scale(1.05); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
 body {
-  background: var(--bg-base);
+  background: var(--bg-main);
   color: var(--text-primary);
   font-family: var(--font-sans);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  /* Subtle grid background */
-  background-image:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79, 142, 247, 0.12) 0%, transparent 60%),
-    linear-gradient(rgba(30, 45, 69, 0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(30, 45, 69, 0.3) 1px, transparent 1px);
-  background-size: 100% 100%, 48px 48px, 48px 48px;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  background: radial-gradient(circle at 50% 50%, rgba(79, 142, 247, 0.05) 0%, rgba(155, 135, 245, 0.03) 30%, transparent 70%);
+  animation: drift 20s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* ─── Scrollbar ───────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-surface); }
-::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 4px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-main); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 6px; border: 2px solid var(--bg-main); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ─── Prose (Markdown) ────────────────────────────────────────── */
@@ -132,5 +145,28 @@ body {
   0%   { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
+@keyframes pulse-border {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
 
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+.running-border {
+  position: relative;
+}
+
+.running-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: pulse-border 2s infinite ease-in-out;
+  pointer-events: none;
+}

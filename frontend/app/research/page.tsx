@@ -304,7 +304,7 @@ export default function ResearchPage() {
       </AnimatePresence>
 
       {/* Agent timeline */}
-      <AgentTimeline steps={steps} statusMessage={statusMessage} />
+      <AgentTimeline steps={steps} statusMessage={statusMessage} isRunning={isRunning} />
 
       {/* Report */}
       <AnimatePresence>

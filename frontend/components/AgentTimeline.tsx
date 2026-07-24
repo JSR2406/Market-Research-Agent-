@@ -7,8 +7,8 @@ const AGENT_CONFIG: Record<string, { label: string; color: string; bg: string; g
   research_agent:    { label: "Research",    color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  glow: "rgba(96,165,250,0.2)" },
   analyst_agent:     { label: "Analyst",     color: "#a78bfa", bg: "rgba(167,139,250,0.12)", glow: "rgba(167,139,250,0.2)" },
   opportunity_agent: { label: "Opportunity", color: "#fb923c", bg: "rgba(251,146,60,0.12)",  glow: "rgba(251,146,60,0.2)" },
-  writer_agent:      { label: "Writer",      color: "#34d399", bg: "rgba(52,211,153,0.12)",  glow: "rgba(52,211,153,0.2)" },
-  editor_agent:      { label: "Editor",      color: "#f472b6", bg: "rgba(244,114,182,0.12)", glow: "rgba(244,114,182,0.2)" },
+  writer_agent:      { label: "Writer",      color: "#2dd4bf", bg: "rgba(45,212,191,0.12)",  glow: "rgba(45,212,191,0.2)" },
+  editor_agent:      { label: "Editor",      color: "#f97316", bg: "rgba(249,115,22,0.12)",  glow: "rgba(249,115,22,0.2)" },
 };
 
 type Step = {
@@ -21,6 +21,7 @@ type Step = {
 interface Props {
   steps: Step[];
   statusMessage?: string;
+  isRunning?: boolean;
 }
 
 function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
@@ -31,15 +32,14 @@ function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: i * 0.06, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ delay: i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className={s.status === "running" ? "running-border" : ""}
       style={{
         background: "var(--bg-card)",
-        border: `1px solid ${s.status === "running" ? (cfg?.color ?? "var(--accent)") : "var(--border)"}`,
+        border: `1px solid ${s.status === "running" ? "transparent" : "var(--border)"}`,
         borderRadius: "var(--radius-md)",
         overflow: "hidden",
-        boxShadow: s.status === "running"
-          ? `0 0 20px ${cfg?.glow ?? "var(--accent-glow)"}`
-          : "0 2px 12px rgba(0,0,0,0.3)",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
         transition: "border-color 0.3s, box-shadow 0.3s",
       }}
     >
@@ -71,7 +71,13 @@ function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
         {/* Status icon */}
         <div style={{ flexShrink: 0 }}>
           {s.status === "done" ? (
-            <CheckCircle2 size={18} color={cfg?.color ?? "var(--success)"} />
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 15 }}
+            >
+              <CheckCircle2 size={18} color={cfg?.color ?? "var(--success)"} />
+            </motion.div>
           ) : s.status === "running" ? (
             <Loader2 size={18} color={cfg?.color ?? "var(--accent)"} className="animate-spin" style={{ animation: "spin 1s linear infinite" }} />
           ) : (
@@ -159,8 +165,8 @@ function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
   );
 }
 
-export default function AgentTimeline({ steps, statusMessage }: Props) {
-  if (steps.length === 0 && !statusMessage) return null;
+export default function AgentTimeline({ steps, statusMessage, isRunning }: Props) {
+  if (steps.length === 0 && !statusMessage && !isRunning) return null;
 
   const doneCount = steps.filter((s) => s.status === "done").length;
   const progress = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0;
@@ -207,7 +213,7 @@ export default function AgentTimeline({ steps, statusMessage }: Props) {
       )}
 
       {/* Status-only message (before plan arrives) */}
-      {steps.length === 0 && statusMessage && (
+      {steps.length === 0 && statusMessage && !isRunning && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -228,6 +234,44 @@ export default function AgentTimeline({ steps, statusMessage }: Props) {
           />
           <span style={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}>{statusMessage}</span>
         </motion.div>
+      )}
+
+      {/* Loading Skeletons */}
+      {isRunning && steps.length === 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+          {[0, 1, 2, 3].map((i) => (
+            <motion.div
+              key={`skeleton-${i}`}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                height: "56px",
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                overflow: "hidden",
+                position: "relative"
+              }}
+            >
+              <div 
+                style={{
+                  position: "absolute",
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent)",
+                  backgroundSize: "200% 100%",
+                  animation: "shimmer 1.5s infinite linear"
+                }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", height: "100%", padding: "0 16px" }}>
+                <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "var(--border)", flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ height: "10px", width: i === 0 ? "40%" : i === 1 ? "60%" : i === 2 ? "50%" : "30%", background: "var(--border)", borderRadius: "4px" }} />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       )}
 
       {/* Step cards */}

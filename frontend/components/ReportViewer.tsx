@@ -2,7 +2,8 @@
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Download, FileText, BookOpen, Share2 } from "lucide-react";
+import { Download, FileText, BookOpen, Share2, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
 
 interface Props {
   report: string;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function ReportViewer({ report, topic }: Props) {
+  const [copied, setCopied] = useState(false);
   const download = () => {
     const blob = new Blob([report], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
@@ -23,6 +25,8 @@ export default function ReportViewer({ report, topic }: Props) {
   const copyMarkdown = async () => {
     try {
       await navigator.clipboard.writeText(report);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       /* ignore */
     }
@@ -32,7 +36,7 @@ export default function ReportViewer({ report, topic }: Props) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 32 }}
+      initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       style={{
@@ -111,7 +115,14 @@ export default function ReportViewer({ report, topic }: Props) {
               e.currentTarget.style.color = "var(--text-secondary)";
             }}
           >
-            <Share2 size={12} /> Copy
+            {copied ? (
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                <CheckCircle2 size={12} color="var(--success)" />
+              </motion.div>
+            ) : (
+              <Share2 size={12} />
+            )}
+            {copied ? "Copied!" : "Copy"}
           </button>
           <button
             onClick={download}

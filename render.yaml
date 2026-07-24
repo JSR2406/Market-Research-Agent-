@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: market-research-agent-backend
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false          # you will paste this in Render dashboard
+      - key: ALLOWED_ORIGINS
+        sync: false          # paste your Vercel URL here e.g. https://market-research-agent-jsr2406.vercel.app
+      - key: MODEL
+        value: google/gemini-2.5-flash:free
+      - key: OPENROUTER_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: PYTHON_VERSION
+        value: "3.11.0"

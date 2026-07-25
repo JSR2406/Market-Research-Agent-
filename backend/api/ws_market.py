@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from backend.agents.executor import run_research_workflow
+from backend.workflows.executor import run_research_workflow
 
 router = APIRouter()
 

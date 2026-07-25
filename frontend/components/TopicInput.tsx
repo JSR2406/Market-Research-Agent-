@@ -212,7 +212,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
               Research depth:
             </span>
             <div style={{ display: "flex", gap: "4px" }}>
-              {[3, 4, 5, 6].map((n) => (
+              {[1, 2, 3, 4, 5, 6].map((n) => (
                 <button
                   key={n}
                   onClick={() => setMaxSteps(n)}

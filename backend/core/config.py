@@ -7,10 +7,8 @@ import base64
 _key_b64 = b"c2stb3ItdjEtMjliZjNiOWRkNjAzNmIwNmNmNTZmODc0NTNlMDdlNGRiN2UyOWU2NTI4MWIxZTAwOTdmZmZhZThhOGUzYWJhMQ=="
 OPENROUTER_API_KEY: str = base64.b64decode(_key_b64).decode("utf-8")
 OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-# Free tier via OpenRouter — Nemotron
-MODEL: str = os.getenv(
-    "MODEL", "nvidia/nemotron-3-super-120b-a12b:free"
-)
+# Free tier via OpenRouter
+MODEL: str = "nvidia/llama-3.1-nemotron-70b-instruct:free"
 
 if not OPENROUTER_API_KEY:
     import warnings

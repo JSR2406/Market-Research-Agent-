@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Download, FileText, BookOpen, Share2, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
-
+import Mermaid from "./Mermaid";
 interface Props {
   report: string;
   topic: string;
@@ -178,6 +178,18 @@ export default function ReportViewer({ report, topic }: Props) {
                   <table {...props} style={{ width: "100%", minWidth: "max-content" }} />
                 </div>
               ),
+              code: ({node, className, children, ...props}) => {
+                const match = /language-(\w+)/.exec(className || "");
+                const isMermaid = match && match[1] === "mermaid";
+                if (isMermaid) {
+                  return <Mermaid chart={String(children).replace(/\n$/, "")} />;
+                }
+                return (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                );
+              }
             }}
           >
             {report}

@@ -16,7 +16,9 @@ async def writer_agent(task: str) -> str:
                 "   ## Key Trends\n"
                 "   ## AI/ML Opportunities\n"
                 "   ## Strategic Recommendations\n"
-                "Use tables, bullet points, and headers throughout the report to make it highly readable."
+                "Use tables, bullet points, and headers throughout the report to make it highly readable.\n"
+                "CRITICAL: You MUST include Statistical Inference and Data Visualization using Mermaid.js syntax. "
+                "Embed at least two data visualizations (e.g., Pie chart for Market Share, Bar/XY chart for Market Growth/Trends) using standard Markdown code blocks with the 'mermaid' language (e.g., ```mermaid\npie title Market Share\n\"Company A\" : 40\n```)."
             )
         },
         {"role": "user", "content": task}

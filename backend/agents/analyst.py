@@ -12,6 +12,7 @@ async def analyst_agent(task: str) -> str:
                 "2. 📈 Market Sizing & Growth: Provide calculated/deduced TAM, SAM, SOM estimates and CAGR.\n"
                 "3. 🎯 Customer Segments: Detail the primary users and their core pain points.\n"
                 "4. ⚔️ SWOT Analysis: Strengths, Weaknesses, Opportunities, Threats in a structured format.\n"
+                "5. 📊 Statistical Data Points: Provide explicit numerical distributions (e.g., % market share of top competitors, year-over-year market size data) that can be easily converted into charts.\n"
                 "Use tables and bullet points where appropriate."
             )
         },

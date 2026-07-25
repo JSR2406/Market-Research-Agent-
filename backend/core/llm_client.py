@@ -17,6 +17,7 @@ async def call_llm(
         "model": MODEL,
         "messages": messages,
         "temperature": temperature,
+        "max_tokens": 2048,
     }
     print(f"Calling LLM: {OPENROUTER_BASE_URL}/chat/completions")
     async with httpx.AsyncClient(timeout=120.0) as client:

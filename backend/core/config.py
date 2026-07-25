@@ -7,9 +7,9 @@ OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL: str = os.getenv(
     "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
 )
-# Free tier via OpenRouter — Gemini 2.5 Flash
+# Free tier via OpenRouter — Nemotron
 MODEL: str = os.getenv(
-    "MODEL", "google/gemini-2.5-flash:free"
+    "MODEL", "nvidia/nemotron-3-super-120b-a12b:free"
 )
 
 if not OPENROUTER_API_KEY:

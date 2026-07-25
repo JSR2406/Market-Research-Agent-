@@ -13,11 +13,11 @@ interface Props {
 export default function ReportViewer({ report, topic }: Props) {
   const [copied, setCopied] = useState(false);
   const download = () => {
-    const blob = new Blob([report], { type: "text/markdown" });
+    const blob = new Blob([report], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${topic.slice(0, 50).replace(/\s+/g, "-").toLowerCase()}-report.md`;
+    a.download = `${topic.slice(0, 50).replace(/\s+/g, "-").toLowerCase()}-report.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -142,7 +142,7 @@ export default function ReportViewer({ report, topic }: Props) {
               fontFamily: "inherit",
             }}
           >
-            <Download size={12} /> Download .md
+            <Download size={12} /> Download .txt
           </button>
         </div>
       </div>
@@ -170,7 +170,18 @@ export default function ReportViewer({ report, topic }: Props) {
       {/* Markdown body */}
       <div style={{ padding: "20px 28px 32px" }}>
         <div className="prose">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{report}</ReactMarkdown>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={{
+              table: ({node, ...props}) => (
+                <div style={{ overflowX: "auto", width: "100%", margin: "1rem 0" }}>
+                  <table {...props} style={{ width: "100%", minWidth: "max-content" }} />
+                </div>
+              ),
+            }}
+          >
+            {report}
+          </ReactMarkdown>
         </div>
       </div>
     </motion.div>

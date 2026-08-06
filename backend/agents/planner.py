@@ -51,21 +51,19 @@ async def planner_agent(topic: str) -> List[str]:
         {
             "role": "system",
             "content": (
-                "You are a market research planning specialist. "
-                "Return ONLY a valid Python list of exactly 5 strings. "
-                "No explanation, no markdown, no preamble — just the raw Python list."
+                "Market research planner. "
+                "Output ONLY a raw Python list of exactly 5 short step strings. "
+                "No explanation, no markdown."
             ),
         },
         {
             "role": "user",
             "content": (
-                f'Create a 5-step market research plan for: "{topic}"\n\n'
-                "Each step should cover one of: industry overview, customer segments, "
-                "competitive landscape, AI/ML opportunities, final report synthesis.\n\n"
-                'Example format:\n["Step one description", "Step two description", '
-                '"Step three description", "Step four description", "Step five description"]'
+                f'5-step research plan for: "{topic}". '
+                "Cover: industry overview, customer segments, competitive landscape, "
+                'AI/ML opportunities, report synthesis. Format: ["step1","step2","step3","step4","step5"]'
             ),
         },
     ]
-    content = await call_llm(messages, temperature=0.8)
+    content = await call_llm(messages, temperature=0.7, max_tokens=300)
     return _parse_plan(content)

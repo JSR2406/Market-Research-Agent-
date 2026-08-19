@@ -12,7 +12,7 @@ app = FastAPI(title="Market Research Agent")
 #   ALLOWED_ORIGINS=https://market-research-agent-jsr2406.vercel.app
 _raw = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:3001",
+    "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005",
 )
 ALLOWED_ORIGINS: list[str] = [o.strip() for o in _raw.split(",") if o.strip()]
 

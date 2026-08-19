@@ -96,6 +96,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
         {/* Topic textarea */}
         <div style={{ position: "relative", marginBottom: "16px" }}>
           <textarea
+            suppressHydrationWarning
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => {

@@ -38,6 +38,11 @@ export default function ResearchPage() {
   const [currentTopic, setCurrentTopic] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleMessage = useCallback((data: Record<string, unknown>) => {
     setErrorMessage("");
@@ -186,11 +191,11 @@ export default function ResearchPage() {
       if (wsRef.current?.readyState !== WebSocket.OPEN) {
         setStatusMessage("");
         setErrorMessage(
-          "Could not connect to the backend. Is the server running? Check that NEXT_PUBLIC_WS_URL is set correctly."
+          "Could not connect to the backend. Make sure the backend server is running on port 8000 (run: uvicorn backend.main:app --reload)."
         );
         setIsRunning(false);
       }
-    }, 5000);
+    }, 8000);
   };
 
   const handleCancel = () => {
@@ -204,8 +209,13 @@ export default function ResearchPage() {
 
   useEffect(() => () => { wsRef.current?.close(); }, []);
 
+  if (!mounted) {
+    return <div style={{ minHeight: "100vh" }} suppressHydrationWarning />;
+  }
+
   return (
     <main
+      suppressHydrationWarning
       style={{
         minHeight: "100vh",
         padding: "48px 20px",

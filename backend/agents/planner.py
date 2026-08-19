@@ -65,5 +65,16 @@ async def planner_agent(topic: str) -> List[str]:
             ),
         },
     ]
-    content = await call_llm(messages, temperature=0.7, max_tokens=300)
-    return _parse_plan(content)
+    try:
+        content = await call_llm(messages, temperature=0.7, max_tokens=300)
+        return _parse_plan(content)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Planner LLM failed: {e}")
+        return [
+            f"Analyze industry overview and market metrics for {topic}",
+            f"Identify target customer segments and pain points for {topic}",
+            f"Map the competitive landscape and key players for {topic}",
+            f"Evaluate AI/ML opportunities and trends for {topic}",
+            f"Synthesize findings into a final strategic report for {topic}"
+        ]

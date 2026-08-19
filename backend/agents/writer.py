@@ -8,18 +8,18 @@ async def writer_agent(task: str) -> str:
         {
             "role": "system",
             "content": (
-                "Market research report writer. Write a concise Markdown report with these sections: "
-                "# Executive Summary | ## Market Overview | ## Customer Segments | "
-                "## Competitive Landscape | ## Key Trends | ## AI/ML Opportunities | ## Strategic Recommendations. "
-                "Include one mermaid pie chart (market share) and one mermaid xychart-beta (growth trend). "
-                "Use bullet points and tables. Be direct."
+                "Market research report writer. Write a highly concise Markdown report: "
+                "# Exec Summary | ## Market Overview | ## Customers | "
+                "## Competitors | ## AI Opportunities. "
+                "Include one mermaid chart if possible. "
+                "Use bullet points. STRICTLY to the point, NO exaggeration, maximum brevity."
             )
         },
         {"role": "user", "content": task}
     ]
     
     try:
-        return await call_llm(messages, temperature=0.9, max_tokens=750)
+        return await call_llm(messages, temperature=0.4, max_tokens=500)
     except Exception as e:
         logger.error(f"Writer agent LLM failed: {e}")
         # Fallback to just structuring the input data into a simple report

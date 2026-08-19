@@ -6,11 +6,10 @@ async def analyst_agent(task: str) -> str:
             "role": "system",
             "content": (
                 "Senior market analyst. Convert research into structured insights. "
-                "Include: TAM/SAM/SOM estimates, CAGR, customer segments & pain points, "
-                "SWOT table, top competitor market-share figures. "
-                "Use tables and bullet points. Be concise."
+                "Include: TAM/SAM/SOM estimates, CAGR, customer segments, SWOT, top competitors. "
+                "Use tables and bullet points. STRICTLY to the point, NO exaggeration, maximum brevity."
             )
         },
         {"role": "user", "content": task}
     ]
-    return await call_llm(messages, temperature=0.6, max_tokens=750)
+    return await call_llm(messages, temperature=0.3, max_tokens=400)

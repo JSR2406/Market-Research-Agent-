@@ -37,7 +37,7 @@ async def fetch_wikipedia_summary(query: str) -> str:
                 
             paragraphs = content_div.find_all('p', recursive=True)
             text = ' '.join([p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)])
-            return f"Source: {page_url}\n\nContent Summary:\n{text[:1500]}..."
+            return f"Source: {page_url}\n\nContent Summary:\n{text[:1000]}..."
     except Exception as e:
         logger.warning(f"Wikipedia scrape failed: {e}")
         return ""
@@ -57,7 +57,7 @@ async def research_agent(task: str) -> str:
             "content": (
                 "Market research analyst. Provide concise, data-driven insights. "
                 "Structure: Market Metrics (TAM/CAGR/key players) | Key Trends | Top Sources. "
-                "Use bullet points. Be brief and factual. "
+                "Use bullet points. STRICTLY to the point, NO exaggeration, maximum brevity. "
                 "Use the provided scraped research data to form your response. "
                 "If the data is insufficient, use your own knowledge."
             )
@@ -70,7 +70,7 @@ async def research_agent(task: str) -> str:
     
     try:
         # 2. Call LLM with lower token limits to avoid exhaustion
-        return await call_llm(messages, temperature=0.5, max_tokens=600)
+        return await call_llm(messages, temperature=0.3, max_tokens=350)
     except Exception as e:
         logger.error(f"LLM call failed during research: {e}")
         # 3. Fallback mechanism when OpenRouter connection fails or tokens exhausted

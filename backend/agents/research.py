@@ -1,86 +1,51 @@
-import asyncio
+import json
 import logging
-import urllib.parse
-import httpx
-from bs4 import BeautifulSoup
+import os
 from datetime import datetime
+from typing import Optional
+
 from backend.core.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
-async def fetch_wikipedia_summary(query: str) -> str:
-    """Uses BeautifulSoup to search and scrape Wikipedia for the topic"""
+def load_schemes_data() -> str:
+    """Load Indian MSME scheme data from local JSON."""
+    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "schemes.json")
     try:
-        url = f"https://en.wikipedia.org/w/index.php?search={urllib.parse.quote(query)}&title=Special%3ASearch&profile=advanced&fulltext=1"
-        headers = {"User-Agent": "Mozilla/5.0 MarketResearchAgent/1.0"}
-        
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
-            resp = await client.get(url, headers=headers)
-            soup = BeautifulSoup(resp.text, 'lxml')
-            
-            # Find first search result
-            results = soup.find_all('div', class_='mw-search-result-heading')
-            if not results:
-                return ""
-            
-            first_link = results[0].find('a')['href']
-            page_url = f"https://en.wikipedia.org{first_link}"
-            
-            # Scrape page
-            page_resp = await client.get(page_url, headers=headers)
-            page_soup = BeautifulSoup(page_resp.text, 'lxml')
-            
-            # Extract main paragraphs
-            content_div = page_soup.find('div', id='mw-content-text')
-            if not content_div:
-                return ""
-                
-            paragraphs = content_div.find_all('p', recursive=True)
-            text = ' '.join([p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)])
-            return f"Source: {page_url}\n\nContent Summary:\n{text[:1000]}..."
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return json.dumps(data, indent=2)
     except Exception as e:
-        logger.warning(f"Wikipedia scrape failed: {e}")
-        return ""
+        logger.error(f"Failed to load schemes.json: {e}")
+        return "[]"
 
-async def research_agent(task: str) -> str:
+async def research_agent(task: str, agent_hint: Optional[str] = "research") -> str:
     today = datetime.now().strftime("%B %d, %Y")
-    
-    # 1. Scrape data to avoid relying purely on LLM knowledge
-    scraped_data = await fetch_wikipedia_summary(task)
-    
-    if not scraped_data:
-        scraped_data = "No external data could be retrieved. Rely on internal knowledge."
+
+    schemes_data = load_schemes_data()
 
     messages = [
         {
             "role": "system",
             "content": (
-                "Market research analyst. Provide concise, data-driven insights. "
-                "Structure: Market Metrics (TAM/CAGR/key players) | Key Trends | Top Sources. "
-                "Use bullet points. STRICTLY to the point, NO exaggeration, maximum brevity. "
-                "Use the provided scraped research data to form your response. "
-                "If the data is insufficient, use your own knowledge."
-            )
+                "Financial research analyst. Read the provided MSME schemes data and filter "
+                "facts relevant to the entrepreneur's profile described in the task. "
+                "Structure: Business Profile | Relevant Schemes | Key Eligibility Facts. "
+                "Use bullet points. STRICTLY to the point, NO exaggeration, maximum brevity."
+            ),
         },
         {
             "role": "user",
-            "content": f"Date: {today}.\nTask: {task}\n\nScraped Research Data:\n{scraped_data}"
-        }
+            "content": f"Date: {today}.\nTask: {task}\n\nAvailable Schemes Data:\n{schemes_data}",
+        },
     ]
-    
+
     try:
-        # 2. Call LLM with lower token limits to avoid exhaustion
-        return await call_llm(messages, temperature=0.3, max_tokens=350)
+        return await call_llm(messages, temperature=0.3, max_tokens=400, agent_hint=agent_hint)
     except Exception as e:
         logger.error(f"LLM call failed during research: {e}")
-        # 3. Fallback mechanism when OpenRouter connection fails or tokens exhausted
         fallback = (
-            "### Market Research (Fallback Mode)\n\n"
-            "*Note: AI synthesis failed due to API connection issues. Displaying raw scraped data instead.*\n\n"
+            "### Financial Research (Fallback Mode)\n\n"
+            "*Note: AI synthesis failed due to API connection issues.*\n\n"
         )
-        if "No external data" not in scraped_data:
-            fallback += scraped_data
-        else:
-            fallback += "Failed to retrieve both AI insights and external scraped data."
-            
-        return fallback
+        return fallback + schemes_data

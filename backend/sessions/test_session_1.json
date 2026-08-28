@@ -1,0 +1,29 @@
+{
+  "session_id": "test_session_1",
+  "topic": "tailor",
+  "state": {
+    "plan": [
+      "Gather data on product/service and business model for tailor",
+      "Analyze daily/monthly income metrics for tailor"
+    ],
+    "history": [
+      [
+        "Gather data on product/service and business model for tailor",
+        "research_agent",
+        "### Financial Research (Fallback Mode)\n\n*Note: AI synthesis failed due to API connection issues.*\n\n[\n  {\n    \"scheme_name\": \"CGTMSE (Credit Guarantee Fund Trust for Micro and Small Enterprises)\",\n    \"target_segment\": \"MSEs (Micro and Small Enterprises) without collateral\",\n    \"loan_ceiling\": \"\\u20b9500 lakh (\\u20b95 Crore)\",\n    \"collateral_requirement\": \"None (Collateral-free)\",\n    \"nodal_agency\": \"Ministry of MSME & SIDBI\",\n    \"one_line_eligibility\": \"Both existing and new MSEs are eligible; requires formal business registration (Udyam).\"\n  },\n  {\n    \"scheme_name\": \"MUDRA (Micro Units Development & Refinance Agency Ltd.) - Shishu\",\n    \"target_segment\": \"Start-ups and first-time micro-entrepreneurs\",\n    \"loan_ceiling\": \"\\u20b950,000\",\n    \"collateral_requirement\": \"None (Collateral-free)\",\n    \"nodal_agency\": \"Banks, NBFCs, MFIs\",\n    \"one_line_eligibility\": \"Any individual, including women, proprietary concern, partnership firm, private limited company or any other entity are eligible.\"\n  },\n  {\n    \"scheme_name\": \"MUDRA - Kishore\",\n    \"target_segment\": \"Entrepreneurs who have started a business and want to expand\",\n    \"loan_ceiling\": \"\\u20b95,00,000\",\n    \"collateral_requirement\": \"None (Collateral-free)\",\n    \"nodal_agency\": \"Banks, NBFCs, MFIs\",\n    \"one_line_eligibility\": \"Suitable for existing micro units seeking expansion funding.\"\n  },\n  {\n    \"scheme_name\": \"PMEGP (Prime Minister's Employment Generation Programme)\",\n    \"target_segment\": \"New micro enterprises in non-farm sector (manufacturing/services)\",\n    \"loan_ceiling\": \"\\u20b950 Lakh (Manufacturing) / \\u20b920 Lakh (Services)\",\n    \"collateral_requirement\": \"None for loans up to \\u20b910 lakh (under CGTMSE)\",\n    \"nodal_agency\": \"KVIC (Khadi and Village Industries Commission)\",\n    \"one_line_eligibility\": \"Any individual above 18 years of age setting up a new project/micro enterprise; at least VIII standard pass for projects above \\u20b910 lakh (Mfg) / \\u20b95 lakh (Service).\"\n  },\n  {\n    \"scheme_name\": \"PM SVANidhi\",\n    \"target_segment\": \"Street vendors (informal micro-entrepreneurs)\",\n    \"loan_ceiling\": \"\\u20b910,000 (first tranche)\",\n    \"collateral_requirement\": \"None (Collateral-free)\",\n    \"nodal_agency\": \"Ministry of Housing and Urban Affairs & SIDBI\",\n    \"one_line_eligibility\": \"Street vendors vending in urban areas, formal registration (Udyam) not strictly required but ULB certificate needed.\"\n  }\n]"
+      ],
+      [
+        "Analyze daily/monthly income metrics for tailor",
+        "analyst_agent",
+        "⚠️ Error in analyst_agent: OpenRouter 400 on google/gemini-2.0-flash-lite-preview-02-05:free: {\"error\":{\"message\":\"google/gemini-2.0-flash-lite-preview-02-05:free is not a valid model ID\",\"code\":400},\"user_id\":\"user_3CDSQkTbHmxbVcW77s6YeAFusIz\"}"
+      ]
+    ],
+    "final_report": "{\"business_summary\": \"AI generation encountered a connection or token limit error.\", \"cash_flow_snapshot\": {}, \"matched_schemes\": [], \"documents_needed\": [], \"next_step\": \"Try running the query again when API limits reset.\"}",
+    "token_usage": {
+      "input": 2587,
+      "output": 0,
+      "total": 0
+    }
+  },
+  "updated_at": 1787849356.6635277
+}

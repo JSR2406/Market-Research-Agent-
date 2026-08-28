@@ -1,8 +1,9 @@
 import ast
 import json
 import re
-from typing import List
+from typing import List, Optional
 from backend.core.llm_client import call_llm
+
 
 def _parse_plan(content: str) -> List[str]:
     """Robustly extract a list of strings from LLM output."""
@@ -36,7 +37,7 @@ def _parse_plan(content: str) -> List[str]:
 
     # Last resort: split numbered lines
     lines = [
-        re.sub(r"^\d+[\.\)]\s*", "", line).strip()
+        re.sub(r"^\d+[\.)] \s*", "", line).strip()
         for line in content.splitlines()
         if line.strip() and re.match(r"^\d", line.strip())
     ]
@@ -46,12 +47,27 @@ def _parse_plan(content: str) -> List[str]:
     raise ValueError(f"Could not parse plan from LLM output: {content[:300]}")
 
 
-async def planner_agent(topic: str) -> List[str]:
+async def planner_agent(
+    topic: str,
+    previous_context: str = "",
+    agent_hint: Optional[str] = "planner",
+) -> List[str]:
+    """
+    Plan a 5-step research workflow for the given topic.
+    previous_context: optional summary of a prior session (Phase 2 hook).
+    """
+    context_note = ""
+    if previous_context:
+        context_note = (
+            f"\n\nPrevious research context (for continuity, do not repeat — build on it):\n"
+            f"{previous_context[:800]}"
+        )
+
     messages = [
         {
             "role": "system",
             "content": (
-                "Market research planner. "
+                "Financial advisory planner. "
                 "Output ONLY a raw Python list of exactly 5 short step strings. "
                 "No explanation, no markdown."
             ),
@@ -59,22 +75,25 @@ async def planner_agent(topic: str) -> List[str]:
         {
             "role": "user",
             "content": (
-                f'5-step research plan for: "{topic}". '
-                "Cover: industry overview, customer segments, competitive landscape, "
-                'AI/ML opportunities, report synthesis. Format: ["step1","step2","step3","step4","step5"]'
+                f'Plan the financial advisory steps needed for a rural micro-entrepreneur based on their described business: "{topic}". '
+                "Cover: product/service, daily/monthly rough income, location type, whether they have any formal registration, report synthesis. "
+                f'Format: ["step1","step2","step3","step4","step5"]'
+                f"{context_note}"
             ),
         },
     ]
     try:
-        content = await call_llm(messages, temperature=0.7, max_tokens=300)
+        content = await call_llm(
+            messages, temperature=0.7, max_tokens=300, agent_hint=agent_hint
+        )
         return _parse_plan(content)
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"Planner LLM failed: {e}")
         return [
-            f"Analyze industry overview and market metrics for {topic}",
-            f"Identify target customer segments and pain points for {topic}",
-            f"Map the competitive landscape and key players for {topic}",
-            f"Evaluate AI/ML opportunities and trends for {topic}",
-            f"Synthesize findings into a final strategic report for {topic}"
+            f"Gather data on product/service and business model for {topic}",
+            f"Analyze daily/monthly income metrics for {topic}",
+            f"Research location type and operational scale for {topic}",
+            f"Recommend schemes based on formal registration status and credit readiness for {topic}",
+            f"Synthesize findings into a final loan readiness report for {topic}",
         ]

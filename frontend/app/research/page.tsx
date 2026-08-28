@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import TopicInput from "@/components/TopicInput";
 import AgentTimeline from "@/components/AgentTimeline";
-import ReportViewer from "@/components/ReportViewer";
+import AdvisoryCard from "@/components/AdvisoryCard";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, MessageCircle } from "lucide-react";
 
 // Use wss:// in production (HTTPS pages block ws://)
 const rawWsUrl =
@@ -241,7 +241,7 @@ export default function ResearchPage() {
             marginBottom: "10px",
           }}
         >
-          Powered by Gemini 2.5 Flash via OpenRouter
+          Loan Readiness Advisory for Micro-Entrepreneurs
         </h2>
         <p
           style={{
@@ -256,19 +256,18 @@ export default function ResearchPage() {
             WebkitTextFillColor: "transparent",
           }}
         >
-          AI Market Intelligence
+          GrameenAI Advisor
         </p>
         <p
           style={{
             marginTop: "8px",
             fontSize: "0.92rem",
             color: "var(--text-muted)",
-            maxWidth: "480px",
+            maxWidth: "520px",
             margin: "8px auto 0",
           }}
         >
-          Multi-agent research pipeline that generates comprehensive market
-          reports in minutes.
+          Describe your business in plain language — get a structured Loan Readiness Advisory, matched government schemes, and a document checklist in under 60 seconds.
         </p>
       </motion.div>
 
@@ -319,9 +318,39 @@ export default function ResearchPage() {
       {/* Report */}
       <AnimatePresence>
         {finalReport && (
-          <ReportViewer report={finalReport} topic={currentTopic} />
+          <AdvisoryCard report={finalReport} topic={currentTopic} />
         )}
       </AnimatePresence>
+
+      {/* WhatsApp Roadmap — voice input/output is now live; WhatsApp channel is next */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{
+          marginTop: "48px",
+          marginBottom: "80px",
+          width: "100%",
+          maxWidth: "760px",
+          padding: "20px 24px",
+          background: "rgba(37,211,102,0.04)",
+          border: "1px dashed rgba(37,211,102,0.3)",
+          borderRadius: "var(--radius-xl)",
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+        }}
+      >
+        <div style={{ width: "44px", height: "44px", borderRadius: "22px", background: "linear-gradient(135deg, #25D366, #128C7E)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 12px rgba(37,211,102,0.2)" }}>
+          <MessageCircle size={22} color="#fff" />
+        </div>
+        <div>
+          <div style={{ display: "inline-block", background: "rgba(37,211,102,0.15)", color: "#25D366", padding: "2px 8px", borderRadius: "10px", fontSize: "0.68rem", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase" }}>
+            Coming Next (Roadmap)
+          </div>
+          <p style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-primary)" }}>WhatsApp Advisory Bot</p>
+          <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Deliver the same advisory via WhatsApp in Hindi, Marathi &amp; Gujarati — no app install needed.</p>
+        </div>
+      </motion.div>
     </main>
   );
 }

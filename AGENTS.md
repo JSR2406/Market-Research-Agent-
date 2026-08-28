@@ -55,3 +55,8 @@ plan, step_start, step_end, done, cancelled, error, status
 - Use lucide-react for all icons
 - WebSocket connects to ws://localhost:8000/ws/market
 - Use Windows PowerShell compatible commands only
+
+## Data Retention & Privacy
+- **Storage:** Research sessions are stored locally as JSON files in `backend/sessions/`.
+- **Privacy:** Each session is isolated by `session_id`. Users can export their full session data or permanently delete their session using the `export_session` and `delete_session` WebSocket commands (GDPR right-to-delete).
+- **Retention:** By default, sessions older than 7 days are automatically deleted on server startup by the `cleanup_old_sessions` hook in `main.py`.

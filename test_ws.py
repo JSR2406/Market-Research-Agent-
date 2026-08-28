@@ -4,13 +4,13 @@ import json
 import sys
 
 async def test_websocket():
-    uri = "ws://localhost:8000/ws/market"
+    uri = "ws://localhost:8001/ws/market"
     try:
         async with websockets.connect(uri) as websocket:
             request = {
                 "type": "start",
-                "topic": "AI in healthcare",
-                "max_steps": 2
+                "topic": "I sell vegetables, make about ₹400/day",
+                "max_steps": 5
             }
             await websocket.send(json.dumps(request))
             
@@ -23,6 +23,10 @@ async def test_websocket():
                     break
                 elif data['type'] == 'done':
                     print("Workflow completed successfully.")
+                    print("\n--- FINAL REPORT ---\n")
+                    with open("test_output.md", "w", encoding="utf-8") as f:
+                        f.write(data.get('final_report'))
+                    print("Report saved to test_output.md")
                     break
                 elif data['type'] == 'cancelled':
                     print("Workflow cancelled.")

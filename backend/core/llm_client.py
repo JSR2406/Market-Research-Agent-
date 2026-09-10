@@ -1,5 +1,5 @@
 """
-LLM client for OpenRouter.
+LLM client with multi-provider support (Ollama, Hugging Face, OpenRouter).
 
 Phase 1b additions:
   - Request-level in-memory cache (keyed on sha256(messages + candidates + max_tokens))
@@ -8,11 +8,11 @@ Phase 1b additions:
   - SESSION_TOKEN_USAGE accumulates approx token count per WebSocket session
   - reset_session_state() clears cache + counter between runs
 
-Phase 6 addition:
-  - API key rotation: if OPENROUTER_API_KEY_2 is set, every model attempt is tried
-    first with key 1, then with key 2 before giving up on that model.
-    Gives effectively double the free-tier quota without any agent changes.
-    Key rotation is tracked separately from model blacklisting.
+Phase 2 additions:
+  - Multi-provider support: Ollama (local), Hugging Face Inference API, OpenRouter
+  - Provider priority order configurable via LLM_PROVIDER_PRIORITY
+  - Automatic fallback between providers
+  - No token limits when using local Ollama
 """
 import asyncio
 import hashlib
@@ -24,7 +24,21 @@ from typing import Dict, List, Optional
 import httpx
 
 # Module-level so tests can monkey-patch them directly (existing test pattern)
-from backend.core.config import OPENROUTER_API_KEY, OPENROUTER_API_KEY_2, OPENROUTER_BASE_URL, MODEL, FALLBACK_MODELS
+from backend.core.config import (
+    OPENROUTER_API_KEY,
+    OPENROUTER_API_KEY_2,
+    OPENROUTER_BASE_URL,
+    MODEL,
+    FALLBACK_MODELS,
+    OLLAMA_BASE_URL,
+    OLLAMA_MODEL,
+    OLLAMA_FALLBACK_MODELS,
+    HF_API_TOKEN,
+    HF_MODEL,
+    HF_FALLBACK_MODELS,
+    LLM_PROVIDER_PRIORITY,
+    AGENT_TOKEN_BUDGETS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,21 +61,6 @@ _response_cache: Dict[str, str] = {}
 # --------------------------------------------------------------------------- #
 SESSION_TOKEN_USAGE: Dict[str, int] = {"input": 0, "output": 0, "total": 0}
 
-# --------------------------------------------------------------------------- #
-# Per-agent default token budgets                                               #
-# Keeps LLM costs low. Caller can override by passing max_tokens explicitly.  #
-# --------------------------------------------------------------------------- #
-AGENT_TOKEN_BUDGETS: Dict[str, int] = {
-    "planner":     300,   # just a list of strings
-    "research":    400,   # concise bullet synthesis
-    "analyst":     450,   # tables + bullets
-    "opportunity": 350,   # 3-5 ranked items
-    "writer":      600,   # full markdown report
-    "editor":      600,   # polished markdown
-    "decide":      120,   # agent routing JSON (legacy; no longer used)
-    "default":     500,
-}
-
 
 def reset_session_state() -> None:
     """Clear token counter. Call at the start of each WS workflow run. Cache is preserved for rehearsal."""
@@ -83,6 +82,198 @@ def _approx_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Provider-specific implementations
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _call_ollama(
+    messages: List[Dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+    model: str,
+) -> Optional[str]:
+    """Call Ollama local API."""
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": max_tokens,
+                },
+            }
+            response = await client.post(
+                f"{OLLAMA_BASE_URL}/api/chat",
+                json=payload,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                content = data.get("message", {}).get("content")
+                if content:
+                    logger.info(f"[LLM/Ollama] Success via {model}")
+                    return content
+                logger.warning(f"[LLM/Ollama] {model}: empty content")
+            elif response.status_code == 404:
+                err = response.text[:200]
+                if "not found" in err.lower() or "model" in err.lower():
+                    logger.warning(f"[LLM/Ollama] {model} not found locally. Blacklisting.")
+                    _model_blacklist.add(model)
+            else:
+                logger.warning(f"[LLM/Ollama] {model} -> {response.status_code}: {response.text[:200]}")
+    except httpx.ConnectError:
+        logger.warning(f"[LLM/Ollama] Cannot connect to {OLLAMA_BASE_URL}. Is Ollama running?")
+    except httpx.TimeoutException:
+        logger.warning(f"[LLM/Ollama] Timeout calling {model}")
+    except Exception as e:
+        logger.warning(f"[LLM/Ollama] {model} error: {e}")
+    return None
+
+
+async def _call_huggingface(
+    messages: List[Dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+    model: str,
+) -> Optional[str]:
+    """Call Hugging Face Inference API."""
+    try:
+        # Convert messages to HF text-completion format (model-agnostic)
+        prompt = ""
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                prompt += f"SYSTEM: {content}\n\n"
+            elif role == "user":
+                prompt += f"USER: {content}\n\n"
+            elif role == "assistant":
+                prompt += f"ASSISTANT: {content}\n\n"
+        prompt += "ASSISTANT: "
+
+        headers = {"Content-Type": "application/json"}
+        if HF_API_TOKEN:
+            headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
+
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "temperature": temperature,
+                "max_new_tokens": max_tokens,
+                "return_full_text": False,
+            },
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"https://api-inference.huggingface.co/models/{model}",
+                headers=headers,
+                json=payload,
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and data:
+                    content = data[0].get("generated_text", "")
+                    if content:
+                        logger.info(f"[LLM/HF] Success via {model}")
+                        return content.strip()
+                logger.warning(f"[LLM/HF] {model}: unexpected response format: {data}")
+            elif response.status_code == 404:
+                logger.warning(f"[LLM/HF] {model} not found. Blacklisting.")
+                _model_blacklist.add(model)
+            elif response.status_code == 503:
+                # Model loading
+                logger.warning(f"[LLM/HF] {model} is loading, waiting...")
+                await asyncio.sleep(10)
+                # Retry once
+                response = await client.post(
+                    f"https://api-inference.huggingface.co/models/{model}",
+                    headers=headers,
+                    json=payload,
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if isinstance(data, list) and data:
+                        content = data[0].get("generated_text", "")
+                        if content:
+                            logger.info(f"[LLM/HF] Success via {model} (after loading)")
+                            return content.strip()
+            elif response.status_code in (429, 402):
+                logger.warning(f"[LLM/HF] {model} rate limited")
+                _model_blacklist.add(model)
+            else:
+                logger.warning(f"[LLM/HF] {model} -> {response.status_code}: {response.text[:200]}")
+    except Exception as e:
+        logger.warning(f"[LLM/HF] {model} error: {e}")
+    return None
+
+
+async def _call_openrouter(
+    messages: List[Dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+    model: str,
+    api_key: str,
+) -> Optional[str]:
+    """Call OpenRouter API with a specific API key."""
+    try:
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://market-research-agent.app",
+            "X-Title": "Market Research Agent",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+        }
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices", [])
+                if choices:
+                    content = choices[0]["message"].get("content")
+                    if content is not None:
+                        logger.info(f"[LLM/OpenRouter] Success via {model}")
+                        return content
+                    logger.warning(f"[LLM/OpenRouter] {model}: content=None")
+                else:
+                    logger.warning(f"[LLM/OpenRouter] {model}: no choices")
+            elif response.status_code in (429, 402):
+                logger.warning(f"[LLM/OpenRouter] {model} rate limited")
+            elif response.status_code == 404:
+                err_text = response.text[:300]
+                if "No endpoints found" in err_text or "unavailable" in err_text.lower():
+                    logger.warning(f"[LLM/OpenRouter] {model} no endpoints. Blacklisting.")
+                    _model_blacklist.add(model)
+                else:
+                    logger.warning(f"[LLM/OpenRouter] {model} -> 404: {err_text}")
+            else:
+                logger.warning(f"[LLM/OpenRouter] {model} -> {response.status_code}: {response.text[:200]}")
+    except Exception as e:
+        logger.warning(f"[LLM/OpenRouter] {model} error: {e}")
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main entry point
+# ─────────────────────────────────────────────────────────────────────────────
+
 async def call_llm(
     messages: List[Dict[str, str]],
     temperature: float = 0.7,
@@ -90,8 +281,7 @@ async def call_llm(
     agent_hint: Optional[str] = None,
 ) -> str:
     """
-    Call OpenRouter with fallback, request-level caching, session blacklisting,
-    and per-agent token budgeting.
+    Call LLM with multi-provider fallback.
 
     Parameters
     ----------
@@ -105,43 +295,48 @@ async def call_llm(
     if agent_hint and max_tokens == 500:
         max_tokens = AGENT_TOKEN_BUDGETS.get(agent_hint, AGENT_TOKEN_BUDGETS["default"])
 
-    # Hard ceiling to protect free-tier quotas
-    max_tokens = min(max_tokens, 1200)
+    # Cloud providers get a hard ceiling to protect free-tier quotas.
+    # Local providers (Ollama) keep the caller's budget — no arbitrary cap.
+    cloud_max_tokens = min(max_tokens, 1200)
 
-    api_key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
-    api_key_2 = OPENROUTER_API_KEY_2 or os.getenv("OPENROUTER_API_KEY_2", "")
-    base_url = OPENROUTER_BASE_URL or os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    # Build all candidate models across providers
+    all_candidates: List[tuple[str, str]] = []  # (provider, model)
+    seen: set[tuple[str, str]] = set()
 
-    if not api_key:
-        raise ValueError(
-            "OPENROUTER_API_KEY is not configured. Check backend/.env or deployment env vars."
-        )
+    for provider in LLM_PROVIDER_PRIORITY:
+        if provider == "ollama":
+            for m in OLLAMA_FALLBACK_MODELS:
+                if m and (provider, m) not in seen and m not in _model_blacklist:
+                    seen.add((provider, m))
+                    all_candidates.append((provider, m))
+        elif provider == "huggingface":
+            for m in HF_FALLBACK_MODELS:
+                if m and (provider, m) not in seen and m not in _model_blacklist:
+                    seen.add((provider, m))
+                    all_candidates.append((provider, m))
+        elif provider == "openrouter":
+            api_key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
+            api_key_2 = OPENROUTER_API_KEY_2 or os.getenv("OPENROUTER_API_KEY_2", "")
+            if api_key:
+                for m in [MODEL] + list(FALLBACK_MODELS):
+                    if m and (provider, m) not in seen and m not in _model_blacklist:
+                        seen.add((provider, m))
+                        all_candidates.append((provider, m))
+            else:
+                logger.warning("[LLM] OpenRouter in priority but no API key configured")
 
-    # Build deduplicated API key list (key 1 always first; key 2 appended if set)
-    api_keys: List[str] = [api_key]
-    if api_key_2 and api_key_2 != api_key:
-        api_keys.append(api_key_2)
-        logger.debug(f"[LLM] Key rotation active — {len(api_keys)} API keys available.")
-
-    # Build deduplicated candidate list, respecting test-time monkey-patching
-    import backend.core.llm_client as _self
-    candidates: List[str] = []
-    for m in [_self.MODEL] + list(_self.FALLBACK_MODELS):
-        if m and m not in candidates and m not in _model_blacklist:
-            candidates.append(m)
-
-    if not candidates:
+    if not all_candidates:
         raise ValueError(
             f"All candidate models are blacklisted: {_model_blacklist}. "
-            "Restart the server to reset, or update FALLBACK_MODELS in config."
+            "Restart the server to reset, or update model lists in config."
         )
 
     # Cache lookup
-    ck = _cache_key(messages, candidates, max_tokens)
+    candidate_models = [m for _, m in all_candidates]
+    ck = _cache_key(messages, candidate_models, max_tokens)
     if ck in _response_cache:
         logger.info(f"[LLM] Cache HIT (key={ck[:12]}...)")
         return _response_cache[ck]
-
 
     # Approximate input token cost
     input_text = " ".join(m.get("content", "") for m in messages)
@@ -149,132 +344,48 @@ async def call_llm(
 
     last_exception: Optional[Exception] = None
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        for model in candidates:
-            payload = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
+    # Try each provider/model combination
+    for provider, model in all_candidates:
+        content = None
+        # Local providers (Ollama) are not token-capped; cloud are.
+        budget = cloud_max_tokens if provider != "ollama" else max_tokens
 
-            # ── Key rotation loop ────────────────────────────────────────────
-            # For each model, try key1 then key2 before blacklisting the model.
-            # A 429/402 on key1 → immediately retry same model with key2.
-            # A 429/402 on key2 too → blacklist the model and move on.
-            succeeded = False
-            for key_idx, active_key in enumerate(api_keys):
-                if succeeded:
+        if provider == "ollama":
+            content = await _call_ollama(messages, temperature, budget, model)
+        elif provider == "huggingface":
+            content = await _call_huggingface(messages, temperature, budget, model)
+        elif provider == "openrouter":
+            api_key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
+            api_key_2 = OPENROUTER_API_KEY_2 or os.getenv("OPENROUTER_API_KEY_2", "")
+            keys = [api_key]
+            if api_key_2 and api_key_2 != api_key:
+                keys.append(api_key_2)
+
+            for key in keys:
+                content = await _call_openrouter(messages, temperature, budget, model, key)
+                if content:
                     break
-                key_label = f"key{key_idx + 1}"
-                headers = {
-                    "Authorization": f"Bearer {active_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://market-research-agent.app",
-                    "X-Title": "Market Research Agent",
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                    ),
-                }
+                # If rate limited on first key, try second
+                if not content and key == keys[0] and len(keys) > 1:
+                    continue
+                break
 
-                for attempt in range(3):
-                    logger.info(
-                        f"[LLM] model={model} {key_label} attempt={attempt+1} max_tokens={max_tokens}"
-                    )
-                    try:
-                        response = await client.post(
-                            f"{base_url}/chat/completions",
-                            headers=headers,
-                            json=payload,
-                        )
+        if content:
+            out_tokens = _approx_tokens(content)
+            SESSION_TOKEN_USAGE["output"] += out_tokens
+            SESSION_TOKEN_USAGE["total"] = (
+                SESSION_TOKEN_USAGE["input"] + SESSION_TOKEN_USAGE["output"]
+            )
+            _response_cache[ck] = content
+            logger.info(
+                f"[LLM] Success via {provider}/{model} | "
+                f"session_tokens~{SESSION_TOKEN_USAGE['total']}"
+            )
+            return content
 
-                        if response.status_code == 200:
-                            data = response.json()
-                            choices = data.get("choices", [])
-                            if choices:
-                                content = choices[0]["message"].get("content")
-                                if content is not None:
-                                    out_tokens = _approx_tokens(content)
-                                    SESSION_TOKEN_USAGE["output"] += out_tokens
-                                    SESSION_TOKEN_USAGE["total"] = (
-                                        SESSION_TOKEN_USAGE["input"] + SESSION_TOKEN_USAGE["output"]
-                                    )
-                                    _response_cache[ck] = content
-                                    logger.info(
-                                        f"[LLM] Success via {model} ({key_label}) | "
-                                        f"session_tokens~{SESSION_TOKEN_USAGE['total']}"
-                                    )
-                                    succeeded = True
-                                    return content
-                                else:
-                                    logger.warning(f"[LLM] {model} {key_label}: content=None -- {data}")
-                                    last_exception = ValueError(f"None content from {model}")
-                                    break  # try next key
-                            else:
-                                logger.warning(f"[LLM] {model} {key_label}: no choices -- {data}")
-                                last_exception = ValueError(f"No choices from {model}")
-                                break  # try next key
-
-                        elif response.status_code in (429, 402):
-                            remaining_keys = len(api_keys) - key_idx - 1
-                            logger.warning(
-                                f"[LLM] {model} {key_label} -> {response.status_code} "
-                                f"(rate-limited). {remaining_keys} key(s) still available for this model."
-                            )
-                            last_exception = ValueError(f"{response.status_code} on {model} ({key_label})")
-                            break  # stop retrying this key — outer loop tries next key
-
-                        elif response.status_code == 404:
-                            err_text = response.text[:300]
-                            if "No endpoints found" in err_text or "unavailable" in err_text.lower():
-                                logger.warning(
-                                    f"[LLM] {model} {key_label} -> 404 (no endpoints). Blacklisting model."
-                                )
-                                _model_blacklist.add(model)
-                                # No point trying key2 for a down model — break key loop too
-                                key_idx = len(api_keys)  # signal to skip remaining keys
-                            else:
-                                logger.warning(f"[LLM] {model} {key_label} -> 404: {err_text}")
-                            last_exception = ValueError(f"OpenRouter 404 on {model}: {err_text}")
-                            break
-
-                        elif response.status_code in (400, 401, 403):
-                            err_text = response.text[:200]
-                            logger.warning(f"[LLM] {model} {key_label} -> {response.status_code}: {err_text}")
-                            last_exception = ValueError(
-                                f"OpenRouter {response.status_code} on {model}: {err_text}"
-                            )
-                            break  # non-retryable per-key; try next key
-
-                        else:
-                            err_text = response.text[:200]
-                            logger.warning(
-                                f"[LLM] {model} {key_label} -> {response.status_code}: {err_text} "
-                                f"(attempt {attempt+1}/3)"
-                            )
-                            last_exception = ValueError(
-                                f"OpenRouter {response.status_code} on {model}: {err_text}"
-                            )
-                            await asyncio.sleep(1)
-
-                    except (httpx.TimeoutException, httpx.ConnectError) as e:
-                        logger.warning(f"[LLM] {model} {key_label} network error: {e} (attempt {attempt+1}/3)")
-                        last_exception = e
-                        await asyncio.sleep(1)
-
-                    except Exception as e:
-                        logger.error(f"[LLM] {model} {key_label} unexpected error: {e}")
-                        last_exception = e
-                        await asyncio.sleep(1)
-
-            # All keys exhausted for this model without success → blacklist it
-            if not succeeded and model not in _model_blacklist:
-                _model_blacklist.add(model)
-                logger.warning(
-                    f"[LLM] {model} failed on all {len(api_keys)} key(s). Blacklisting for this session."
-                )
+        # Model failed, continue to next
+        last_exception = ValueError(f"{provider}/{model} failed")
 
     if last_exception:
         raise last_exception
-    raise ValueError("All candidate LLM models and API keys failed.")
+    raise ValueError("All candidate LLM models and providers failed.")

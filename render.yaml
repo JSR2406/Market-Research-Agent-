@@ -16,5 +16,13 @@ services:
         value: google/gemini-2.5-flash:free
       - key: OPENROUTER_BASE_URL
         value: https://openrouter.ai/api/v1
+      - key: LLM_PROVIDER_PRIORITY
+        value: huggingface,openrouter   # no local Ollama on Render
+      - key: HF_API_TOKEN
+        sync: false          # optional — paste for higher Hugging Face rate limits
+      - key: HF_MODEL
+        value: Qwen/Qwen2.5-7B-Instruct
+      - key: HF_TTS_MODEL
+        value: facebook/mms-tts-eng
       - key: PYTHON_VERSION
         value: "3.11.0"

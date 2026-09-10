@@ -10,6 +10,7 @@ speech_to_text():
 
 text_to_speech():
   Primary:  ElevenLabs TTS flash v2.5 (streaming via httpx, assembled into bytes).
+  Secondary: Hugging Face TTS models (free, no API key required for public models).
   Fallback: pyttsx3 offline TTS (written to a temp WAV, read back, deleted).
             If that also fails → return b"" (caller shows graceful message).
 
@@ -26,12 +27,15 @@ from typing import Optional
 
 import httpx
 
+from backend.core.config import (
+    HF_TTS_MODEL,
+    HF_TTS_FALLBACK_MODELS,
+)
+
 logger = logging.getLogger(__name__)
 
-ELEVENLABS_API_KEY: Optional[str] = None  # resolved at call-time via os.getenv
 
-
-def _get_key() -> str:
+def _get_elevenlabs_key() -> str:
     return os.getenv("ELEVENLABS_API_KEY", "") or ""
 
 
@@ -44,7 +48,7 @@ async def speech_to_text(audio_bytes: bytes) -> str:
     Transcribe audio bytes to text.
     Returns "" on total failure (never raises).
     """
-    key = _get_key()
+    key = _get_elevenlabs_key()
     if key:
         result = await _stt_elevenlabs(audio_bytes, key)
         if result:
@@ -137,22 +141,26 @@ async def text_to_speech(text: str) -> bytes:
     if not text.strip():
         return b""
 
-    key = _get_key()
+    key = _get_elevenlabs_key()
     if key:
         result = await _tts_elevenlabs(text, key)
         if result:
             logger.info("[Voice/TTS] ElevenLabs engine used.")
             return result
-        logger.warning("[Voice/TTS] ElevenLabs failed, trying pyttsx3 fallback.")
-    else:
-        logger.info("[Voice/TTS] No ElevenLabs key — using pyttsx3 fallback directly.")
+        logger.warning("[Voice/TTS] ElevenLabs failed, trying Hugging Face fallback.")
+
+    result = await _tts_huggingface(text)
+    if result:
+        logger.info("[Voice/TTS] Hugging Face engine used.")
+        return result
+    logger.warning("[Voice/TTS] Hugging Face failed, trying pyttsx3 fallback.")
 
     result = await _tts_pyttsx3(text)
     if result:
         logger.info("[Voice/TTS] pyttsx3 offline engine used.")
         return result
 
-    logger.error("[Voice/TTS] Both TTS engines failed — returning empty bytes.")
+    logger.error("[Voice/TTS] All TTS engines failed — returning empty bytes.")
     return b""
 
 
@@ -183,6 +191,51 @@ async def _tts_elevenlabs(text: str, api_key: str) -> bytes:
     except Exception as e:
         logger.warning(f"[Voice/TTS] ElevenLabs exception: {e}")
         return b""
+
+
+async def _tts_huggingface(text: str) -> bytes:
+    """
+    Use Hugging Face Inference API TTS models (free for public models).
+    Sends text, expects raw audio bytes back. Never raises.
+    """
+    token = os.getenv("HF_API_TOKEN", "") or ""
+    truncated = text[:1000]
+    headers = {"Content-Type": "text/plain"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    for model in [HF_TTS_MODEL] + list(HF_TTS_FALLBACK_MODELS):
+        if not model:
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                response = await client.post(
+                    f"https://api-inference.huggingface.co/models/{model}",
+                    headers=headers,
+                    content=truncated.encode("utf-8"),
+                )
+                content_type = response.headers.get("content-type", "")
+                if response.status_code == 200 and "audio" in content_type.lower():
+                    logger.info(f"[Voice/TTS] Hugging Face model {model} used.")
+                    return response.content
+                if response.status_code == 503:
+                    logger.warning(f"[Voice/TTS] HF {model} is loading — retrying once.")
+                    await asyncio.sleep(10)
+                    response = await client.post(
+                        f"https://api-inference.huggingface.co/models/{model}",
+                        headers=headers,
+                        content=truncated.encode("utf-8"),
+                    )
+                    content_type = response.headers.get("content-type", "")
+                    if response.status_code == 200 and "audio" in content_type.lower():
+                        logger.info(f"[Voice/TTS] Hugging Face model {model} used (after load).")
+                        return response.content
+                logger.warning(
+                    f"[Voice/TTS] HF {model} -> {response.status_code} ({content_type or 'no content-type'})"
+                )
+        except Exception as e:
+            logger.warning(f"[Voice/TTS] HF {model} exception: {e}")
+    return b""
 
 
 async def _tts_pyttsx3(text: str) -> bytes:

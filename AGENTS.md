@@ -3,7 +3,7 @@
 ## Stack
 - Backend: Python, FastAPI, WebSockets, httpx, uvicorn, python-dotenv
 - Frontend: Next.js 15 App Router, TypeScript, Tailwind CSS, Framer Motion, react-markdown, remark-gfm, lucide-react
-- LLM: OpenRouter API (https://openrouter.ai/api/v1)
+- LLM: Multi-provider via backend/core/llm_client.py — Ollama (local, free), Hugging Face Inference API (free tier), OpenRouter (cloud)
 
 ## Folder Structure
 market-research-agent/
@@ -41,8 +41,17 @@ market-research-agent/
         └── ReportViewer.tsx
 
 ## LLM Model Routing (all calls via backend/core/llm_client.py only)
-- planning, deep_analysis, realtime_research → use the configured Nemotron model
-- writer, editor, default → use the configured Nemotron model
+- All agents route through `backend/core/llm_client.call_llm()` with a per-agent `agent_hint`.
+- Provider priority (default `ollama,huggingface,openrouter`) is configurable via `LLM_PROVIDER_PRIORITY`.
+  - **Ollama** (local) — completely free, no token limits: `OLLAMA_MODEL` (default `llama3.2:3b`).
+  - **Hugging Face** — Inference API free tier: `HF_MODEL` (default `Qwen/Qwen2.5-7B-Instruct`).
+  - **OpenRouter** — cloud fallback: uses `MODEL` + `FALLBACK_MODELS`.
+- Agents never hardcode a provider; they just pass `agent_hint` and the client handles fallback.
+
+## Voice / TTS
+- `backend/core/voice.py` — never raises, always falls back through:
+  - STT: ElevenLabs Scribe (if key) → SpeechRecognition/Google (free).
+  - TTS: ElevenLabs (if key) → Hugging Face Inference API (`HF_TTS_MODEL`, default `facebook/mms-tts-eng`, free) → pyttsx3 (offline).
 
 ## WebSocket Events
 plan, step_start, step_end, done, cancelled, error, status

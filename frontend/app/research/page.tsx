@@ -6,8 +6,10 @@ import AdvisoryCard from "@/components/AdvisoryCard";
 import ChatPanel from "@/components/ChatPanel";
 import Usps from "@/components/Usps";
 import LiveAdvisorPanel from "@/components/LiveAdvisorPanel";
+import StartupQuiz, { buildProfileSnippet, type ProfileInit } from "@/components/StartupQuiz";
+import CashflowSimulator from "@/components/CashflowSimulator";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, MessageCircle } from "lucide-react";
+import { AlertTriangle, MessageCircle, X } from "lucide-react";
 
 // Use wss:// in production (HTTPS pages block ws://)
 const rawWsUrl =
@@ -20,9 +22,18 @@ const WS_URL =
     ? rawWsUrl.replace("ws://", "wss://")
     : rawWsUrl;
 
+const rawApiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+const API_BASE =
+  typeof window !== "undefined" &&
+  window.location.protocol === "https:" &&
+  rawApiBase.startsWith("http://")
+    ? rawApiBase.replace("http://", "https://")
+    : rawApiBase;
+
 const WS_RECONNECT_DELAY_MS = 1500;
 const WS_MAX_RETRIES = 3;
 const SESSION_KEY = "grameenai_session";
+const PROFILE_KEY = "grameenai_profile";
 
 type Step = {
   step: string;
@@ -49,6 +60,8 @@ export default function ResearchPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [mounted, setMounted] = useState(false);
   const [sessionId, setSessionId] = useState("");
+  const [profile, setProfile] = useState<ProfileInit>({});
+  const [resumeNote, setResumeNote] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -65,6 +78,49 @@ export default function ResearchPage() {
       }
     } catch {
       // localStorage unavailable (private mode) — chat degrades to stateless.
+    }
+
+    // Restore the optional Startup Doctor answers.
+    try {
+      const savedProfile = window.localStorage.getItem(PROFILE_KEY);
+      if (savedProfile) {
+        const parsed = JSON.parse(savedProfile) as ProfileInit;
+        if (parsed && typeof parsed === "object") setProfile(parsed);
+      }
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  // Resume the saved advisory for this browser session, if any.
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}`);
+        if (!res.ok) return;
+        const body = await res.json();
+        if (cancelled || !body?.final_report) return;
+        setFinalReport(body.final_report as string);
+        setSimplifiedReport(((body.simplified_report as string) ?? "").trim());
+        setCurrentTopic((body.topic as string) ?? "");
+        setResumeNote("Reopened your last advisory — run research again to refresh it.");
+      } catch {
+        /* backend offline — nothing to resume */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  const changeProfile = useCallback((next: ProfileInit) => {
+    setProfile(next);
+    try {
+      window.localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
+    } catch {
+      /* noop */
     }
   }, []);
 
@@ -192,18 +248,28 @@ export default function ResearchPage() {
     setFinalReport(null);
     setSimplifiedReport("");
     setCurrentTopic(topic);
+    setResumeNote("");
     setStatusMessage("Connecting…");
     setErrorMessage("");
     retriesRef.current = 0;
 
+    // Enrich the topic with the Startup Doctor answers (deterministic — no LLM call).
+    const profileSnippet = buildProfileSnippet(profile);
+    const startTopic = profileSnippet ? `${profileSnippet}. ${topic}` : topic;
+
+    const payload = {
+      type: "start",
+      topic: startTopic,
+      max_steps: maxSteps,
+      session_id: sessionId,
+    };
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({ type: "start", topic, max_steps: maxSteps, session_id: sessionId })
-      );
+      wsRef.current.send(JSON.stringify(payload));
       return;
     }
 
-    pendingStartRef.current = { topic, maxSteps, sessionId };
+    pendingStartRef.current = { topic: startTopic, maxSteps, sessionId };
     connectWs((ws) => {
       const pending = pendingStartRef.current;
       if (pending) {
@@ -304,6 +370,9 @@ export default function ResearchPage() {
         </p>
       </motion.div>
 
+      {/* Startup Doctor — optional quick questions that sharpen the first report */}
+      <StartupQuiz value={profile} onChange={changeProfile} />
+
       {/* Main input */}
       <div style={{ width: "100%", maxWidth: "760px" }}>
         <TopicInput
@@ -351,6 +420,35 @@ export default function ResearchPage() {
       {/* Agent timeline */}
       <AgentTimeline steps={steps} statusMessage={statusMessage} isRunning={isRunning} />
 
+      {/* Resume banner */}
+      <AnimatePresence>
+        {resumeNote && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            style={{
+              marginTop: "16px", width: "100%", maxWidth: "760px",
+              display: "flex", alignItems: "center", gap: "10px",
+              padding: "12px 18px",
+              background: "rgba(251,146,60,0.08)",
+              border: "1px solid rgba(251,146,60,0.25)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            <span style={{ fontSize: "0.82rem", color: "var(--warn)", flex: 1 }}>{resumeNote}</span>
+            <button
+              type="button"
+              aria-label="Dismiss resume notice"
+              onClick={() => setResumeNote("")}
+              style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", display: "flex" }}
+            >
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Report */}
       <AnimatePresence>
         {finalReport && (
@@ -361,6 +459,9 @@ export default function ResearchPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Cash-flow simulator — self-serve financial viz, runs locally */}
+      <CashflowSimulator />
 
       {/* Personal business advisor chat — remembers this session and your report */}
       <ChatPanel sessionId={sessionId} topic={currentTopic} />

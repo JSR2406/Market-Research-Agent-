@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.core import config  # noqa: F401  (import for side-effect / fail-fast)
 from backend.api.voice import router as voice_router
 from backend.api.chat import router as chat_router
+from backend.api.sessions import router as sessions_router
 from backend.api.ws_market import router as ws_router
 from backend.core.memory import cleanup_old_sessions
 
@@ -57,6 +58,7 @@ app.add_middleware(
 app.include_router(ws_router)
 app.include_router(voice_router)
 app.include_router(chat_router)
+app.include_router(sessions_router)
 
 
 @app.get("/health")

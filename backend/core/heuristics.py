@@ -248,6 +248,95 @@ def build_heuristic_advisory(topic: str) -> Dict:
     }
 
 
+def _numbers_in(values) -> List[int]:
+    """Pull every numeric figure out of advisory cash-flow values (e.g. '₹15,000')."""
+    nums: List[int] = []
+    if not isinstance(values, dict):
+        return nums
+    for v in values.values():
+        for m in re.findall(r"\d[\d,]*", str(v)):
+            try:
+                nums.append(int(m.replace(",", "")))
+            except ValueError:
+                pass
+    return nums
+
+
+def compute_loan_ready_score(data: Dict) -> Dict:
+    """
+    Deterministic 0-100 "Loan-Ready Score" judged purely from the advisory JSON.
+
+    Transparent rubric (20 points each, with partial credit where sensible):
+    - business_summary present
+    - cash_flow_snapshot holds at least two figures
+    - a positive income figure exists in cash-flow
+    - at least one government scheme matched
+    - a document checklist is present
+    Together they mirror what a banker looks at: who you are, how much you earn,
+    whether you qualify, and whether you know what to bring.
+    """
+    summary_ok = bool(str(data.get("business_summary", "")).strip())
+    cash = data.get("cash_flow_snapshot", {})
+    numbers = _numbers_in(cash)
+
+    points = 0
+    reasons: List[str] = []
+
+    if summary_ok:
+        points += 20
+        reasons.append("Your business summary is clear — a banker can understand you fast.")
+    else:
+        reasons.append("Add a clear business summary to score higher.")
+
+    if len(numbers) >= 2:
+        points += 20
+        reasons.append("Your cash-flow figures are specific, not vague.")
+    else:
+        reasons.append("Give at least two real income/expense figures — vague numbers score lower.")
+
+    if any(n > 0 for n in numbers):
+        points += 20
+        reasons.append("You declared positive earnings — lenders like that.")
+    else:
+        reasons.append("Declare a positive monthly earning to score higher.")
+
+    schemes = data.get("matched_schemes", []) or []
+    scheme_n = len(schemes)
+    if scheme_n >= 2:
+        points += 20
+        reasons.append(f"There are {scheme_n} schemes you can apply for right now.")
+    elif scheme_n == 1:
+        points += 10
+        reasons.append("A scheme is matched — add a second one to max this score.")
+    else:
+        reasons.append("Match at least one government scheme to score higher.")
+
+    docs = data.get("documents_needed", []) or []
+    if len(docs) >= 5:
+        points += 20
+        reasons.append("You have a full document checklist ready to work from.")
+    elif docs:
+        points += 10
+        reasons.append("A document checklist exists — complete it fully to max this score.")
+    else:
+        reasons.append("Ask for the document checklist to score higher.")
+
+    if 100 >= points >= 80:
+        level = "Strongly loan-ready"
+    elif points >= 60:
+        level = "Nearly loan-ready"
+    elif points >= 40:
+        level = "Building readiness"
+    else:
+        level = "Early stage"
+
+    return {
+        "score": points,
+        "level": level,
+        "why": reasons,
+    }
+
+
 def build_simplified_summary(advisory: Dict, topic: str = "") -> str:
     """
     Low-literacy, print-friendly plain-language summary of an advisory.

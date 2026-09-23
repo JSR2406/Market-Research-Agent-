@@ -13,6 +13,7 @@ interface AdvisoryData {
   matched_schemes?: string[];
   documents_needed?: string[];
   next_step?: string;
+  loan_ready_score?: { score?: number; level?: string; why?: string[] };
 }
 
 interface Props {
@@ -30,6 +31,32 @@ function Sparkles({ size }: { size?: number }) {
     <svg xmlns="http://www.w3.org/2000/svg" width={size || 16} height={size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
       <path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>
+    </svg>
+  );
+}
+
+function ScoreGauge({ score }: { score: number }) {
+  const radius = 44;
+  const circ = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, score));
+  const color =
+    clamped >= 80 ? "var(--success)"
+    : clamped >= 60 ? "var(--accent)"
+    : clamped >= 40 ? "var(--warn)"
+    : "var(--error)";
+  return (
+    <svg width="128" height="128" viewBox="0 0 120 120" aria-label={`Loan-ready score ${clamped} out of 100`}>
+      <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+      <circle
+        cx="60" cy="60" r={radius} fill="none"
+        stroke={color} strokeWidth="10" strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={circ * (1 - clamped / 100)}
+        transform="rotate(-90 60 60)"
+        style={{ transition: "stroke-dashoffset 0.9s ease" }}
+      />
+      <text x="60" y="57" textAnchor="middle" fill="var(--text-primary)" fontSize="24" fontWeight="800">{clamped}</text>
+      <text x="60" y="76" textAnchor="middle" fill="var(--text-muted)" fontSize="9">out of 100</text>
     </svg>
   );
 }
@@ -257,6 +284,44 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
       </div>
 
       <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+        {/* Loan-Ready Score */}
+        {data.loan_ready_score && typeof data.loan_ready_score.score === "number" && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
+            style={{
+              display: "flex", alignItems: "center", gap: "18px", flexWrap: "wrap",
+              background: "linear-gradient(135deg, rgba(79,142,247,0.08), rgba(139,92,246,0.05))",
+              border: "1px solid rgba(139,92,246,0.22)",
+              borderRadius: "12px", padding: "18px",
+            }}
+          >
+            <ScoreGauge score={data.loan_ready_score.score} />
+            <div style={{ flex: 1, minWidth: "220px" }}>
+              <div style={{ marginBottom: "6px" }}>
+                <span style={{
+                  fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
+                  color: "var(--accent)", background: "rgba(79,142,247,0.12)",
+                  padding: "3px 8px", borderRadius: "8px",
+                }}>
+                  Loan-Ready Score
+                </span>
+                {data.loan_ready_score.level && (
+                  <span style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)", marginLeft: "8px" }}>
+                    {data.loan_ready_score.level}
+                  </span>
+                )}
+              </div>
+              {Array.isArray(data.loan_ready_score.why) && data.loan_ready_score.why.length > 0 && (
+                <ul style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {data.loan_ready_score.why.map((r, i) => (
+                    <li key={i} style={{ fontSize: "0.78rem", lineHeight: 1.45, color: "var(--text-secondary)" }}>{r}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* In Simple Words */}
         {simplified && (
           <motion.div

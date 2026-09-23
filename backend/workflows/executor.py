@@ -12,6 +12,9 @@ Design:
 """
 import logging
 
+import re
+import json
+
 from backend.agents.analyst import analyst_agent
 from backend.agents.editor import editor_agent
 from backend.agents.opportunity import opportunity_agent
@@ -24,6 +27,24 @@ from backend.core.ws import SafeWebSocket
 from backend.workflows.routing import AGENT_REGISTRY, SYNTHESIS_AGENTS, route_step
 
 logger = logging.getLogger(__name__)
+
+
+def _attach_loan_ready_score(report: str) -> str:
+    """Merge a deterministic loan_ready_score into the report JSON if parseable."""
+    if not report:
+        return report
+    match = re.search(r"\{.*\}", report, flags=re.DOTALL)
+    if not match:
+        return report
+    try:
+        data = json.loads(match.group(0))
+        if isinstance(data, dict) and "loan_ready_score" not in data:
+            from backend.core.heuristics import compute_loan_ready_score
+            data["loan_ready_score"] = compute_loan_ready_score(data)
+            return json.dumps(data, ensure_ascii=False)
+    except Exception:
+        pass
+    return report
 
 
 async def run_research_workflow(
@@ -143,6 +164,9 @@ async def run_research_workflow(
         final_report = await editor_agent(editor_task, agent_hint="editor")
     except Exception as e:
         final_report = written  # degrade gracefully
+
+    # ── Deterministic Loan-Ready Score (no LLM cost) ──────────────────────────
+    final_report = _attach_loan_ready_score(final_report)
 
     # ── Simplified low-literacy document (GrameenAI use case) ─────────────────
     simplified_report = ""

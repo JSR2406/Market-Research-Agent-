@@ -19,6 +19,10 @@ Built with **Next.js 15**, **FastAPI**, and a multi-provider LLM client
 - **🧭 Real-time Web Research**: Optional web search + scraping enriches the research agent with live snippets.
 - **🗣️ Voice I/O**: Record your business description by voice; listen to the advisory (ElevenLabs → Hugging Face → offline pyttsx3 fallback).
 - **💬 Business Advisor Chat**: Specialised chatbot that builds your business and makes you loan-ready (schemes, documents, eligibility) — with saved chat memory per session and Hindi/Hinglish replies.
+- **📊 Loan-Ready Score**: Deterministic 0–100 gauge computed from the actual advisory (cash-flow specificity, income, scheme matches, document checklist) — with a plain-language "why". Zero extra AI cost, works fully offline.
+- **📈 Cash-Flow Simulator**: Self-serve, client-side. Type in capital, weekly sales and expenses → an SVG projection chart, break-even week and monthly surplus. No internet needed.
+- **🩺 Startup Doctor**: 5 optional quick questions before the run that sharpen the very first report.
+- **📌 Resume last advisory**: Reopen your previous session's advisory automatically — no re-running research.
 - **📜 Simplified Document**: Low-literacy "In Simple Words" advisory, download/copy as `.txt`.
 - **🛟 Offline Resilience**: If every LLM provider is down, a deterministic engine still produces a full advisory from local scheme data.
 
@@ -163,6 +167,7 @@ browser mic ──► LiveKit room ──► Silero STT (local) ──► Adviso
   - `POST /api/chat` — body `{message, session_id?, topic?, lang?}` where `lang` ∈ `auto` (default) | `hi` | `en` → `{reply, session_id, history_count}`
   - `GET  /api/chat/history?session_id=` — remembered messages
   - `DELETE /api/chat/{session_id}` — clear chat memory (GDPR-aligned)
+  - `GET  /api/sessions/{session_id}` — resume the latest saved advisory (report + simplified)
 - **Memory**: per-session `backend/sessions/{session_id}_chat.json` (capped at
   `MAX_CHAT_MESSAGES`, covered by the 7-day retention cleanup). The session's
   latest advisory is injected automatically, so you can ask follow-ups about

@@ -46,6 +46,7 @@ market-research-agent/
 │       ├── __init__.py
 │       ├── ws_market.py        # WS endpoint (start/cancel/export/delete)
 │       ├── chat.py             # /api/chat (POST/GET history/DELETE) + chat memory
+│       ├── sessions.py         # GET /api/sessions/{session_id} — resume a saved advisory
 │       └── voice.py            # /api/voice/{transcribe,speak,livekit-token}
 └── frontend/
     ├── .env.local
@@ -92,6 +93,12 @@ market-research-agent/
 
 ## WebSocket Events
 plan, step_start, step_end, token_usage, status, done (with simplified_report), cancelled, error, resume_available, session_deleted, session_export
+
+## Frontend Novelty Features
+- **Loan-Ready Score** — deterministic 0–100 score added to the advisory JSON by `executor._attach_loan_ready_score()` (no LLM cost; rubric in `backend/core/heuristics.compute_loan_ready_score`). `AdvisoryCard.tsx` draws an SVG gauge + "why" reasons. Always present, even fully offline.
+- **Cash-Flow Simulator** (`CashflowSimulator.tsx`) — pure client-side cash-flow projection (capital/weekly sales/weekly expenses, 4–24 weeks), SVG line chart, break-even week, monthly surplus. No backend calls.
+- **Startup Doctor quiz** (`StartupQuiz.tsx`) — 5 optional questions persisted in `localStorage["grameenai_profile"]`; answers are deterministically folded into the WS `start` topic via `buildProfileSnippet()` (no extra LLM calls).
+- **Resume last advisory** — page mount calls `GET /api/sessions/{session_id}` and restores the saved advisory (report + simplified + grey-out of run state) until the user runs again. Backend lives in `backend/api/sessions.py`.
 
 ## Rules
 - Never hardcode API keys, always use os.getenv()

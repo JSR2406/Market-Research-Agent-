@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import TopicInput from "@/components/TopicInput";
 import AgentTimeline from "@/components/AgentTimeline";
 import AdvisoryCard from "@/components/AdvisoryCard";
+import LiveAdvisorPanel from "@/components/LiveAdvisorPanel";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, MessageCircle } from "lucide-react";
 
@@ -19,6 +20,7 @@ const WS_URL =
 
 const WS_RECONNECT_DELAY_MS = 1500;
 const WS_MAX_RETRIES = 3;
+const SESSION_KEY = "grameenai_session";
 
 type Step = {
   step: string;
@@ -30,7 +32,11 @@ type Step = {
 export default function ResearchPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
-  const pendingStartRef = useRef<{ topic: string; maxSteps: number } | null>(null);
+  const pendingStartRef = useRef<{
+    topic: string;
+    maxSteps: number;
+    sessionId: string;
+  } | null>(null);
 
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -40,9 +46,24 @@ export default function ResearchPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [sessionId, setSessionId] = useState("");
 
   useEffect(() => {
     setMounted(true);
+    // Stable per-browser session: ties the chat memory and the advisory run
+    // together so follow-up questions remember this research session.
+    try {
+      const existing = window.localStorage.getItem(SESSION_KEY);
+      if (existing) {
+        setSessionId(existing);
+      } else {
+        const id = `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        window.localStorage.setItem(SESSION_KEY, id);
+        setSessionId(id);
+      }
+    } catch {
+      // localStorage unavailable (private mode) — chat degrades to stateless.
+    }
   }, []);
 
   const handleMessage = useCallback((data: Record<string, unknown>) => {
@@ -174,16 +195,23 @@ export default function ResearchPage() {
     retriesRef.current = 0;
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "start", topic, max_steps: maxSteps }));
+      wsRef.current.send(
+        JSON.stringify({ type: "start", topic, max_steps: maxSteps, session_id: sessionId })
+      );
       return;
     }
 
-    pendingStartRef.current = { topic, maxSteps };
+    pendingStartRef.current = { topic, maxSteps, sessionId };
     connectWs((ws) => {
       const pending = pendingStartRef.current;
       if (pending) {
         ws.send(
-          JSON.stringify({ type: "start", topic: pending.topic, max_steps: pending.maxSteps })
+          JSON.stringify({
+            type: "start",
+            topic: pending.topic,
+            max_steps: pending.maxSteps,
+            session_id: pending.sessionId,
+          })
         );
         pendingStartRef.current = null;
       }
@@ -328,6 +356,9 @@ export default function ResearchPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Realtime voice advisor (LiveKit) */}
+      <LiveAdvisorPanel />
 
       {/* WhatsApp Roadmap — voice input/output is now live; WhatsApp channel is next */}
       <motion.div

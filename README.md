@@ -18,6 +18,7 @@ Built with **Next.js 15**, **FastAPI**, and a multi-provider LLM client
 - **🔍 Deep Analysis**: Leverages multiple free LLM providers (via one client) for actionable advisory.
 - **🧭 Real-time Web Research**: Optional web search + scraping enriches the research agent with live snippets.
 - **🗣️ Voice I/O**: Record your business description by voice; listen to the advisory (ElevenLabs → Hugging Face → offline pyttsx3 fallback).
+- **💬 Business Advisor Chat**: Specialised chatbot that builds your business and makes you loan-ready (schemes, documents, eligibility) — with saved chat memory per session.
 - **📜 Simplified Document**: Low-literacy "In Simple Words" advisory, download/copy as `.txt`.
 - **🛟 Offline Resilience**: If every LLM provider is down, a deterministic engine still produces a full advisory from local scheme data.
 
@@ -40,9 +41,10 @@ Built with **Next.js 15**, **FastAPI**, and a multi-provider LLM client
               ▼                                                    └───────────────┬────────────────────────────────┘
         BACKEND_URL:8000                                                           │
                                                      ┌──────────────────────────────▼─────────────────────────────┐
-                                                     │  api/                                                        │
-                                                     │   ws_market.py — WS loop, session_id, cancel, export/delete │
-                                                     │   voice.py     — STT/TTS HTTP endpoints                    │
+│  api/                                                        │
+                                                      │   ws_market.py — WS loop, session_id, cancel, export/delete │
+                                                      │   chat.py     — /api/chat + history + delete            │
+                                                      │   voice.py    — STT/TTS HTTP endpoints                    │
                                                      └──────────────────────────────┬─────────────────────────────┘
                                                                                     │
                                                     ┌───────────────────────────────▼──────────────────────────────┐
@@ -124,6 +126,48 @@ hardcode a provider.
 
 - **STT**: ElevenLabs Scribe (if key) → SpeechRecognition/Google (WAV only).
 - **TTS**: ElevenLabs (if key) → Hugging Face Inference API → pyttsx3 (offline).
+
+### Realtime voice advisory (LiveKit, optional)
+
+The browser talks directly to a LiveKit voice agent over WebRTC — speech stays
+realtime, no record-and-upload round trip.
+
+```
+browser mic ──► LiveKit room ──► Silero STT (local) ──► AdvisoryLLM ──► ElevenLabs TTS ──► browser speakers
+                                    (free, offline)      (call_llm) 
+```
+
+- **Agent worker** (separate process): `pip install -r backend/requirements-voice.txt`, then
+  `python -m backend.voice_agent.worker`. Joins `LIVEKIT_ADVISOR_ROOM`.
+- **Token endpoint**: `POST /api/voice/livekit-token` → `{url, token, room}`.
+- **Frontend**: `LiveAdvisorPanel.tsx` (bottom of `/research`) — Start Voice / End Call / mute.
+- **Backend creds** (`backend/.env`): `LIVEKIT_URL`, `LIVEKIT_API_KEY`,
+  `LIVEKIT_API_SECRET` (free at https://cloud.livekit.io), reusing
+  `ELEVENLABS_API_KEY` for the agent's voice.
+- The advisory brain is the same `call_llm` multi-provider client (with the
+  heuristic offline guarantee) — `agent_hint="voice"` gives it a short spoken
+  style and its own model (`openrouter/auto`).
+
+### Business Advisor Chat (with chat memory)
+
+- **Specialist** (`backend/agents/chat.py`): business advisory & building —
+  loan schemes, document packs, eligibility, and step-by-step business-building
+  guidance. Off-topic questions get steered back to the business. Primary model
+  is **open-source** (`mistralai/mistral-7b-instruct`); the call follows the
+  normal free-first chain (Ollama → Hugging Face → OpenRouter) with a
+  deterministic offline fallback.
+- **Endpoints**:
+  - `POST /api/chat` — body `{message, session_id?, topic?}` → `{reply, session_id, history_count}`
+  - `GET  /api/chat/history?session_id=` — remembered messages
+  - `DELETE /api/chat/{session_id}` — clear chat memory (GDPR-aligned)
+- **Memory**: per-session `backend/sessions/{session_id}_chat.json` (capped at
+  `MAX_CHAT_MESSAGES`, covered by the 7-day retention cleanup). The session's
+  latest advisory is injected automatically, so you can ask follow-ups about
+  your own report.
+- **Frontend**: `ChatPanel.tsx` on `/research` (bubbles, history restore,
+  clear button). `session_id` is generated browser-side and kept in
+  `localStorage["grameenai_session"]` — the same id ties the research run, the
+  chat, its export, and its delete together.
 
 ## 📁 Project Structure
 

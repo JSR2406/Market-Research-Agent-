@@ -10,7 +10,7 @@
 market-research-agent/
 ├── backend/
 │   ├── .env
-│   ├── requirements.txt
+│   └── requirements-voice.txt  # OPTIONAL livekit stack (torch-heavy)
 │   ├── main.py                 # FastAPI app, lifespan, CORS, /health
 │   ├── __init__.py
 │   ├── core/
@@ -30,7 +30,12 @@ market-research-agent/
 │   │   ├── opportunity.py      # scheme matching (+heuristic fallback)
 │   │   ├── writer.py           # advisory JSON (+heuristic fallback)
 │   │   ├── editor.py           # polished advisory JSON (+heuristic fallback)
-│   │   └── simplifier.py       # low-literacy "In Simple Words" doc (+heuristic fallback)
+│   │   ├── simplifier.py       # low-literacy "In Simple Words" doc (+heuristic fallback)
+│   │   └── chat.py             # specialised business advisory/building chatbot (+heuristic fallback)
+│   ├── voice_agent/            # OPTIONAL realtime voice (LiveKit) — separate process
+│   │   ├── __init__.py
+│   │   ├── llm.py              # LiveKit LLM adapter → call_llm (+heuristic fallback)
+│   │   └── worker.py           # Silero STT → AdvisoryLLM → ElevenLabs TTS
 │   ├── workflows/
 │   │   ├── __init__.py
 │   │   ├── executor.py         # run orchestration, emits WS events
@@ -40,7 +45,8 @@ market-research-agent/
 │   └── api/
 │       ├── __init__.py
 │       ├── ws_market.py        # WS endpoint (start/cancel/export/delete)
-│       └── voice.py            # /api/voice/{transcribe,speak}
+│       ├── chat.py             # /api/chat (POST/GET history/DELETE) + chat memory
+│       └── voice.py            # /api/voice/{transcribe,speak,livekit-token}
 └── frontend/
     ├── .env.local
     ├── package.json
@@ -51,7 +57,9 @@ market-research-agent/
     └── components/
         ├── TopicInput.tsx      # text + voice input, step selector
         ├── AgentTimeline.tsx   # step progress + status
-        └── AdvisoryCard.tsx    # advisory render, simplified doc, download/copy, listen
+        ├── AdvisoryCard.tsx    # advisory render, simplified doc, download/copy, listen
+        ├── ChatPanel.tsx       # business advisory chatbot with saved chat memory
+        └── LiveAdvisorPanel.tsx # realtime voice (LiveKit): join room, mic, agent audio
 
 ## LLM Model Routing (all calls via backend/core/llm_client.py only)
 - All agents route through `backend/core/llm_client.call_llm()` with a per-agent `agent_hint`.
@@ -67,6 +75,20 @@ market-research-agent/
 - `backend/core/voice.py` — never raises, always falls back through:
   - STT: ElevenLabs Scribe (if key) → SpeechRecognition/Google (free).
   - TTS: ElevenLabs (if key) → Hugging Face Inference API (`HF_TTS_MODEL`, default `facebook/mms-tts-eng`, free) → pyttsx3 (offline).
+- **Realtime voice (LiveKit)** — separate process, optional stack in `backend/requirements-voice.txt` (`pip install -r backend/requirements-voice.txt`).
+  - `python -m backend.voice_agent.worker` joins `LIVEKIT_ADVISOR_ROOM`: Silero local STT → `AdvisoryLLM` (bridges to `call_llm`, agent_hint="voice") → ElevenLabs TTS.
+  - Browser joins the same room via `POST /api/voice/livekit-token` (needs `LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`) and `LiveAdvisorPanel.tsx` (frontend, `livekit-client`).
+  - Lazy imports keep the base backend working without the LiveKit stack.
+
+## Chat / Conversation
+- `backend/agents/chat.py` — specialised business advisory & business-building chatbot (loans, schemes, documents, and building the business). Scope-limited: routes off-topic questions back to business.
+- `backend/api/chat.py` — REST endpoints:
+  - `POST /api/chat` (body `{message, session_id?, topic?}`) → `{reply, session_id, history_count}`
+  - `GET  /api/chat/history?session_id=` → remembered messages
+  - `DELETE /api/chat/{session_id}` → clear chat memory (GDPR-aligned)
+- Chat memory: stored as `backend/sessions/{session_id}_chat.json` (capped at `MAX_CHAT_MESSAGES`); the latest written advisory is injected as context so the user can ask follow-ups about their own report. The same `session_id` ties the WS research run, the chat, the export, and the delete together.
+- Frontend: `ChatPanel.tsx` on `/research` — bubbles, history restore, clear button; `session_id` comes from `localStorage["grameenai_session"]` (generated browser-side).
+- **Model rule: the `chat` agent's primary OpenRouter model must stay OPEN-SOURCE** (`mistralai/mistral-7b-instruct`). Call path follows the normal chain: Ollama (local) → Hugging Face (free) → OpenRouter.
 
 ## WebSocket Events
 plan, step_start, step_end, token_usage, status, done (with simplified_report), cancelled, error, resume_available, session_deleted, session_export
@@ -82,6 +104,6 @@ plan, step_start, step_end, token_usage, status, done (with simplified_report), 
 - Use Windows PowerShell compatible commands only
 
 ## Data Retention & Privacy
-- **Storage:** Research sessions are stored locally as JSON files in `backend/sessions/`.
-- **Privacy:** Each session is isolated by `session_id`. Users can export their full session data or permanently delete their session using the `export_session` and `delete_session` WebSocket commands (GDPR right-to-delete).
+- **Storage:** Research sessions are stored locally as JSON files in `backend/sessions/` (chat memory lives alongside as `{session_id}_chat.json`).
+- **Privacy:** Each session is isolated by `session_id`. Users can export their full session data or permanently delete their session using the `export_session` and `delete_session` WebSocket commands (GDPR right-to-delete); deleting a session also clears its chat memory.
 - **Retention:** By default, sessions older than 7 days are automatically deleted on server startup by the `cleanup_old_sessions` hook in `main.py`.

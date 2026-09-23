@@ -73,6 +73,8 @@ AGENT_TOKEN_BUDGETS: dict[str, int] = {
     "writer":      600,   # full markdown report
     "editor":      600,   # polished markdown
     "simplifier":  200,   # very short plain-language summary
+    "voice":       250,   # live voice advisor — short spoken answers
+    "chat":        400,   # conversational chatbot — concise, with memory
     "default":     500,
 }
 
@@ -82,6 +84,8 @@ AGENT_TOKEN_BUDGETS: dict[str, int] = {
 # is not exhausted by every agent in every run. Each agent leads with its own
 # primary model (first entry); the global FALLBACK_MODELS chain is appended
 # afterwards, so any agent still degrades gracefully if its primary 404s.
+# NOTE: "chat" must keep an OPEN-SOURCE primary (project rule — no proprietary
+# models for the chatbot).
 # ──────────────────────────────────────────────────────────────────────────────
 AGENT_OPENROUTER_MODELS: dict[str, list[str]] = {
     "planner":      ["qwen/qwen-2.5-72b-instruct"],
@@ -91,6 +95,8 @@ AGENT_OPENROUTER_MODELS: dict[str, list[str]] = {
     "writer":       ["google/gemini-2.5-flash"],
     "editor":       ["meta-llama/llama-3.3-70b-instruct"],
     "simplifier":   ["openrouter/auto"],
+    "voice":        ["openrouter/auto"],
+    "chat":         ["mistralai/mistral-7b-instruct"],  # open-source
     "default":      [],
 }
 
@@ -113,6 +119,18 @@ HF_TTS_FALLBACK_MODELS: list[str] = [
     HF_TTS_MODEL,
     "espnet/kan-bayashi_ljspeech_vits",
 ]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LiveKit realtime voice (advisory voice agent)
+# ──────────────────────────────────────────────────────────────────────────────
+# LiveKit provides the realtime audio transport (WebRTC). The agent worker runs
+# separately (backend/voice_agent/) and joins LIVEKIT_ADVISOR_ROOM; the browser
+# joins the same room via a short-lived token from /api/voice/livekit-token.
+# LiveKit Cloud: https://cloud.livekit.io (free tier) or self-host `lk-server`.
+LIVEKIT_URL: str = os.getenv("LIVEKIT_URL", "")  # wss://<project>.livekit.cloud
+LIVEKIT_API_KEY: str = os.getenv("LIVEKIT_API_KEY", "")
+LIVEKIT_API_SECRET: str = os.getenv("LIVEKIT_API_SECRET", "")
+LIVEKIT_ADVISOR_ROOM: str = os.getenv("LIVEKIT_ADVISOR_ROOM", "advisory-room")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fail-fast guard

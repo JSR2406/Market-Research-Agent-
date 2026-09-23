@@ -1,0 +1,10 @@
+# Realtime voice advisory agent (LiveKit) — OPTIONAL.
+# Install separately to keep the base backend lean (silero pulls torch, ~2 GB):
+#     pip install -r backend/requirements-voice.txt
+# Then run:  python -m backend.voice_agent.worker
+# Configure LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET in backend/.env
+# (free tier: https://cloud.livekit.io). ELEVENLABS_API_KEY is reused for TTS.
+livekit-api==1.2.1
+livekit-agents==1.8.3
+livekit-plugins-silero==1.8.3
+livekit-plugins-elevenlabs==1.8.3

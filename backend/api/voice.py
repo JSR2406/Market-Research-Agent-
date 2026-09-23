@@ -1,15 +1,20 @@
 """
-backend/api/voice.py — HTTP endpoints for speech-to-text and text-to-speech.
+backend/api/voice.py — HTTP endpoints for speech and realtime voice (LiveKit).
 
-Both endpoints are purely additive and degrade gracefully: they never hard-fail
-the client, they always surface a human-readable message instead.
+STT/TTS (/transcribe, /speak) are REST-based and degrade gracefully.
+/livekit-token mints a short-lived LiveKit access token so the browser can join
+the voice advisory room the agent worker is listening in on. It never hard-fails
+the client: missing credentials or a missing optional dependency return a clear
+503 instead of crashing.
 """
 import logging
+import uuid
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from backend.core.config import LIVEKIT_ADVISOR_ROOM, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL
 from backend.core.voice import speech_to_text, text_to_speech
 
 logger = logging.getLogger(__name__)
@@ -19,6 +24,10 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 
 class SpeakRequest(BaseModel):
     text: str
+
+
+class LiveKitTokenRequest(BaseModel):
+    topic: str = ""  # optional context — not stored, kept for future room scoping
 
 
 @router.post("/transcribe")
@@ -60,3 +69,56 @@ async def speak(body: SpeakRequest):
     except Exception as e:
         logger.error(f"[Voice/speak] Unexpected error: {e}")
         raise HTTPException(status_code=503, detail="Voice synthesis unavailable right now.")
+
+
+@router.post("/livekit-token")
+async def livekit_token(body: LiveKitTokenRequest | None = None):
+    """
+    Mint a short-lived LiveKit access token for the advisory voice room.
+
+    Returns {"url", "token", "room", "identity"}. The backend/.env must have
+    LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET set; `livekit-api`
+    must be installed (pip install -r backend/requirements-voice.txt).
+    """
+    if not (LIVEKIT_URL and LIVEKIT_API_KEY and LIVEKIT_API_SECRET):
+        logger.warning("[Voice/livekit-token] LiveKit credentials not configured")
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit is not configured. Add LIVEKIT_URL, LIVEKIT_API_KEY "
+                   "and LIVEKIT_API_SECRET to backend/.env.",
+        )
+    try:
+        from livekit import api  # optional dependency
+    except ImportError:
+        logger.warning("[Voice/livekit-token] 'livekit-api' not installed")
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit SDK missing. Run: pip install -r backend/requirements-voice.txt",
+        )
+
+    identity = f"advisor-{uuid.uuid4().hex[:12]}"
+    try:
+        token = (
+            api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+            .with_identity(identity)
+            .with_name("GrameenAI Advisor User")
+            .with_grants(
+                api.VideoGrants(
+                    room_join=True,
+                    room=LIVEKIT_ADVISOR_ROOM,
+                    can_publish=True,
+                    can_subscribe=True,
+                )
+            )
+        )
+        jwt = token.to_jwt()
+    except Exception as e:
+        logger.error(f"[Voice/livekit-token] Failed to mint token: {e}")
+        raise HTTPException(status_code=500, detail="Could not mint LiveKit token.")
+
+    return {
+        "url": LIVEKIT_URL,
+        "token": jwt,
+        "room": LIVEKIT_ADVISOR_ROOM,
+        "identity": identity,
+    }

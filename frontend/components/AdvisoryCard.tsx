@@ -170,7 +170,7 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
             <BookOpen size={16} color="#fff" />
           </div>
           <div>
-            <p style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--text-primary)" }}>Loan Readiness Advisory</p>
+            <p style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--text-primary)" }}>Market Research &amp; Business Advisory</p>
             <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Generated for: {topic}</p>
           </div>
         </div>

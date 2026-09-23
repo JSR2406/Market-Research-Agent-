@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import TopicInput from "@/components/TopicInput";
 import AgentTimeline from "@/components/AgentTimeline";
 import AdvisoryCard from "@/components/AdvisoryCard";
+import ChatPanel from "@/components/ChatPanel";
+import Usps from "@/components/Usps";
 import LiveAdvisorPanel from "@/components/LiveAdvisorPanel";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, MessageCircle } from "lucide-react";
@@ -272,7 +274,7 @@ export default function ResearchPage() {
             marginBottom: "10px",
           }}
         >
-          Loan Readiness Advisory for Micro-Entrepreneurs
+          Market Research &amp; Business Advisor for Micro-Entrepreneurs
         </h2>
         <p
           style={{
@@ -298,7 +300,7 @@ export default function ResearchPage() {
             margin: "8px auto 0",
           }}
         >
-          Describe your business in plain language — get a structured Loan Readiness Advisory, matched government schemes, and a document checklist in under 60 seconds.
+          Describe your business in plain language — get live market research, a clear business road-map, matched government schemes, and a loan-readiness checklist in under 60 seconds.
         </p>
       </motion.div>
 
@@ -343,6 +345,9 @@ export default function ResearchPage() {
         )}
       </AnimatePresence>
 
+      {/* Why GrameenAI — what makes this different from a generic chatbot */}
+      <Usps />
+
       {/* Agent timeline */}
       <AgentTimeline steps={steps} statusMessage={statusMessage} isRunning={isRunning} />
 
@@ -356,6 +361,9 @@ export default function ResearchPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Personal business advisor chat — remembers this session and your report */}
+      <ChatPanel sessionId={sessionId} topic={currentTopic} />
 
       {/* Realtime voice advisor (LiveKit) */}
       <LiveAdvisorPanel />

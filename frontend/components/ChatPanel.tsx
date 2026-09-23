@@ -1,7 +1,18 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Loader2, Send, Trash2, User } from "lucide-react";
+import {
+  Banknote,
+  Bot,
+  FileText,
+  Languages,
+  Loader2,
+  Send,
+  Sparkles,
+  Trash2,
+  TrendingUp,
+  User,
+} from "lucide-react";
 
 const rawApiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 const API_BASE =
@@ -20,11 +31,19 @@ const LANGS = [
   { value: "en", label: "EN" },
 ];
 
-const WELCOME: ChatMessage = {
-  role: "assistant",
-  content:
-    "Hi, I'm your business advisor. Ask me how to build your business, which loan scheme fits you, what documents to carry, or anything to get you loan-ready.",
-};
+const QUICK_PROMPTS = [
+  { icon: Banknote, label: "Which loans can I get?", lang: "en" },
+  { icon: FileText, label: "Documents I need", lang: "en" },
+  { icon: Languages, label: "क्या मुद्रा लोन मिलेगा?", lang: "hi" },
+  { icon: TrendingUp, label: "Start with ₹1 lakh?", lang: "en" },
+];
+
+function welcome(topic: string) {
+  if (topic.trim()) {
+    return `I've read your “${topic}” business report — I'm your personal advisor now. Ask me about your loan eligibility, the documents to carry, or your next steps. आप हिंदी में भी पूछ सकते हैं।`;
+  }
+  return "Hi, I'm your personal business advisor. Run a research above and I'll learn your business — then ask me about loans, schemes, documents, or how to get loan-ready.";
+}
 
 export default function ChatPanel({
   sessionId,
@@ -87,37 +106,40 @@ export default function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isLoading]);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || isLoading) return;
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, session_id: sessionId, topic, lang }),
-      });
-      const body = await res.json();
-      const reply =
-        typeof body?.reply === "string" && body.reply.trim()
-          ? body.reply
-          : "I couldn't answer that right now. Please rephrase and try again.";
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "I couldn't reach the backend. Make sure the server is running on port 8000 and try again.",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [input, isLoading, sessionId, topic, lang]);
+  const send = useCallback(
+    async (preset?: string) => {
+      const text = (preset ?? input).trim();
+      if (!text || isLoading) return;
+      setInput("");
+      setMessages((prev) => [...prev, { role: "user", content: text }]);
+      setIsLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, session_id: sessionId, topic, lang }),
+        });
+        const body = await res.json();
+        const reply =
+          typeof body?.reply === "string" && body.reply.trim()
+            ? body.reply
+            : "I couldn't answer that right now. Please rephrase and try again.";
+        setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "I couldn't reach the backend. Make sure the server is running on port 8000 and try again.",
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [input, isLoading, sessionId, topic, lang]
+  );
 
   const clearChat = useCallback(async () => {
     setMessages([]);
@@ -133,7 +155,7 @@ export default function ChatPanel({
 
   const displayMessages: ChatMessage[] =
     messages.length === 0 && !isLoading
-      ? [WELCOME]
+      ? [{ role: "assistant", content: welcome(topic) }]
       : messages;
 
   return (
@@ -170,10 +192,14 @@ export default function ChatPanel({
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            Business Advisor Chat
+            Your Personal Business Advisor
           </div>
           <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-            {sessionId ? "Remembers this conversation — ask follow-ups freely." : "Chatting without saved memory."}
+            {topic.trim()
+              ? `Knows your “${topic}” business — follow-ups come straight from your report.`
+              : sessionId
+                ? "Remembers this conversation — run a research above and I'll learn your business."
+                : "Chatting without saved memory."}
           </div>
         </div>
         {/* Language toggle */}
@@ -229,6 +255,28 @@ export default function ChatPanel({
           </button>
         )}
       </div>
+
+      {/* Personalised context badge */}
+      {topic.trim() && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            marginBottom: "10px",
+            padding: "6px 12px",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "999px",
+            alignSelf: "flex-start",
+          }}
+        >
+          <Sparkles size={12} color="var(--accent)" />
+          <span style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
+            Personalised for your “{topic}” business — answers are grounded in your report, not generic advice.
+          </span>
+        </div>
+      )}
 
       {/* Messages */}
       <div
@@ -325,6 +373,46 @@ export default function ChatPanel({
         <div ref={bottomRef} />
       </div>
 
+      {/* Quick prompts — tap to ask */}
+      {messages.length === 0 && !isLoading && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            marginTop: "12px",
+          }}
+        >
+          {QUICK_PROMPTS.map((q) => {
+            const Icon = q.icon;
+            return (
+              <motion.button
+                key={q.label}
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                onClick={() => send(q.label)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "7px 12px",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: "999px",
+                  fontSize: "0.74rem",
+                  fontWeight: 600,
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                }}
+              >
+                <Icon size={13} color="var(--accent)" />
+                {q.label}
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Input */}
       <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
         <input
@@ -349,7 +437,7 @@ export default function ChatPanel({
         />
         <button
           type="button"
-          onClick={send}
+          onClick={() => send()}
           disabled={isLoading || !input.trim()}
           title="Send"
           style={{

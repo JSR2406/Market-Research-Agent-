@@ -9,10 +9,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "GrameenAI Advisor — Loan Readiness for Micro-Entrepreneurs",
+  title: "GrameenAI Advisor — Market Research & Business Advisor for Micro-Entrepreneurs",
   description:
-    "Multi-agent AI advisory that turns a plain-language business description into a loan readiness report, matched government schemes, and a document checklist.",
-  keywords: ["loan readiness", "MUDRA", "CGTMSE", "PMEGP", "micro-entrepreneur", "MSME schemes", "financial advisory"],
+    "Multi-agent AI research and advisory that turns a plain-language business description into market research, a business road-map, matched government schemes, and a loan-readiness checklist.",
+  keywords: ["market research", "business advisor", "loan readiness", "MUDRA", "CGTMSE", "PMEGP", "micro-entrepreneur", "MSME schemes", "financial advisory"],
 };
 
 export default function RootLayout({

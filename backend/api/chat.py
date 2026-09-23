@@ -30,6 +30,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str = ""
     topic: str = ""
+    lang: str = "auto"  # "auto" | "hi" | "en"
 
 
 @router.post("")
@@ -61,6 +62,7 @@ async def chat(body: ChatRequest):
             topic=topic,
             advisory_context=advisory_context,
             chat_history=history,
+            lang=body.lang,
         )
     except Exception as e:
         logger.error(f"[Chat] chat_agent raised unexpectedly: {e}")

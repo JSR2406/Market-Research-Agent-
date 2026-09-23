@@ -18,7 +18,7 @@ Built with **Next.js 15**, **FastAPI**, and a multi-provider LLM client
 - **🔍 Deep Analysis**: Leverages multiple free LLM providers (via one client) for actionable advisory.
 - **🧭 Real-time Web Research**: Optional web search + scraping enriches the research agent with live snippets.
 - **🗣️ Voice I/O**: Record your business description by voice; listen to the advisory (ElevenLabs → Hugging Face → offline pyttsx3 fallback).
-- **💬 Business Advisor Chat**: Specialised chatbot that builds your business and makes you loan-ready (schemes, documents, eligibility) — with saved chat memory per session.
+- **💬 Business Advisor Chat**: Specialised chatbot that builds your business and makes you loan-ready (schemes, documents, eligibility) — with saved chat memory per session and Hindi/Hinglish replies.
 - **📜 Simplified Document**: Low-literacy "In Simple Words" advisory, download/copy as `.txt`.
 - **🛟 Offline Resilience**: If every LLM provider is down, a deterministic engine still produces a full advisory from local scheme data.
 
@@ -152,12 +152,15 @@ browser mic ──► LiveKit room ──► Silero STT (local) ──► Adviso
 
 - **Specialist** (`backend/agents/chat.py`): business advisory & building —
   loan schemes, document packs, eligibility, and step-by-step business-building
-  guidance. Off-topic questions get steered back to the business. Primary model
-  is **open-source** (`mistralai/mistral-7b-instruct`); the call follows the
-  normal free-first chain (Ollama → Hugging Face → OpenRouter) with a
-  deterministic offline fallback.
+  guidance. Off-topic questions get steered back to the business. **Multi-
+  language**: replies follow the user — Hindi/Hinglish when they write in
+  Devanagari (or the toggle is set to हिंदी), English otherwise; even the
+  offline fallback speaks Hindi. Primary model is **open-source**
+  (`mistralai/mistral-7b-instruct`); the call follows the normal free-first
+  chain (Ollama → Hugging Face → OpenRouter) with a deterministic offline
+  fallback.
 - **Endpoints**:
-  - `POST /api/chat` — body `{message, session_id?, topic?}` → `{reply, session_id, history_count}`
+  - `POST /api/chat` — body `{message, session_id?, topic?, lang?}` where `lang` ∈ `auto` (default) | `hi` | `en` → `{reply, session_id, history_count}`
   - `GET  /api/chat/history?session_id=` — remembered messages
   - `DELETE /api/chat/{session_id}` — clear chat memory (GDPR-aligned)
 - **Memory**: per-session `backend/sessions/{session_id}_chat.json` (capped at
@@ -165,9 +168,9 @@ browser mic ──► LiveKit room ──► Silero STT (local) ──► Adviso
   latest advisory is injected automatically, so you can ask follow-ups about
   your own report.
 - **Frontend**: `ChatPanel.tsx` on `/research` (bubbles, history restore,
-  clear button). `session_id` is generated browser-side and kept in
-  `localStorage["grameenai_session"]` — the same id ties the research run, the
-  chat, its export, and its delete together.
+  clear button, Auto/हिंदी/EN language toggle). `session_id` is generated
+  browser-side and kept in `localStorage["grameenai_session"]` — the same id
+  ties the research run, the chat, its export, and its delete together.
 
 ## 📁 Project Structure
 

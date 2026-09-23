@@ -13,6 +13,13 @@ const API_BASE =
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
+const LANG_KEY = "grameenai_chat_lang";
+const LANGS = [
+  { value: "auto", label: "Auto" },
+  { value: "hi", label: "हिंदी" },
+  { value: "en", label: "EN" },
+];
+
 const WELCOME: ChatMessage = {
   role: "assistant",
   content:
@@ -30,8 +37,28 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadedHistory, setLoadedHistory] = useState(false);
+  const [lang, setLang] = useState("auto");
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Restore the language choice.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(LANG_KEY);
+      if (saved === "hi" || saved === "en" || saved === "auto") setLang(saved);
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const changeLang = (value: string) => {
+    setLang(value);
+    try {
+      window.localStorage.setItem(LANG_KEY, value);
+    } catch {
+      /* noop */
+    }
+  };
 
   // Restore remembered chat for this session (chat memory).
   useEffect(() => {
@@ -70,7 +97,7 @@ export default function ChatPanel({
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, session_id: sessionId, topic }),
+        body: JSON.stringify({ message: text, session_id: sessionId, topic, lang }),
       });
       const body = await res.json();
       const reply =
@@ -90,7 +117,7 @@ export default function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, sessionId, topic]);
+  }, [input, isLoading, sessionId, topic, lang]);
 
   const clearChat = useCallback(async () => {
     setMessages([]);
@@ -148,6 +175,38 @@ export default function ChatPanel({
           <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
             {sessionId ? "Remembers this conversation — ask follow-ups freely." : "Chatting without saved memory."}
           </div>
+        </div>
+        {/* Language toggle */}
+        <div
+          style={{
+            display: "flex",
+            gap: "2px",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: "10px",
+            padding: "3px",
+          }}
+        >
+          {LANGS.map((l) => (
+            <button
+              key={l.value}
+              type="button"
+              onClick={() => changeLang(l.value)}
+              title={l.value === "hi" ? "हिंदी में जवाब पाएँ" : l.label}
+              style={{
+                border: "none",
+                background: lang === l.value ? "rgba(45,212,191,0.18)" : "transparent",
+                color: lang === l.value ? "var(--accent)" : "var(--text-muted)",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                padding: "4px 10px",
+                borderRadius: "7px",
+                cursor: "pointer",
+              }}
+            >
+              {l.label}
+            </button>
+          ))}
         </div>
         {sessionId && (
           <button
@@ -275,7 +334,7 @@ export default function ChatPanel({
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
-          placeholder="Ask anything about your business or loan…"
+          placeholder={lang === "hi" ? "बिज़नेस या कर्ज़ के बारे में हिंदी में पूछें…" : "Ask anything about your business or loan…"}
           aria-label="Chat message"
           style={{
             flex: 1,
@@ -313,7 +372,7 @@ export default function ChatPanel({
         <div style={{ marginTop: "10px", display: "flex", gap: "6px", alignItems: "center" }}>
           <User size={12} color="var(--text-muted)" />
           <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-            Tip: run a research above first — the advisor will then remember your actual business when answering.
+            Tip: run a research above first — the advisor then remembers your actual business. हिंदी में भी लिख सकते हैं।
           </span>
         </div>
       )}

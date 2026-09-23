@@ -81,13 +81,13 @@ market-research-agent/
   - Lazy imports keep the base backend working without the LiveKit stack.
 
 ## Chat / Conversation
-- `backend/agents/chat.py` — specialised business advisory & business-building chatbot (loans, schemes, documents, and building the business). Scope-limited: routes off-topic questions back to business.
+- `backend/agents/chat.py` — specialised business advisory & business-building chatbot (loans, schemes, documents, and building the business). Scope-limited: routes off-topic questions back to business. **Multi-language:** replies follow the user's language — Devanagari/Hinglish input (or `lang="hi"`) yields Hindi replies; the offline heuristic fallback speaks Hindi too.
 - `backend/api/chat.py` — REST endpoints:
-  - `POST /api/chat` (body `{message, session_id?, topic?}`) → `{reply, session_id, history_count}`
+  - `POST /api/chat` (body `{message, session_id?, topic?, lang?}`) → `{reply, session_id, history_count}` where `lang` ∈ `auto` (default) | `hi` | `en`
   - `GET  /api/chat/history?session_id=` → remembered messages
   - `DELETE /api/chat/{session_id}` → clear chat memory (GDPR-aligned)
 - Chat memory: stored as `backend/sessions/{session_id}_chat.json` (capped at `MAX_CHAT_MESSAGES`); the latest written advisory is injected as context so the user can ask follow-ups about their own report. The same `session_id` ties the WS research run, the chat, the export, and the delete together.
-- Frontend: `ChatPanel.tsx` on `/research` — bubbles, history restore, clear button; `session_id` comes from `localStorage["grameenai_session"]` (generated browser-side).
+- Frontend: `ChatPanel.tsx` on `/research` — bubbles, history restore, clear button, Auto/हिंदी/EN language toggle (persisted in `localStorage["grameenai_chat_lang"]`); `session_id` comes from `localStorage["grameenai_session"]` (generated browser-side).
 - **Model rule: the `chat` agent's primary OpenRouter model must stay OPEN-SOURCE** (`mistralai/mistral-7b-instruct`). Call path follows the normal chain: Ollama (local) → Hugging Face (free) → OpenRouter.
 
 ## WebSocket Events

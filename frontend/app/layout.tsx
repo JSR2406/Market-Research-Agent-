@@ -9,10 +9,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Market Research Agent — AI-Powered Intelligence",
+  title: "GrameenAI Advisor — Loan Readiness for Micro-Entrepreneurs",
   description:
-    "Generate comprehensive market research reports in minutes using autonomous AI agents. Powered by Nemotron LLM.",
-  keywords: ["market research", "AI agent", "market analysis", "competitive intelligence"],
+    "Multi-agent AI advisory that turns a plain-language business description into a loan readiness report, matched government schemes, and a document checklist.",
+  keywords: ["loan readiness", "MUDRA", "CGTMSE", "PMEGP", "micro-entrepreneur", "MSME schemes", "financial advisory"],
 };
 
 export default function RootLayout({

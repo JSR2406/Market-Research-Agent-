@@ -35,6 +35,7 @@ export default function ResearchPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [steps, setSteps] = useState<Step[]>([]);
   const [finalReport, setFinalReport] = useState<string | null>(null);
+  const [simplifiedReport, setSimplifiedReport] = useState<string>("");
   const [currentTopic, setCurrentTopic] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -88,6 +89,7 @@ export default function ResearchPage() {
         break;
       case "done":
         setFinalReport(data.final_report as string);
+        setSimplifiedReport(((data.simplified_report as string) ?? "").trim());
         setIsRunning(false);
         setStatusMessage("Research complete ✓");
         retriesRef.current = 0;
@@ -165,6 +167,7 @@ export default function ResearchPage() {
     setIsRunning(true);
     setSteps([]);
     setFinalReport(null);
+    setSimplifiedReport("");
     setCurrentTopic(topic);
     setStatusMessage("Connecting…");
     setErrorMessage("");
@@ -318,7 +321,11 @@ export default function ResearchPage() {
       {/* Report */}
       <AnimatePresence>
         {finalReport && (
-          <AdvisoryCard report={finalReport} topic={currentTopic} />
+          <AdvisoryCard
+            report={finalReport}
+            topic={currentTopic}
+            simplified={simplifiedReport}
+          />
         )}
       </AnimatePresence>
 

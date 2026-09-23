@@ -1,8 +1,13 @@
 import ast
 import json
+import logging
 import re
 from typing import List, Optional
+
+from backend.core.heuristics import fallback_plan
 from backend.core.llm_client import call_llm
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_plan(content: str) -> List[str]:
@@ -54,7 +59,7 @@ async def planner_agent(
 ) -> List[str]:
     """
     Plan a 5-step research workflow for the given topic.
-    previous_context: optional summary of a prior session (Phase 2 hook).
+    previous_context: optional summary of a prior session.
     """
     context_note = ""
     if previous_context:
@@ -88,12 +93,5 @@ async def planner_agent(
         )
         return _parse_plan(content)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"Planner LLM failed: {e}")
-        return [
-            f"Gather data on product/service and business model for {topic}",
-            f"Analyze daily/monthly income metrics for {topic}",
-            f"Research location type and operational scale for {topic}",
-            f"Recommend schemes based on formal registration status and credit readiness for {topic}",
-            f"Synthesize findings into a final loan readiness report for {topic}",
-        ]
+        logger.error(f"Planner LLM failed: {e}")
+        return fallback_plan(topic)

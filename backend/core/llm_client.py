@@ -2,11 +2,12 @@
 LLM client with multi-provider support (Ollama, Hugging Face, OpenRouter).
 
 Phase 1b additions:
-  - Request-level in-memory cache (keyed on sha256(messages + candidates + max_tokens))
+  - Request-level in-memory cache (keyed on sha256(messages + candidates + max_tokens)),
+    bounded FIFO (see _RESPONSE_CACHE_MAX_ENTRIES)
   - Per-process model blacklist: skip 429/402 and "No endpoints found" 404s for this process
   - Optional agent_hint kwarg auto-applies per-agent token budgets
   - SESSION_TOKEN_USAGE accumulates approx token count per WebSocket session
-  - reset_session_state() clears cache + counter between runs
+  - reset_session_state() clears the counter between runs (cache deliberately preserved)
 
 Phase 2 additions:
   - Multi-provider support: Ollama (local), Hugging Face Inference API, OpenRouter
@@ -19,6 +20,7 @@ import hashlib
 import json
 import logging
 import os
+from collections import OrderedDict
 from typing import Dict, List, Optional
 
 import httpx
@@ -51,9 +53,11 @@ _model_blacklist: set[str] = set()
 
 # --------------------------------------------------------------------------- #
 # Request-level response cache                                                  #
-# dict[sha256_hex -> str]  -- cleared on each new WS session                  #
+# Dict[sha256_hex -> str]. Bounded FIFO: preserved across runs for rehearsal,   #
+# but capped so it cannot grow without bound within a long-lived process.      #
 # --------------------------------------------------------------------------- #
-_response_cache: Dict[str, str] = {}
+_RESPONSE_CACHE_MAX_ENTRIES = 128
+_response_cache: "OrderedDict[str, str]" = OrderedDict()
 
 # --------------------------------------------------------------------------- #
 # Session-level approximate token counter                                       #
@@ -63,7 +67,7 @@ SESSION_TOKEN_USAGE: Dict[str, int] = {"input": 0, "output": 0, "total": 0}
 
 
 def reset_session_state() -> None:
-    """Clear token counter. Call at the start of each WS workflow run. Cache is preserved for rehearsal."""
+    """Clear the token counter. Call at the start of each WS workflow run. Cache is preserved for rehearsal."""
     SESSION_TOKEN_USAGE["input"] = 0
     SESSION_TOKEN_USAGE["output"] = 0
     SESSION_TOKEN_USAGE["total"] = 0
@@ -201,8 +205,8 @@ async def _call_huggingface(
                             logger.info(f"[LLM/HF] Success via {model} (after loading)")
                             return content.strip()
             elif response.status_code in (429, 402):
+                # Rate-limited, NOT a broken model — do not blacklist. Just move on.
                 logger.warning(f"[LLM/HF] {model} rate limited")
-                _model_blacklist.add(model)
             else:
                 logger.warning(f"[LLM/HF] {model} -> {response.status_code}: {response.text[:200]}")
     except Exception as e:
@@ -336,6 +340,7 @@ async def call_llm(
     ck = _cache_key(messages, candidate_models, max_tokens)
     if ck in _response_cache:
         logger.info(f"[LLM] Cache HIT (key={ck[:12]}...)")
+        _response_cache.move_to_end(ck)
         return _response_cache[ck]
 
     # Approximate input token cost
@@ -377,6 +382,9 @@ async def call_llm(
                 SESSION_TOKEN_USAGE["input"] + SESSION_TOKEN_USAGE["output"]
             )
             _response_cache[ck] = content
+            _response_cache.move_to_end(ck)
+            while len(_response_cache) > _RESPONSE_CACHE_MAX_ENTRIES:
+                _response_cache.popitem(last=False)
             logger.info(
                 f"[LLM] Success via {provider}/{model} | "
                 f"session_tokens~{SESSION_TOKEN_USAGE['total']}"

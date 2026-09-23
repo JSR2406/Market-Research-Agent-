@@ -72,9 +72,17 @@ AGENT_TOKEN_BUDGETS: dict[str, int] = {
     "opportunity": 350,   # 3-5 ranked items
     "writer":      600,   # full markdown report
     "editor":      600,   # polished markdown
-    "decide":      120,   # agent routing JSON (legacy; no longer used)
+    "simplifier":  200,   # very short plain-language summary
     "default":     500,
 }
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Real-time web research
+# ──────────────────────────────────────────────────────────────────────────────
+WEB_SEARCH_ENABLED: bool = os.getenv("WEB_SEARCH_ENABLED", "true").strip().lower() in (
+    "1", "true", "yes",
+)
+WEB_SEARCH_MAX_RESULTS: int = int(os.getenv("WEB_SEARCH_MAX_RESULTS", "3"))
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Voice/TTS settings

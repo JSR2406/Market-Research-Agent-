@@ -39,6 +39,11 @@ def _get_elevenlabs_key() -> str:
     return os.getenv("ELEVENLABS_API_KEY", "") or ""
 
 
+def _tts_model_candidates() -> list:
+    """HF TTS models in priority order, deduplicated."""
+    return list(dict.fromkeys([HF_TTS_MODEL, *HF_TTS_FALLBACK_MODELS]))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Speech-to-text
 # ─────────────────────────────────────────────────────────────────────────────
@@ -93,13 +98,25 @@ async def _stt_elevenlabs(audio_bytes: bytes, api_key: str) -> str:
 
 
 async def _stt_speech_recognition(audio_bytes: bytes) -> str:
-    """Use SpeechRecognition + Google free STT. Runs sync call in executor."""
+    """
+    Use SpeechRecognition + Google free STT. Runs sync call in executor.
+
+    SpeechRecognition only decodes RIFF/WAVE audio. Browsers record WebM/Opus,
+    which would fail here without an ffmpeg transcode step — so we guard on the
+    container and return "" (caller shows a graceful message) instead of burning
+    seconds on a doomed decode.
+    """
+    if not (audio_bytes.startswith(b"RIFF") and b"WAVE" in audio_bytes[:16]):
+        logger.warning(
+            "[Voice/STT] SpeechRecognition fallback needs WAV audio "
+            "(got non-RIFF/WebM container) — skipping."
+        )
+        return ""
     try:
         import speech_recognition as sr  # type: ignore
 
         def _sync_recognize() -> str:
             recognizer = sr.Recognizer()
-            # SpeechRecognition expects WAV; write to temp file
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                 tmp_path = tmp.name
                 tmp.write(audio_bytes)
@@ -204,7 +221,7 @@ async def _tts_huggingface(text: str) -> bytes:
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    for model in [HF_TTS_MODEL] + list(HF_TTS_FALLBACK_MODELS):
+    for model in _tts_model_candidates():
         if not model:
             continue
         try:

@@ -1,33 +1,35 @@
 """
 ws_market.py — WebSocket endpoint for the market research workflow.
 
-Phase 1 additions:
-  - Accept optional session_id in "start" message (Phase 2 hook, no-op in Phase 1)
-  - Pass session_context="" to run_research_workflow (wired in Phase 2)
-
-Phase 2 additions (stubs wired here, implemented in backend/core/memory.py):
-  - On connect, if session_id provided & prior session exists → send "resume_available" event
-
-Phase 3 additions:
-  - "delete_session" message type
-  - "export_session" message type
+Messages handled:
+- `start`: begin a run (optionally resume a prior session via session_id)
+- `cancel`: cancel the running workflow
+- `delete_session`: GDPR right-to-delete
+- `export_session`: export stored session data
 """
+import asyncio
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.core.ws import SafeWebSocket
 from backend.workflows.executor import run_research_workflow
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.websocket("/ws/market")
 async def market_research_websocket(websocket: WebSocket):
     await websocket.accept()
+    ws = SafeWebSocket(websocket)
+
     cancel_flag = {"cancelled": False}
     workflow_task = None
 
     try:
         while True:
-            msg = await websocket.receive_json()
+            msg = await ws.receive_json()
             msg_type = msg.get("type")
 
             if msg_type == "start":
@@ -36,110 +38,98 @@ async def market_research_websocket(websocket: WebSocket):
                 session_id = msg.get("session_id", "").strip()
 
                 if not topic:
-                    await websocket.send_json({"type": "error", "message": "Topic is empty."})
+                    await ws.send_json({"type": "error", "message": "Topic is empty."})
                     continue
 
                 cancel_flag["cancelled"] = False
 
-                # ── Phase 2 hook: load prior session context ──────────────
+                # Load prior session context for continuity.
                 session_context = ""
                 if session_id:
                     try:
-                        from backend.core.memory import load_last_session, build_resume_context
+                        from backend.core.memory import build_resume_context, load_last_session
                         prior = load_last_session(session_id)
                         if prior:
                             session_context = build_resume_context(prior)
-                            await websocket.send_json({
+                            await ws.send_json({
                                 "type": "resume_available",
                                 "session_id": session_id,
                                 "previous_topic": prior.get("topic", ""),
                                 "summary": session_context[:300],
                             })
                     except ImportError:
-                        pass  # memory module not yet present (Phase 1 only)
+                        pass  # memory module not present
                     except Exception:
-                        pass  # don't block a run because of memory errors
+                        pass  # never block a run because of memory errors
 
-                # Cancel previous task if still running
-                import asyncio
+                # Cancel the previous task if still running.
                 if workflow_task and not workflow_task.done():
                     workflow_task.cancel()
 
                 workflow_task = asyncio.create_task(
                     run_research_workflow(
-                        topic, max_steps, websocket, cancel_flag,
+                        topic, max_steps, ws, cancel_flag,
                         session_context=session_context,
                         session_id=session_id,
                     )
                 )
 
-                # ── Phase 2 hook: save session after completion ───────────
-                if session_id:
-                    async def _save_on_done(task, sid, t):
-                        try:
-                            result = await task
-                        except Exception:
-                            return
-                        # save handled inside executor via memory module (Phase 2)
-
             elif msg_type == "cancel":
                 cancel_flag["cancelled"] = True
                 if workflow_task and not workflow_task.done():
                     workflow_task.cancel()
-                await websocket.send_json({"type": "cancelled"})
+                await ws.send_json({"type": "cancelled"})
 
             elif msg_type == "delete_session":
-                # Phase 3: handled here when memory module is present
                 session_id = msg.get("session_id", "").strip()
                 try:
                     from backend.core.memory import delete_session
                     delete_session(session_id)
-                    await websocket.send_json({
+                    await ws.send_json({
                         "type": "session_deleted",
                         "session_id": session_id,
                     })
                 except ImportError:
-                    await websocket.send_json({
+                    await ws.send_json({
                         "type": "error",
-                        "message": "Memory module not available (Phase 3 not yet implemented).",
+                        "message": "Memory module not available.",
                     })
 
             elif msg_type == "export_session":
-                # Phase 3: handled here when memory module is present
                 session_id = msg.get("session_id", "").strip()
                 try:
                     from backend.core.memory import load_last_session
                     data = load_last_session(session_id)
                     if data:
-                        await websocket.send_json({
+                        await ws.send_json({
                             "type": "session_export",
                             "session_id": session_id,
                             "data": data,
                         })
                     else:
-                        await websocket.send_json({
+                        await ws.send_json({
                             "type": "error",
                             "message": f"No session found for id: {session_id}",
                         })
                 except ImportError:
-                    await websocket.send_json({
+                    await ws.send_json({
                         "type": "error",
-                        "message": "Memory module not available (Phase 3 not yet implemented).",
+                        "message": "Memory module not available.",
                     })
 
             else:
-                await websocket.send_json({
+                await ws.send_json({
                     "type": "error",
                     "message": f"Unknown message type: {msg_type}",
                 })
 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        logger.info("Client disconnected")
         if workflow_task and not workflow_task.done():
             workflow_task.cancel()
     except Exception as e:
         try:
-            await websocket.send_json({"type": "error", "message": str(e)})
+            await ws.send_json({"type": "error", "message": str(e)})
         except Exception:
             pass
         if workflow_task and not workflow_task.done():

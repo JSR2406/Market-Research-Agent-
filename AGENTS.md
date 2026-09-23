@@ -4,41 +4,54 @@
 - Backend: Python, FastAPI, WebSockets, httpx, uvicorn, python-dotenv
 - Frontend: Next.js 15 App Router, TypeScript, Tailwind CSS, Framer Motion, react-markdown, remark-gfm, lucide-react
 - LLM: Multi-provider via backend/core/llm_client.py — Ollama (local, free), Hugging Face Inference API (free tier), OpenRouter (cloud)
+- Web research: googlesearch-python + httpx + BeautifulSoup (no keys, Google → DuckDuckGo fallback)
 
 ## Folder Structure
 market-research-agent/
 ├── backend/
 │   ├── .env
 │   ├── requirements.txt
-│   ├── main.py
+│   ├── main.py                 # FastAPI app, lifespan, CORS, /health
 │   ├── __init__.py
 │   ├── core/
 │   │   ├── __init__.py
-│   │   ├── config.py
-│   │   └── llm_client.py
+│   │   ├── config.py           # env-derived settings, fail-fast key guard
+│   │   ├── llm_client.py       # multi-provider LLM client + cache + token counter
+│   │   ├── heuristics.py       # zero-LLM advisory engine (offline guarantee tier)
+│   │   ├── web_research.py     # search + scrape (Google → DuckDuckGo), no keys
+│   │   ├── ws.py               # SafeWebSocket — serialized sends
+│   │   ├── memory.py           # JSON session store, 7-day retention
+│   │   └── voice.py            # STT/TTS, never raises
 │   ├── agents/
 │   │   ├── __init__.py
-│   │   ├── planner.py
-│   │   ├── research.py
-│   │   ├── analyst.py
-│   │   ├── opportunity.py
-│   │   ├── writer.py
-│   │   ├── editor.py
-│   │   └── executor.py
+│   │   ├── planner.py          # 5-step plan (+heuristic fallback)
+│   │   ├── research.py         # facts + optional live web context (+heuristic fallback)
+│   │   ├── analyst.py          # cash-flow snapshot (+heuristic fallback)
+│   │   ├── opportunity.py      # scheme matching (+heuristic fallback)
+│   │   ├── writer.py           # advisory JSON (+heuristic fallback)
+│   │   ├── editor.py           # polished advisory JSON (+heuristic fallback)
+│   │   └── simplifier.py       # low-literacy "In Simple Words" doc (+heuristic fallback)
+│   ├── workflows/
+│   │   ├── __init__.py
+│   │   ├── executor.py         # run orchestration, emits WS events
+│   │   └── routing.py          # keyword step→agent mapping (zero LLM calls)
+│   ├── data/
+│   │   └── schemes.json        # curated Indian MSME schemes
 │   └── api/
 │       ├── __init__.py
-│       └── ws_market.py
+│       ├── ws_market.py        # WS endpoint (start/cancel/export/delete)
+│       └── voice.py            # /api/voice/{transcribe,speak}
 └── frontend/
     ├── .env.local
     ├── package.json
     ├── app/
     │   ├── layout.tsx
-    │   ├── page.tsx
-    │   └── research/page.tsx
+    │   ├── page.tsx            # redirect → /research
+    │   └── research/page.tsx   # WS client, run/cancel, report state
     └── components/
-        ├── TopicInput.tsx
-        ├── AgentTimeline.tsx
-        └── ReportViewer.tsx
+        ├── TopicInput.tsx      # text + voice input, step selector
+        ├── AgentTimeline.tsx   # step progress + status
+        └── AdvisoryCard.tsx    # advisory render, simplified doc, download/copy, listen
 
 ## LLM Model Routing (all calls via backend/core/llm_client.py only)
 - All agents route through `backend/core/llm_client.call_llm()` with a per-agent `agent_hint`.
@@ -54,12 +67,13 @@ market-research-agent/
   - TTS: ElevenLabs (if key) → Hugging Face Inference API (`HF_TTS_MODEL`, default `facebook/mms-tts-eng`, free) → pyttsx3 (offline).
 
 ## WebSocket Events
-plan, step_start, step_end, done, cancelled, error, status
+plan, step_start, step_end, token_usage, status, done (with simplified_report), cancelled, error, resume_available, session_deleted, session_export
 
 ## Rules
 - Never hardcode API keys, always use os.getenv()
 - All LLM calls only through backend/core/llm_client.py
-- All React components must have "use client" at top
+- Every agent must wrap its call_llm in try/except with a deterministic fallback
+- Frontend components: all React components must have "use client" at top
 - Use Framer Motion for all animations
 - Use lucide-react for all icons
 - WebSocket connects to ws://localhost:8000/ws/market

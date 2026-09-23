@@ -12,12 +12,14 @@ services:
         sync: false          # you will paste this in Render dashboard
       - key: ALLOWED_ORIGINS
         sync: false          # paste your Vercel URL here e.g. https://market-research-agent-jsr2406.vercel.app
-      - key: MODEL
-        value: google/gemini-2.5-flash:free
+- key: MODEL
+        value: google/gemini-2.5-flash
       - key: OPENROUTER_BASE_URL
         value: https://openrouter.ai/api/v1
       - key: LLM_PROVIDER_PRIORITY
         value: huggingface,openrouter   # no local Ollama on Render
+      - key: WEB_SEARCH_ENABLED
+        value: "true"
       - key: HF_API_TOKEN
         sync: false          # optional — paste for higher Hugging Face rate limits
       - key: HF_MODEL

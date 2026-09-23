@@ -60,6 +60,8 @@ market-research-agent/
   - **Hugging Face** — Inference API free tier: `HF_MODEL` (default `Qwen/Qwen2.5-7B-Instruct`).
   - **OpenRouter** — cloud fallback: uses `MODEL` + `FALLBACK_MODELS`.
 - Agents never hardcode a provider; they just pass `agent_hint` and the client handles fallback.
+- Per-agent OpenRouter model priority (`AGENT_OPENROUTER_MODELS` in `backend/core/config.py`) — each agent leads with a distinct model so no single model's quota gets exhausted; the global `FALLBACK_MODELS` chain is appended as backup.
+- OpenRouter key rotation: `OPENROUTER_API_KEY_2` (in `backend/.env`) is used automatically on 429/402/timeout and once healthy it becomes the preferred key for later calls.
 
 ## Voice / TTS
 - `backend/core/voice.py` — never raises, always falls back through:

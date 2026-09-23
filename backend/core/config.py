@@ -77,6 +77,24 @@ AGENT_TOKEN_BUDGETS: dict[str, int] = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Per-agent model selection
+# Spreads LLM load across different models so a single model's free-tier quota
+# is not exhausted by every agent in every run. Each agent leads with its own
+# primary model (first entry); the global FALLBACK_MODELS chain is appended
+# afterwards, so any agent still degrades gracefully if its primary 404s.
+# ──────────────────────────────────────────────────────────────────────────────
+AGENT_OPENROUTER_MODELS: dict[str, list[str]] = {
+    "planner":      ["qwen/qwen-2.5-72b-instruct"],
+    "research":     ["google/gemini-2.5-flash"],
+    "analyst":      ["meta-llama/llama-3.3-70b-instruct"],
+    "opportunity":  ["deepseek/deepseek-chat"],
+    "writer":       ["google/gemini-2.5-flash"],
+    "editor":       ["meta-llama/llama-3.3-70b-instruct"],
+    "simplifier":   ["openrouter/auto"],
+    "default":      [],
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Real-time web research
 # ──────────────────────────────────────────────────────────────────────────────
 WEB_SEARCH_ENABLED: bool = os.getenv("WEB_SEARCH_ENABLED", "true").strip().lower() in (

@@ -113,6 +113,13 @@ Configured via `LLM_PROVIDER_PRIORITY` in `backend/.env` (default
 All calls go through `backend/core/llm_client.call_llm()` — agents never
 hardcode a provider.
 
+- **Per-agent models**: `AGENT_OPENROUTER_MODELS` in `backend/core/config.py`
+  gives each agent a distinct leading OpenRouter model (load spread — no single
+  model exhausts its free-tier quota), falling back to the shared
+  `FALLBACK_MODELS` chain.
+- **Key rotation**: `OPENROUTER_API_KEY_2` (in `backend/.env`) is auto-used on
+  429/402/timeout and stays promoted while healthy.
+
 ### Voice pipeline (never raises)
 
 - **STT**: ElevenLabs Scribe (if key) → SpeechRecognition/Google (WAV only).

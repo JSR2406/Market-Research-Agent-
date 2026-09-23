@@ -14,6 +14,14 @@ Phase 2 additions:
   - Provider priority order configurable via LLM_PROVIDER_PRIORITY
   - Automatic fallback between providers
   - No token limits when using local Ollama
+
+Phase 3 additions:
+  - Per-agent model priority (AGENT_OPENROUTER_MODELS): each agent leads with a
+    distinct OpenRouter model so one model's free-tier quota isn't exhausted by
+    every agent; global FALLBACK_MODELS chain still applies afterwards
+  - Self-learning OpenRouter key rotation: a healthy second key is promoted to
+    the front of the rotation so a dead/rate-limited key isn't retried on every
+    call
 """
 import asyncio
 import hashlib
@@ -40,6 +48,7 @@ from backend.core.config import (
     HF_FALLBACK_MODELS,
     LLM_PROVIDER_PRIORITY,
     AGENT_TOKEN_BUDGETS,
+    AGENT_OPENROUTER_MODELS,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +81,38 @@ def reset_session_state() -> None:
     SESSION_TOKEN_USAGE["output"] = 0
     SESSION_TOKEN_USAGE["total"] = 0
     logger.info("Session state reset: token counter zeroed.")
+
+
+# --------------------------------------------------------------------------- #
+# OpenRouter key rotation with self-learning preference                        #
+# --------------------------------------------------------------------------- #
+# Two keys can be configured (OPENROUTER_API_KEY + OPENROUTER_API_KEY_2) for
+# rate-limit/cost rotation. Once a key proves healthy it is moved to the front
+# of the rotation order so subsequent requests hit the working key first —
+# otherwise an exhausted/dead key would be retried on every model fallback and
+# on every LLM call, wasting 402/429 requests.
+_openrouter_ordered_keys: Optional[List[str]] = None
+
+
+def _init_openrouter_rotation(primary: str, alternate: str) -> None:
+    global _openrouter_ordered_keys
+    if _openrouter_ordered_keys is None:
+        keys = [primary]
+        if alternate and alternate != primary:
+            keys.append(alternate)
+        _openrouter_ordered_keys = keys
+
+
+def _promote_openrouter_key(working_key: str) -> None:
+    """Move a key that just succeeded to the front of the rotation order."""
+    global _openrouter_ordered_keys
+    if not _openrouter_ordered_keys:
+        return
+    try:
+        _openrouter_ordered_keys.remove(working_key)
+        _openrouter_ordered_keys.insert(0, working_key)
+    except ValueError:
+        pass  # key no longer in the rotation list
 
 
 def _cache_key(messages: List[Dict[str, str]], candidates: List[str], max_tokens: int) -> str:
@@ -293,7 +334,9 @@ async def call_llm(
     temperature : sampling temperature
     max_tokens  : hard cap on output tokens; if 500 (default) and agent_hint given,
                   the per-agent budget from AGENT_TOKEN_BUDGETS is used instead
-    agent_hint  : optional name (planner/research/analyst/opportunity/writer/editor)
+    agent_hint  : optional name (planner/research/analyst/opportunity/writer/editor).
+                  Selects the per-agent token budget AND the per-agent OpenRouter
+                  model priority (see AGENT_OPENROUTER_MODELS in config.py).
     """
     # Apply agent budget only when caller left max_tokens at its sentinel default
     if agent_hint and max_tokens == 500:
@@ -322,7 +365,15 @@ async def call_llm(
             api_key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
             api_key_2 = OPENROUTER_API_KEY_2 or os.getenv("OPENROUTER_API_KEY_2", "")
             if api_key:
+                # Per-agent model priority first (spreads load across models to
+                # avoid exhausting one model's quota), then the global verified
+                # fallback chain.
+                agent_models = AGENT_OPENROUTER_MODELS.get(agent_hint or "", [])
+                openrouter_models = [] if agent_models is None else list(agent_models)
                 for m in [MODEL] + list(FALLBACK_MODELS):
+                    if m and m not in openrouter_models:
+                        openrouter_models.append(m)
+                for m in openrouter_models:
                     if m and (provider, m) not in seen and m not in _model_blacklist:
                         seen.add((provider, m))
                         all_candidates.append((provider, m))
@@ -362,18 +413,16 @@ async def call_llm(
         elif provider == "openrouter":
             api_key = OPENROUTER_API_KEY or os.getenv("OPENROUTER_API_KEY", "")
             api_key_2 = OPENROUTER_API_KEY_2 or os.getenv("OPENROUTER_API_KEY_2", "")
-            keys = [api_key]
-            if api_key_2 and api_key_2 != api_key:
-                keys.append(api_key_2)
 
-            for key in keys:
+            _init_openrouter_rotation(api_key, api_key_2)
+            for key in list(_openrouter_ordered_keys):
                 content = await _call_openrouter(messages, temperature, budget, model, key)
                 if content:
+                    _promote_openrouter_key(key)
                     break
-                # If rate limited on first key, try second
-                if not content and key == keys[0] and len(keys) > 1:
-                    continue
-                break
+                # All keys failed for this model — outer loop moves to the next
+                # candidate model (still trying the rotation order).
+                continue
 
         if content:
             out_tokens = _approx_tokens(content)

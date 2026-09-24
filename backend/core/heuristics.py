@@ -337,6 +337,91 @@ def compute_loan_ready_score(data: Dict) -> Dict:
     }
 
 
+def _empty_advisory() -> Dict:
+    """Canonical empty advisory so every consumer sees the same five keys."""
+    return {
+        "business_summary": "",
+        "cash_flow_snapshot": {},
+        "matched_schemes": [],
+        "documents_needed": [],
+        "next_step": "",
+    }
+
+
+def _coerce_str_list(value, default=None) -> List[str]:
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return default or []
+
+
+def normalize_advisory(data: Dict) -> Dict:
+    """
+    Coerce a parsed advisory dict into the canonical writer/editor schema.
+    Absorbs the messy shapes LLMs occasionally emit (string instead of list,
+    list-of-pairs cash-flow, list of scheme strings, stray None values) and
+    preserves any unknown extra keys (e.g. a pre-existing loan_ready_score).
+    """
+    if not isinstance(data, dict):
+        return _empty_advisory()
+
+    cash = data.get("cash_flow_snapshot", {})
+    if isinstance(cash, list):
+        merged: Dict = {}
+        for item in cash:
+            if isinstance(item, dict):
+                merged.update({str(k): v for k, v in item.items()})
+        cash = merged
+    if not isinstance(cash, dict):
+        cash = {}
+
+    out: Dict = {
+        "business_summary": str(data.get("business_summary", "") or "").strip(),
+        "cash_flow_snapshot": cash,
+        "matched_schemes": _coerce_str_list(data.get("matched_schemes")),
+        "documents_needed": _coerce_str_list(data.get("documents_needed")),
+        "next_step": str(data.get("next_step", "") or "").strip(),
+    }
+    for k, v in data.items():
+        if k not in out and k != "loan_ready_score":
+            out[k] = v
+    return out
+
+
+def parse_advisory_json(text: Optional[str]) -> Optional[Dict]:
+    """
+    Extract + normalize an advisory JSON object from raw LLM text.
+    Handles ```json fences, leading/trailing prose and partial garbage.
+    Returns None when no usable JSON object is present.
+    """
+    if not text:
+        return None
+    cleaned = text.strip()
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"```\s*$", "", cleaned)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(cleaned[start:end + 1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    return normalize_advisory(data)
+
+
+def has_advisory_content(data: Dict) -> bool:
+    """True when the dict carries enough substance to render as an advisory."""
+    return bool(
+        data.get("business_summary")
+        or data.get("matched_schemes")
+        or data.get("documents_needed")
+    )
+
+
 def build_simplified_summary(advisory: Dict, topic: str = "") -> str:
     """
     Low-literacy, print-friendly plain-language summary of an advisory.

@@ -2,7 +2,12 @@ import json
 import logging
 from typing import Optional
 
-from backend.core.heuristics import build_heuristic_advisory, extract_topic
+from backend.core.heuristics import (
+    build_heuristic_advisory,
+    extract_topic,
+    has_advisory_content,
+    parse_advisory_json,
+)
 from backend.core.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
@@ -26,7 +31,11 @@ async def writer_agent(task: str, agent_hint: Optional[str] = "writer") -> str:
         {"role": "user", "content": task},
     ]
     try:
-        return await call_llm(messages, temperature=0.4, max_tokens=600, agent_hint=agent_hint)
+        raw = await call_llm(messages, temperature=0.4, max_tokens=600, agent_hint=agent_hint)
+        data = parse_advisory_json(raw)
+        if data and has_advisory_content(data):
+            return json.dumps(data, ensure_ascii=False)
+        raise ValueError("Writer returned unusable advisory JSON")
     except Exception as e:
         logger.error(f"Writer agent LLM failed: {e}")
         return json.dumps(

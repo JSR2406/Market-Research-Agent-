@@ -12,7 +12,6 @@ Design:
 """
 import logging
 
-import re
 import json
 
 from backend.agents.analyst import analyst_agent
@@ -33,18 +32,13 @@ def _attach_loan_ready_score(report: str) -> str:
     """Merge a deterministic loan_ready_score into the report JSON if parseable."""
     if not report:
         return report
-    match = re.search(r"\{.*\}", report, flags=re.DOTALL)
-    if not match:
+    from backend.core.heuristics import compute_loan_ready_score, parse_advisory_json
+    data = parse_advisory_json(report)  # normalized — handles fences, prose, junk
+    if data is None:
         return report
-    try:
-        data = json.loads(match.group(0))
-        if isinstance(data, dict) and "loan_ready_score" not in data:
-            from backend.core.heuristics import compute_loan_ready_score
-            data["loan_ready_score"] = compute_loan_ready_score(data)
-            return json.dumps(data, ensure_ascii=False)
-    except Exception:
-        pass
-    return report
+    if "loan_ready_score" not in data:
+        data["loan_ready_score"] = compute_loan_ready_score(data)
+    return json.dumps(data, ensure_ascii=False)
 
 
 async def run_research_workflow(

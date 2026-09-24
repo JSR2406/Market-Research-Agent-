@@ -1,9 +1,12 @@
 import json
 import logging
-import re
 from typing import Optional
 
-from backend.core.heuristics import build_heuristic_advisory
+from backend.core.heuristics import (
+    build_heuristic_advisory,
+    has_advisory_content,
+    parse_advisory_json,
+)
 from backend.core.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
@@ -11,17 +14,12 @@ logger = logging.getLogger(__name__)
 
 def _heuristic_editor(task: str) -> str:
     """
-    If the draft already contains a valid advisory JSON block, echo it cleanly;
-    otherwise build a deterministic advisory from the topic text.
+    If the draft already contains a usable advisory JSON object, echo it
+    normalized; otherwise build a deterministic advisory from the topic text.
     """
-    match = re.search(r"\{.*\}", task, flags=re.DOTALL)
-    if match:
-        try:
-            data = json.loads(match.group(0))
-            # Re-dump in case the LLM wrapped it in code fences / extra text.
-            return json.dumps(data, ensure_ascii=False)
-        except json.JSONDecodeError:
-            pass
+    data = parse_advisory_json(task)
+    if data:
+        return json.dumps(data, ensure_ascii=False)
     return json.dumps(build_heuristic_advisory(task), ensure_ascii=False)
 
 
@@ -45,7 +43,11 @@ async def editor_agent(task: str, agent_hint: Optional[str] = "editor") -> str:
         {"role": "user", "content": task},
     ]
     try:
-        return await call_llm(messages, temperature=0.3, max_tokens=600, agent_hint=agent_hint)
+        raw = await call_llm(messages, temperature=0.3, max_tokens=600, agent_hint=agent_hint)
+        data = parse_advisory_json(raw)
+        if data and has_advisory_content(data):
+            return json.dumps(data, ensure_ascii=False)
+        raise ValueError("Editor returned unusable advisory JSON")
     except Exception as e:
         logger.error(f"Editor agent LLM failed: {e}")
         return _heuristic_editor(task)

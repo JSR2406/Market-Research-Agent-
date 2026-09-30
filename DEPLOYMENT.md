@@ -35,10 +35,13 @@ This project has two parts:
 1. Go to [vercel.com](https://vercel.com) → your `Market-Research-Agent-` project
 2. Settings → **General** → Set **Root Directory** to `frontend`
 3. Settings → **Environment Variables** → Add:
-   | Key | Value |
-   |-----|-------|
-   | `NEXT_PUBLIC_WS_URL` | `wss://YOUR_RAILWAY_URL/ws/market` |
-   > ⚠️ Use `wss://` (secure WebSocket) — NOT `ws://` — because Vercel serves over HTTPS.
+    | Key | Value |
+    |-----|-------|
+    | `NEXT_PUBLIC_WS_URL` | `wss://YOUR_RAILWAY_URL/ws/market` |
+    | `NEXT_PUBLIC_API_BASE` | `https://YOUR_RAILWAY_URL` |
+    | `NEXT_PUBLIC_BACKEND_URL` | `https://YOUR_RAILWAY_URL` |
+    > ⚠️ Use `wss://` (secure WebSocket) — NOT `ws://` — because Vercel serves over HTTPS.
+    > All three vars must point at the backend, otherwise chat/voice/sessions calls still hit `localhost:8000` in production.
 4. Redeploy the frontend
 
 ---

@@ -33,6 +33,8 @@ OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.2:3b")  # small, fast, good for most tasks
 OLLAMA_FALLBACK_MODELS: list[str] = [
     OLLAMA_MODEL,
+    "llama3.2:3b",
+    "qwen2.5:3b",
     "llama3.1:8b",
     "mistral:7b",
     "qwen2.5:7b",
@@ -131,6 +133,15 @@ LIVEKIT_URL: str = os.getenv("LIVEKIT_URL", "")  # wss://<project>.livekit.cloud
 LIVEKIT_API_KEY: str = os.getenv("LIVEKIT_API_KEY", "")
 LIVEKIT_API_SECRET: str = os.getenv("LIVEKIT_API_SECRET", "")
 LIVEKIT_ADVISOR_ROOM: str = os.getenv("LIVEKIT_ADVISOR_ROOM", "advisory-room")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WhatsApp Cloud API (Meta) — OPTIONAL scaffold, activates when configured
+# ──────────────────────────────────────────────────────────────────────────────
+# Meta Developers → WhatsApp → API Setup. The webhook is served by
+# backend/api/whatsapp.py (GET verifies, POST answers via chat_agent).
+WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
+WHATSAPP_TOKEN: str = os.getenv("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fail-fast guard

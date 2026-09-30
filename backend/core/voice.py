@@ -5,8 +5,10 @@ Phase 6 — Voice I/O module.
 speech_to_text():
   Primary:  ElevenLabs Scribe v2 (async via httpx, not the sync SDK, avoids threading issues in
             an async FastAPI app).
-  Fallback: SpeechRecognition + Google free STT. If that also fails → return "" (caller shows
-            graceful message).
+  Secondary: faster-whisper (fully open-source, local, no API key; handles WebM/Opus
+            directly and supports Hindi). Model size via WHISPER_MODEL_SIZE (default "tiny").
+  Fallback: SpeechRecognition + Google free STT (WAV only). If all fail → return ""
+            (caller shows graceful message).
 
 text_to_speech():
   Primary:  ElevenLabs TTS flash v2.5 (streaming via httpx, assembled into bytes).
@@ -34,6 +36,15 @@ from backend.core.config import (
 
 logger = logging.getLogger(__name__)
 
+# Open-source local STT model size: "tiny" (75 MB, fastest) | "base" | "small".
+# Overridable via WHISPER_MODEL_SIZE in backend/.env. Downloaded once from
+# Hugging Face on first use, then cached locally.
+WHISPER_MODEL_SIZE: str = os.getenv("WHISPER_MODEL_SIZE", "tiny")
+
+# Lazily-loaded faster-whisper singleton (kept module-level so the model
+# weights load once per process, not once per request).
+_whisper_model = None
+
 
 def _get_elevenlabs_key() -> str:
     return os.getenv("ELEVENLABS_API_KEY", "") or ""
@@ -59,16 +70,21 @@ async def speech_to_text(audio_bytes: bytes) -> str:
         if result:
             logger.info("[Voice/STT] ElevenLabs engine used.")
             return result
-        logger.warning("[Voice/STT] ElevenLabs failed, trying SpeechRecognition fallback.")
+        logger.warning("[Voice/STT] ElevenLabs failed, trying faster-whisper fallback.")
     else:
-        logger.info("[Voice/STT] No ElevenLabs key — using SpeechRecognition fallback directly.")
+        logger.info("[Voice/STT] No ElevenLabs key — using faster-whisper fallback directly.")
+
+    result = await _stt_faster_whisper(audio_bytes)
+    if result:
+        logger.info("[Voice/STT] faster-whisper (open-source local) engine used.")
+        return result
 
     result = await _stt_speech_recognition(audio_bytes)
     if result:
         logger.info("[Voice/STT] SpeechRecognition (Google free) engine used.")
         return result
 
-    logger.error("[Voice/STT] Both STT engines failed — returning empty string.")
+    logger.error("[Voice/STT] All STT engines failed — returning empty string.")
     return ""
 
 
@@ -94,6 +110,69 @@ async def _stt_elevenlabs(audio_bytes: bytes, api_key: str) -> str:
             return ""
     except Exception as e:
         logger.warning(f"[Voice/STT] ElevenLabs exception: {e}")
+        return ""
+
+
+async def _stt_faster_whisper(audio_bytes: bytes) -> str:
+    """
+    Fully open-source local STT via faster-whisper (CTranslate2, CPU-friendly).
+
+    Handles WebM/Opus browser recordings directly (no ffmpeg transcode step),
+    auto-detects language (English/Hindi/…). Model downloads once on first use.
+    Runs the blocking inference in an executor. Never raises.
+    """
+    if not audio_bytes:
+        return ""
+    try:
+        from faster_whisper import WhisperModel  # type: ignore
+    except ImportError:
+        logger.warning("[Voice/STT] faster-whisper not installed.")
+        return ""
+    try:
+        # Compat shim: faster-whisper passes metadata_errors="ignore" to av.open(),
+        # but PyAV >= 15 removed that kwarg (and av<15 has no Python 3.14 Windows
+        # wheel). Dropping the kwarg restores default open behaviour.
+        try:
+            import av as _av  # type: ignore
+
+            if not getattr(_av.open, "__grameen_patched__", False):
+                _orig_open = _av.open
+
+                def _patched_open(*args: object, **kwargs: object) -> object:
+                    kwargs.pop("metadata_errors", None)
+                    return _orig_open(*args, **kwargs)
+
+                _patched_open.__grameen_patched__ = True  # type: ignore[attr-defined]
+                _av.open = _patched_open  # type: ignore[assignment]
+        except Exception as e:
+            logger.warning(f"[Voice/STT] av compat shim failed (continuing anyway): {e}")
+
+        global _whisper_model
+        if _whisper_model is None:
+            def _load() -> object:
+                return WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
+
+            loop = asyncio.get_event_loop()
+            _whisper_model = await loop.run_in_executor(None, _load)
+            logger.info(f"[Voice/STT] faster-whisper model '{WHISPER_MODEL_SIZE}' loaded.")
+
+        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+            tmp_path = tmp.name
+            tmp.write(audio_bytes)
+        try:
+            def _transcribe() -> str:
+                segments, _info = _whisper_model.transcribe(tmp_path, beam_size=1)
+                return "".join(seg.text for seg in segments).strip()
+
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, _transcribe)
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+    except Exception as e:
+        logger.warning(f"[Voice/STT] faster-whisper exception: {e}")
         return ""
 
 

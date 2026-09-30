@@ -4,6 +4,7 @@
 - Backend: Python, FastAPI, WebSockets, httpx, uvicorn, python-dotenv
 - Frontend: Next.js 15 App Router, TypeScript, Tailwind CSS, Framer Motion, react-markdown, remark-gfm, lucide-react
 - LLM: Multi-provider via backend/core/llm_client.py — Ollama (local, free), Hugging Face Inference API (free tier), OpenRouter (cloud)
+- LangChain (optional): `backend/core/langchain_adapter.py` exposes the same multi-provider stack as a LangChain `BaseChatModel` (`GrameenChatModel`) + tools + `build_advisory_chain()`; REST via `backend/api/langchain.py` (`GET /api/langchain/status`, `POST /api/langchain/run`). Requires `langchain-core` (in `backend/requirements.txt`).
 - Web research: googlesearch-python + httpx + BeautifulSoup (no keys, Google → DuckDuckGo fallback)
 
 ## Folder Structure
@@ -21,6 +22,7 @@ market-research-agent/
 │   │   ├── web_research.py     # search + scrape (Google → DuckDuckGo), no keys
 │   │   ├── ws.py               # SafeWebSocket — serialized sends
 │   │   ├── memory.py           # JSON session store, 7-day retention
+│   │   ├── langchain_adapter.py # OPTIONAL LangChain: GrameenChatModel → call_llm, tools, chains (never raises)
 │   │   └── voice.py            # STT/TTS, never raises
 │   ├── agents/
 │   │   ├── __init__.py
@@ -35,7 +37,8 @@ market-research-agent/
 │   ├── voice_agent/            # OPTIONAL realtime voice (LiveKit) — separate process
 │   │   ├── __init__.py
 │   │   ├── llm.py              # LiveKit LLM adapter → call_llm (+heuristic fallback)
-│   │   └── worker.py           # Silero STT → AdvisoryLLM → ElevenLabs TTS
+│   │   ├── stt.py              # LiveKit STT adapter → local faster-whisper (no key)
+│   │   └── worker.py           # AgentSession: faster-whisper STT → AdvisoryLLM → ElevenLabs TTS
 │   ├── workflows/
 │   │   ├── __init__.py
 │   │   ├── executor.py         # run orchestration, emits WS events
@@ -47,6 +50,8 @@ market-research-agent/
 │       ├── ws_market.py        # WS endpoint (start/cancel/export/delete)
 │       ├── chat.py             # /api/chat (POST/GET history/DELETE) + chat memory
 │       ├── sessions.py         # GET /api/sessions/{session_id} — resume a saved advisory
+│       ├── langchain.py        # GET /api/langchain/status, POST /api/langchain/run (heuristic fallback, never 500)
+│       ├── whatsapp.py         # OPTIONAL WhatsApp Cloud API: GET verify, POST incoming → chat_agent → Graph reply (always 200)
 │       └── voice.py            # /api/voice/{transcribe,speak,livekit-token}
 └── frontend/
     ├── .env.local
@@ -71,15 +76,19 @@ market-research-agent/
 - Agents never hardcode a provider; they just pass `agent_hint` and the client handles fallback.
 - Per-agent OpenRouter model priority (`AGENT_OPENROUTER_MODELS` in `backend/core/config.py`) — each agent leads with a distinct model so no single model's quota gets exhausted; the global `FALLBACK_MODELS` chain is appended as backup.
 - OpenRouter key rotation: `OPENROUTER_API_KEY_2` (in `backend/.env`) is used automatically on 429/402/timeout and once healthy it becomes the preferred key for later calls.
+- LangChain rule: `GrameenChatModel` and all chains must route through `call_llm` (never call a provider SDK directly); `run_prompt()` must keep the heuristic fallback so endpoints never hard-fail when LangChain or the LLM is unreachable.
 
 ## Voice / TTS
 - `backend/core/voice.py` — never raises, always falls back through:
-  - STT: ElevenLabs Scribe (if key) → SpeechRecognition/Google (free).
+  - STT: ElevenLabs Scribe (if key) → faster-whisper (open-source, local, no key; handles WebM + Hindi; model size via `WHISPER_MODEL_SIZE`, default `tiny`) → SpeechRecognition/Google (free, WAV only).
   - TTS: ElevenLabs (if key) → Hugging Face Inference API (`HF_TTS_MODEL`, default `facebook/mms-tts-eng`, free) → pyttsx3 (offline).
-- **Realtime voice (LiveKit)** — separate process, optional stack in `backend/requirements-voice.txt` (`pip install -r backend/requirements-voice.txt`).
-  - `python -m backend.voice_agent.worker` joins `LIVEKIT_ADVISOR_ROOM`: Silero local STT → `AdvisoryLLM` (bridges to `call_llm`, agent_hint="voice") → ElevenLabs TTS.
+- **Realtime voice (LiveKit)** — separate process, stack in `backend/requirements-voice.txt` (`pip install -r backend/requirements-voice.txt`).
+  - `python -m backend.voice_agent.worker` joins `LIVEKIT_ADVISOR_ROOM` via `AgentSession`: faster-whisper local STT (`voice_agent/stt.py`, no key) → `AdvisoryLLM` (bridges to `call_llm`, agent_hint="voice") → ElevenLabs TTS. Targets livekit-agents==1.8.x.
   - Browser joins the same room via `POST /api/voice/livekit-token` (needs `LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`) and `LiveAdvisorPanel.tsx` (frontend, `livekit-client`).
   - Lazy imports keep the base backend working without the LiveKit stack.
+
+## WhatsApp (optional scaffold)
+- `backend/api/whatsapp.py` — Meta Cloud API webhook: `GET /api/whatsapp/webhook` verifies (`WHATSAPP_VERIFY_TOKEN`), `POST` answers text messages with the same `chat_agent` brain (per-sender `wa-<number>` memory namespace) and replies via Graph API (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`). Always returns 200 so Meta never retry-storms. Inactive until the three env vars are set.
 
 ## Chat / Conversation
 - `backend/agents/chat.py` — specialised business advisory & business-building chatbot (loans, schemes, documents, and building the business). Scope-limited: routes off-topic questions back to business. **Multi-language:** replies follow the user's language — Devanagari/Hinglish input (or `lang="hi"`) yields Hindi replies; the offline heuristic fallback speaks Hindi too.

@@ -1,8 +1,8 @@
 """
 worker.py — LiveKit realtime voice advisory agent (separate process).
 
-Audio pipeline:
-    user mic (browser) -> LiveKit room -> Silero local STT
+Audio pipeline (all open-source except the voice itself):
+    user mic (browser) -> LiveKit room -> faster-whisper local STT
     -> AdvisoryLLM (multi-provider LLM + heuristic fallback)
     -> ElevenLabs TTS -> LiveKit room -> browser speakers
 
@@ -16,6 +16,8 @@ Requirements (backend/.env):
 Get free LiveKit creds at https://cloud.livekit.io (or self-host lk-server).
 The browser joins the same LIVEKIT_ADVISOR_ROOM using the token minted by
 POST /api/voice/livekit-token.
+
+Targets livekit-agents==1.8.x (see backend/requirements-voice.txt).
 """
 from __future__ import annotations
 
@@ -35,7 +37,7 @@ async def run_voice_agent() -> None:
     # the main FastAPI app when the voice stack is not installed.
     try:
         from livekit import api, rtc
-        from livekit.agents.voice import RoomInputOptions, VoicePipelineAgent
+        from livekit.agents import Agent, AgentSession
         from livekit.plugins import elevenlabs, silero
     except ImportError:
         raise SystemExit(
@@ -49,7 +51,8 @@ async def run_voice_agent() -> None:
         LIVEKIT_API_SECRET,
         LIVEKIT_URL,
     )
-    from backend.voice_agent.llm import AdvisoryLLM
+    from backend.voice_agent.llm import SYSTEM_PROMPT, AdvisoryLLM
+    from backend.voice_agent.stt import FasterWhisperSTT
 
     if not (LIVEKIT_URL and LIVEKIT_API_KEY and LIVEKIT_API_SECRET):
         raise SystemExit(
@@ -83,23 +86,32 @@ async def run_voice_agent() -> None:
     room = rtc.Room()
     await room.connect(LIVEKIT_URL, agent_token.to_jwt())
 
-    agent = VoicePipelineAgent(
-        stt=silero.STTR(),
+    session = AgentSession(
+        vad=silero.VAD.load(),
+        stt=FasterWhisperSTT(),
         llm=AdvisoryLLM(),
         tts=elevenlabs.TTS(),
+    )
+    agent = Agent(
+        instructions=SYSTEM_PROMPT,
         allow_interruptions=True,
         min_endpointing_delay=0.5,
     )
-    await agent.start(room, room_input_options=RoomInputOptions(audio=True, video=False))
+    await session.start(agent=agent, room=room)
 
     logger.info("Voice agent running. Speak from the browser panel. Ctrl+C to stop.")
+    session_closed = False
     try:
         while True:
             await asyncio.sleep(1)
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, KeyboardInterrupt):
         pass
     finally:
-        await agent.stop()
+        if not session_closed:
+            try:
+                await session.aclose()
+            except Exception as e:
+                logger.warning(f"Error closing voice session: {e}")
         await room.disconnect()
         logger.info("Voice agent stopped.")
 

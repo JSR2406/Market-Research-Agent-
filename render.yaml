@@ -12,7 +12,7 @@ services:
         sync: false          # you will paste this in Render dashboard
       - key: ALLOWED_ORIGINS
         sync: false          # paste your Vercel URL here e.g. https://market-research-agent-jsr2406.vercel.app
-- key: MODEL
+      - key: MODEL
         value: google/gemini-2.5-flash
       - key: OPENROUTER_BASE_URL
         value: https://openrouter.ai/api/v1

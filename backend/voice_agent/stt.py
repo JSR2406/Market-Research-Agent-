@@ -117,14 +117,19 @@ class FasterWhisperSTT(stt.STT):
         )
 
     def stream(self, *, language: str | None = None, conn_options=None) -> stt.RecognizeStream:
-        return _BufferedStream(self, language=language)
+        return _BufferedStream(self, language=language, conn_options=conn_options)
 
 
 class _BufferedStream(stt.RecognizeStream):
     """Accumulates frames; transcribes the utterance when the session flushes."""
 
-    def __init__(self, stt_plugin: FasterWhisperSTT, *, language: str | None) -> None:
-        super().__init__()
+    def __init__(self, stt_plugin: FasterWhisperSTT, *, language: str | None, conn_options=None) -> None:
+        from livekit.agents import APIConnectOptions  # type: ignore
+
+        super().__init__(
+            stt=stt_plugin,
+            conn_options=conn_options or APIConnectOptions(),
+        )
         self._plugin = stt_plugin
         self._language = language or "en"
         self._chunks: list[np.ndarray] = []

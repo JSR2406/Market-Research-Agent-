@@ -62,7 +62,8 @@ async def run_voice_agent() -> None:
 
     import os
 
-    if not os.getenv("ELEVENLABS_API_KEY"):
+    elevenlabs_key = os.getenv("ELEVENLABS_API_KEY", "")
+    if not elevenlabs_key:
         logger.warning(
             "ELEVENLABS_API_KEY is not set in backend/.env — ElevenLabs TTS will "
             "fail loudly when the agent tries to speak."
@@ -90,7 +91,8 @@ async def run_voice_agent() -> None:
         vad=silero.VAD.load(),
         stt=FasterWhisperSTT(),
         llm=AdvisoryLLM(),
-        tts=elevenlabs.TTS(),
+        # The plugin reads ELEVEN_API_KEY; our project key is ELEVENLABS_API_KEY.
+        tts=elevenlabs.TTS(api_key=elevenlabs_key or None),
     )
     agent = Agent(
         instructions=SYSTEM_PROMPT,

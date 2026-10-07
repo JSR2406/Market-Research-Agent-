@@ -103,6 +103,24 @@ def test_matched_schemes_carry_source():
         assert m.get("last_verified_at")
 
 
+def test_annotate_scheme_sources():
+    from backend.core.heuristics import annotate_scheme_sources
+
+    lines = annotate_scheme_sources([
+        "PM SVANidhi — loan ceiling ₹15,000.",
+        "MUDRA Tarun Plus — loan ceiling ₹10,00,001 – ₹20,00,000.",  # longest token must win
+        "MUDRA Tarun — loan ceiling ₹5,00,001 – ₹10,00,000.",
+        "Some unknown lender scheme line.",
+        "CGTMSE — already annotated (Source: https://www.cgtmse.in/, verified 2026-10-01).",
+    ])
+    assert "pmsvanidhi.mohua.gov.in" in lines[0]
+    assert "verified 2026-10-08" in lines[0]
+    assert "mudra-tarun-plus" not in lines[1]  # src is mudra.org.in for all MUDRA lines
+    assert "https://www.mudra.org.in/" in lines[1] and "https://www.mudra.org.in/" in lines[2]
+    assert lines[3] == "Some unknown lender scheme line."
+    assert lines[4].count("Source:") == 1  # idempotent — never double-annotate
+
+
 # ── llm_client session state ──────────────────────────────────────────────
 
 def test_reset_session_state_zeroes_counter():

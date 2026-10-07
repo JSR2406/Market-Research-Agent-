@@ -28,16 +28,30 @@ from backend.workflows.routing import AGENT_REGISTRY, SYNTHESIS_AGENTS, route_st
 logger = logging.getLogger(__name__)
 
 
-def _attach_loan_ready_score(report: str) -> str:
-    """Merge a deterministic loan_ready_score into the report JSON if parseable."""
+def _finalize_report(report: str) -> str:
+    """
+    Single deterministic post-pass on the LLM-written advisory:
+    1. attach the deterministic loan_ready_score, and
+    2. annotate every matched-scheme line with its official source URL +
+       last-verified date from schemes.json (never trusts the model).
+
+    Runs exactly once so a re-parse cannot drop the injected score.
+    """
     if not report:
         return report
-    from backend.core.heuristics import compute_loan_ready_score, parse_advisory_json
+    from backend.core.heuristics import (
+        annotate_scheme_sources,
+        compute_loan_ready_score,
+        parse_advisory_json,
+    )
     data = parse_advisory_json(report)  # normalized — handles fences, prose, junk
     if data is None:
         return report
     if "loan_ready_score" not in data:
         data["loan_ready_score"] = compute_loan_ready_score(data)
+    schemes = data.get("matched_schemes") or []
+    if schemes:
+        data["matched_schemes"] = annotate_scheme_sources([str(s) for s in schemes])
     return json.dumps(data, ensure_ascii=False)
 
 
@@ -183,8 +197,8 @@ async def run_research_workflow(
     except Exception as e:
         final_report = written  # degrade gracefully
 
-    # ── Deterministic Loan-Ready Score (no LLM cost) ──────────────────────────
-    final_report = _attach_loan_ready_score(final_report)
+    # ── Deterministic finalize: loan-ready score + scheme sources (no LLM) ────
+    final_report = _finalize_report(final_report)
 
     # ── Simplified low-literacy document (GrameenAI use case) ─────────────────
     simplified_report = ""

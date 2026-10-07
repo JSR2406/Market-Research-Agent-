@@ -96,6 +96,54 @@ def schemes_brief() -> str:
     return "\n".join(lines) or "(scheme dataset unavailable)"
 
 
+# Short lowercase tokens used to recognise a known scheme inside free text
+# (LLM-generated advisory lines, chat answers). Longest token wins so
+# "Tarun Plus" resolves to tarun-plus, not plain tarun.
+_SCHEME_TOKENS: Dict[str, str] = {
+    "svanidhi": "pm-svanidhi",
+    "shishu": "mudra-shishu",
+    "kishore": "mudra-kishore",
+    "tarun plus": "mudra-tarun-plus",
+    "tarun": "mudra-tarun",
+    "pmegp": "pmegp",
+    "cgtmse": "cgtmse",
+}
+
+
+def scheme_source_annotation(scheme: Dict) -> str:
+    """'(Source: <url>, verified <date>)' for a scheme dict, or ''."""
+    url = scheme.get("source_url", "")
+    if not url:
+        return ""
+    verified = scheme.get("last_verified_at", "")
+    return f" (Source: {url}, verified {verified})" if verified else f" (Source: {url})"
+
+
+def annotate_scheme_sources(lines: List[str]) -> List[str]:
+    """
+    Append a deterministic source annotation to advisory scheme lines.
+
+    Any line mentioning a known curated scheme (by id-token) gets its official
+    source URL and last-verified date appended — idempotent, and it does NOT
+    trust the LLM: the annotation always comes from schemes.json.
+    """
+    schemes = {s["id"]: s for s in load_schemes() if s.get("id")}
+    out: List[str] = []
+    for line in lines:
+        low = line.lower()
+        if "source:" in low:
+            out.append(line)
+            continue
+        best_token = ""
+        best_id = ""
+        for token, scheme_id in _SCHEME_TOKENS.items():
+            if token in low and len(token) > len(best_token):
+                best_token, best_id = token, scheme_id
+        scheme = schemes.get(best_id) if best_id else None
+        out.append(f"{line}{scheme_source_annotation(scheme)}" if scheme else line)
+    return out
+
+
 def parse_amount(topic: str) -> Optional[int]:
     """
     Pull the most likely monthly earning figure (in INR) out of free text.
@@ -245,11 +293,10 @@ def build_heuristic_advisory(topic: str) -> Dict:
         documents_needed.append("Street vendor certificate / ULB identification")
 
     if matched:
-        scheme_lines = [
+        scheme_lines = annotate_scheme_sources([
             f"{m['name']} — loan ceiling {m['loan_ceiling']}."
-            + (f" (Source: {m['source_url']}, verified {m['last_verified_at']})" if m.get("source_url") else "")
             for m in matched
-        ]
+        ])
         matched_text_lines = scheme_lines
         next_step = (
             "1) Register your business on Udyam (free, online) if not already done. "

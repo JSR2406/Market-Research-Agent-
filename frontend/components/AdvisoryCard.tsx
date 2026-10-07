@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText } from "lucide-react";
+import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText, ExternalLink } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
 interface CashFlow {
@@ -34,6 +34,33 @@ function Sparkles({ size }: { size?: number }) {
       <path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>
     </svg>
   );
+}
+
+interface ParsedScheme {
+  name: string;
+  ceiling?: string;
+  source?: string;
+  verified?: string;
+}
+
+function parseScheme(line: string): ParsedScheme {
+  const text = line.trim();
+  let clean = text;
+  let source: string | undefined;
+  let verified: string | undefined;
+  const sourceMatch = clean.match(/\(Source:\s*(https?:\/\/[^)\s,]+)[^)]*\)/);
+  if (sourceMatch) {
+    source = sourceMatch[1];
+    const verifiedMatch = clean.match(/verified\s+(\d{4}-\d{2}-\d{2})/);
+    verified = verifiedMatch ? verifiedMatch[1] : undefined;
+    clean = clean.replace(/\(\s*Source:.*$/i, "").trim();
+  }
+  const key = "loan ceiling";
+  const at = clean.toLowerCase().indexOf(key);
+  if (at === -1) return { name: clean || text, source, verified };
+  const name = clean.slice(0, at).replace(/[\s\-–—:]+$/u, "").trim();
+  const ceiling = clean.slice(at + key.length).replace(/^[\s:"]+/, "").replace(/[.\s"']+$/u, "").trim();
+  return { name, ceiling, source, verified };
 }
 
 function ScoreGauge({ score }: { score: number }) {
@@ -113,7 +140,11 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
     const parts: string[] = [];
     if (data.business_summary) parts.push("Business Summary: " + data.business_summary);
     if (data.matched_schemes?.length)
-      parts.push("Matched government schemes: " + data.matched_schemes.slice(0, 3).join(", ") + ".");
+      parts.push(
+        "Matched government schemes: " +
+        data.matched_schemes.slice(0, 3).map((s) => s.replace(/\(\s*Source:.*$/i, "").trim()).join(", ") +
+        "."
+      );
     if (data.next_step) parts.push("Your next step is: " + data.next_step);
     return parts.join(" ") || report.slice(0, 600);
   };
@@ -388,18 +419,46 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
         {data.matched_schemes && data.matched_schemes.length > 0 && (
           <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
             <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--accent)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Sparkles size={16} /> Matched Schemes
+              <Sparkles size={16} /> Matched Government Schemes
             </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {data.matched_schemes.map((scheme, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + idx * 0.05 }}
-                  style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "8px", padding: "12px", fontSize: "0.9rem", color: "var(--text-primary)" }}
-                >
-                  {scheme}
-                </motion.div>
-              ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {data.matched_schemes.map((line, idx) => {
+                const s = parseScheme(line);
+                return (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + idx * 0.05 }}
+                    style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "14px" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px" }}>
+                      <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.35 }}>
+                        {s.name || line}
+                      </p>
+                      {s.source && (
+                        <a
+                          href={s.source}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Open official scheme source (${s.source})`}
+                          style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.72rem", fontWeight: 600, color: "var(--accent)", textDecoration: "none", border: "1px solid rgba(79,142,247,0.35)", borderRadius: "6px", padding: "4px 8px", background: "rgba(79,142,247,0.08)" }}
+                        >
+                          <ExternalLink size={11} /> Official details
+                        </a>
+                      )}
+                    </div>
+                    {s.ceiling && (
+                      <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "6px" }}>
+                        Loan ceiling: <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>{s.ceiling}</span>
+                      </p>
+                    )}
+                    <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "6px", lineHeight: 1.45 }}>
+                      {s.source
+                        ? `Official source · verified ${s.verified ?? ""}`.trim()
+                        : "Confirm current terms at your bank or the official scheme portal — details change by state and lender."}
+                    </p>
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         )}

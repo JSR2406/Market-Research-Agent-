@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 _SCHEMES_EXCERPT = schemes_json()[:1500]
 
 SYSTEM_PROMPT = (
-    "You are GrameenAI, a specialised business advisor and business builder for "
-    "Indian micro-entrepreneurs — street vendors, small shopkeepers, home-based "
-    "producers, and first-time founders.\n\n"
+    "You are Your AI Business Saathi (\"Saathi\"), a specialised business advisor "
+    "and business builder for Indian micro-entrepreneurs — street vendors, small "
+    "shopkeepers, home-based producers, and people starting small businesses.\n\n"
     "You help with two things, always in short, plain, practical language:\n"
     "1. BUILDING the business: turn an idea into a real small business and grow "
     "it — business model, pricing, costs and cash flow, getting customers, "
@@ -144,7 +144,7 @@ async def chat_agent(
     Answer a single chat turn. `chat_history` is the recent remembered
     conversation; `advisory_context` is the latest written advisory for the
     session, used when the user asks about their own report. `lang` is one of
-    "auto" | "hi" | "en". `profile` is the Startup Doctor intake snippet —
+    "auto" | "hi" | "en". `profile` is the Business Check-up intake snippet —
     the advisor tailors answers to it and asks follow-up questions from it.
     """
     effective = _effective_lang(message, lang)
@@ -181,7 +181,7 @@ async def chat_agent(
         history.append({
             "role": "system",
             "content": (
-                "The user's Startup Doctor intake answers: "
+                "The user's Business Check-up intake answers: "
                 + profile[:500]
                 + "\nTailor every answer to this profile (business type, stage, "
                 "earnings band, borrowing history, main need). When the user's "

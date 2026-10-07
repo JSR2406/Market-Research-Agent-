@@ -105,7 +105,7 @@ async def livekit_token(body: LiveKitTokenRequest | None = None):
         token = (
             api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
             .with_identity(identity)
-            .with_name("GrameenAI Advisor User")
+            .with_name("Business Saathi User")
             .with_grants(
                 api.VideoGrants(
                     room_join=True,

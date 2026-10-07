@@ -134,7 +134,7 @@ export default function StartupQuiz({
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: "0.85rem", fontWeight: 700 }}>
-              Startup Doctor — 5 quick questions{" "}
+              Business Check-up — 5 quick questions{" "}
               <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>(optional)</span>
             </p>
             <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>

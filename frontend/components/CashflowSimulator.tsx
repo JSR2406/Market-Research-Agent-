@@ -86,7 +86,7 @@ export default function CashflowSimulator() {
       animate={{ opacity: 1, y: 0 }}
       style={{
         marginTop: "16px", width: "100%", maxWidth: "760px",
-        padding: "20px 24px",
+        padding: "20px clamp(16px, 5vw, 24px)",
         background: "rgba(139,92,246,0.05)",
         border: "1px solid rgba(139,92,246,0.22)",
         borderRadius: "var(--radius-xl)",

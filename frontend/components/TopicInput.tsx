@@ -102,7 +102,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
       {/* Header */}
       <div
         style={{
-          padding: "28px 32px 20px",
+          padding: "clamp(20px, 5vw, 28px) clamp(16px, 6vw, 32px) 20px",
           borderBottom: "1px solid var(--border)",
           background: "linear-gradient(135deg, rgba(79,142,247,0.06) 0%, transparent 60%)",
         }}
@@ -119,17 +119,17 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
           </div>
           <div>
             <h1 style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
-              GrameenAI Advisor
+              Your AI Business Saathi
             </h1>
             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "1px" }}>
-              Financial advisory for micro-entrepreneurs • Multi-agent AI
+              Market research, growth planning &amp; schemes for small businesses
             </p>
           </div>
         </div>
       </div>
 
       {/* Input Area */}
-      <div style={{ padding: "24px 32px" }}>
+      <div style={{ padding: "24px clamp(16px, 6vw, 32px)" }}>
         {/* Textarea + mic row */}
         <div style={{ position: "relative", marginBottom: "8px" }}>
           <textarea

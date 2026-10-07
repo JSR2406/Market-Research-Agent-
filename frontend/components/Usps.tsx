@@ -60,7 +60,7 @@ export default function Usps() {
           marginBottom: "6px",
         }}
       >
-        Why GrameenAI
+        Why Your AI Business Saathi
       </p>
       <p
         style={{
@@ -81,8 +81,8 @@ export default function Usps() {
           marginBottom: "16px",
         }}
       >
-        ChatGPT answers general questions. GrameenAI builds, advises and gets
-        your business loan-ready.
+        ChatGPT answers general questions. Your AI Business Saathi builds,
+        advises and gets your business loan-ready.
       </p>
 
       <div

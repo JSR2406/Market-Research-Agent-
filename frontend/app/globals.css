@@ -24,6 +24,10 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-xl: 28px;
+
+  /* Layout tokens — single source for content width (was duplicated as
+     maxWidth: 760px inline in 10+ places). */
+  --content-max: 760px;
 }
 
 @theme inline {
@@ -57,6 +61,44 @@ body {
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   position: relative;
+}
+
+/* ─── Mobile-first layout utilities ───────────────────────────── */
+/* The page must work from 360 px upward. Component inline styles may
+   reference these tokens/classes instead of hardcoding sizes. */
+.content-width {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+}
+
+.page-shell {
+  width: 100%;
+  padding: clamp(24px, 6vw, 48px) clamp(14px, 5vw, 20px);
+}
+
+/* Visible keyboard focus everywhere (a11y). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+img,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Respect users who ask for less motion (a11y). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body::before {

@@ -52,7 +52,7 @@ async def run_research_workflow(
 ) -> None:
     """
     Main workflow. session_context is an optional string injected by ws_market.py
-    when a previous session is resumed. profile is the Startup Doctor intake
+    when a previous session is resumed. profile is the Business Check-up intake
     snippet (frontend folds it into topic too; we keep it separate so it is
     injected into synthesis explicitly and persisted for the chat advisor).
     """
@@ -154,7 +154,7 @@ async def run_research_workflow(
     writer_task = (
         f"Topic: {topic}\n"
         + (
-            f"\nClient intake answers (Startup Doctor):\n{profile}\n"
+            f"\nClient intake answers (Business Check-up):\n{profile}\n"
             "Reflect these answers inside business_summary and next_step — the "
             "advisory must be written for THIS client, not a generic one.\n"
             if profile

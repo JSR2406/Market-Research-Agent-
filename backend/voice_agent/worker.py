@@ -72,7 +72,7 @@ async def run_voice_agent() -> None:
     agent_token = (
         api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
         .with_identity("advisor-agent")
-        .with_name("GrameenAI Advisor")
+        .with_name("Business Saathi")
         .with_grants(
             api.VideoGrants(
                 room_join=True,

@@ -143,7 +143,7 @@ def test_whatsapp_post_always_200(client):
     assert r.json()["status"] == "processed"
 
 
-# ── Startup Doctor profile → advisory + chat ──────────────────────────────
+# ── Business Check-up profile → advisory + chat ────────────────────────────
 
 def test_chat_agent_injects_profile(monkeypatch):
     from backend.agents import chat as chat_mod
@@ -163,7 +163,7 @@ def test_chat_agent_injects_profile(monkeypatch):
     )
     assert reply == "Here is your tailored next step."
     joined = " ".join(m["content"] for m in captured["messages"])
-    assert "Startup Doctor intake answers" in joined
+    assert "Business Check-up intake answers" in joined
     assert "street vendor / cart business" in joined
 
 
@@ -246,7 +246,7 @@ def test_workflow_injects_and_persists_profile(monkeypatch):
         # Profile reaches the planner (topic) and the synthesis prompt.
         assert profile in captured["planner_topic"]
         assert profile in captured["writer_task"]
-        assert "Startup Doctor" in captured["writer_task"]
+        assert "Business Check-up" in captured["writer_task"]
         # Profile persisted with the session for later chat questions.
         saved = load_last_session(sid)
         assert saved["state"]["profile"] == profile

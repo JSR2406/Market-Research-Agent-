@@ -70,7 +70,7 @@ export default function ResearchPage() {
       // localStorage unavailable (private mode) — chat degrades to stateless.
     }
 
-    // Restore the optional Startup Doctor answers.
+    // Restore the optional Business Check-up answers.
     try {
       const savedProfile = window.localStorage.getItem(PROFILE_KEY);
       if (savedProfile) {
@@ -245,7 +245,7 @@ export default function ResearchPage() {
     setErrorMessage("");
     retriesRef.current = 0;
 
-    // Enrich the topic with the Startup Doctor answers (deterministic — no LLM call).
+    // Enrich the topic with the Business Check-up answers (deterministic — no LLM call).
     const profileSnippet = buildProfileSnippet(profile);
     const startTopic = profileSnippet ? `${profileSnippet}. ${topic}` : topic;
 
@@ -311,9 +311,9 @@ export default function ResearchPage() {
   return (
     <main
       suppressHydrationWarning
+      className="page-shell"
       style={{
         minHeight: "100vh",
-        padding: "48px 20px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -328,19 +328,20 @@ export default function ResearchPage() {
       >
         <h2
           style={{
-            fontSize: "0.78rem",
+            fontSize: "clamp(0.68rem, 2.5vw, 0.78rem)",
             fontWeight: 600,
             color: "var(--accent)",
             textTransform: "uppercase",
-            letterSpacing: "0.12em",
+            letterSpacing: "0.1em",
             marginBottom: "10px",
+            paddingInline: "8px",
           }}
         >
-          Market Research &amp; Business Advisor for Micro-Entrepreneurs
+          Market research, growth planning &amp; government schemes for small businesses
         </h2>
         <p
           style={{
-            fontSize: "2.2rem",
+            fontSize: "clamp(1.65rem, 7vw, 2.2rem)",
             fontWeight: 800,
             color: "var(--text-primary)",
             letterSpacing: "-0.03em",
@@ -351,7 +352,7 @@ export default function ResearchPage() {
             WebkitTextFillColor: "transparent",
           }}
         >
-          GrameenAI Advisor
+          Your AI Business Saathi
         </p>
         <p
           style={{
@@ -366,7 +367,7 @@ export default function ResearchPage() {
         </p>
       </motion.div>
 
-      {/* Startup Doctor — optional quick questions that sharpen the first report */}
+      {/* Business Check-up — optional quick questions that sharpen the first report */}
       <StartupQuiz value={profile} onChange={changeProfile} />
 
       {/* Main input */}
@@ -410,7 +411,7 @@ export default function ResearchPage() {
         )}
       </AnimatePresence>
 
-      {/* Why GrameenAI — what makes this different from a generic chatbot */}
+      {/* Why Saathi — what makes this different from a generic chatbot */}
       <Usps />
 
       {/* Agent timeline */}
@@ -459,7 +460,7 @@ export default function ResearchPage() {
       {/* Cash-flow simulator — self-serve financial viz, runs locally */}
       <CashflowSimulator />
 
-      {/* Personal business advisor chat — remembers this session, your report and Startup Doctor answers */}
+      {/* Personal business advisor chat — remembers this session, your report and Business Check-up answers */}
       <ChatPanel
         sessionId={sessionId}
         topic={currentTopic}
@@ -478,7 +479,7 @@ export default function ResearchPage() {
           marginBottom: "80px",
           width: "100%",
           maxWidth: "760px",
-          padding: "20px 24px",
+          padding: "20px clamp(16px, 5vw, 24px)",
           background: "rgba(37,211,102,0.04)",
           border: "1px dashed rgba(37,211,102,0.3)",
           borderRadius: "var(--radius-xl)",

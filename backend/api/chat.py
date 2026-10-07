@@ -34,7 +34,7 @@ class ChatRequest(BaseModel):
     session_id: str = Field("", max_length=64, pattern=_SESSION_ID_PATTERN)
     topic: str = Field("", max_length=2000)
     lang: str = Field("auto", max_length=8)  # "auto" | "hi" | "en"
-    profile: str = Field("", max_length=1500)  # Startup Doctor snippet (falls back to session state)
+    profile: str = Field("", max_length=1500)  # Business Check-up snippet (falls back to session state)
 
 
 @router.post("")
@@ -48,7 +48,7 @@ async def chat(body: ChatRequest):
         return {"reply": "Please type a question first.", "session_id": session_id, "history_count": 0}
 
     # Attach the latest written advisory (if any) for this session so the chat
-    # can answer "me" questions about the user's own report. The Startup Doctor
+    # can answer "me" questions about the user's own report. The Business Check-up
     # profile saved with the run is used when the client didn't send it.
     advisory_context = ""
     if session_id:

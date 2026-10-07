@@ -1,8 +1,8 @@
 # Competitive Positioning
 
-This document outlines how our prototype, **GrameenAI Advisor**, compares to existing MSME-focused AI platforms in the market. 
+This document outlines how our prototype, **Your AI Business Saathi**, compares to existing MSME-focused AI platforms in the market. 
 
-| Feature / Target Audience | Existing MSME-AI Tools (e.g. msmeindia.ai, YojanaRadar, TenderKart) | GrameenAI Advisor (This Prototype) |
+| Feature / Target Audience | Existing MSME-AI Tools (e.g. msmeindia.ai, YojanaRadar, TenderKart) | Your AI Business Saathi (This Prototype) |
 |---------------------------|----------------------------------------------------------------------|------------------------------------|
 | **Target Audience** | Formal, GST-registered businesses, already somewhat digitized. | Informal, cash-only, pre-Udyam micro-entrepreneurs (e.g., vegetable sellers, tailors, dairy farmers). |
 | **User Inputs** | Complex forms, structured financial data, PAN/GST numbers. | Plain-language, conversational input (what they sell, rough earnings, location). |

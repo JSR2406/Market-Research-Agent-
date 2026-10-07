@@ -124,7 +124,7 @@ async def whatsapp_incoming(request: Request):
         except Exception as e:
             logger.error(f"[WhatsApp] brain failed for {session_id}: {e}")
             reply = (
-                "Namaste! Main GrameenAI hoon — business aur loan mein madad karta hoon. "
+                "Namaste! Main aapki AI Business Saathi hoon — business aur loan mein madad karta hoon. "
                 "Abhi thodi dikkat hai, thodi der baad fir se likhiye."
             )
         await _send_reply(sender, reply)

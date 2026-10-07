@@ -161,7 +161,7 @@ export default function ChatPanel({
         marginTop: "16px",
         width: "100%",
         maxWidth: "760px",
-        padding: "20px 24px",
+        padding: "20px clamp(16px, 5vw, 24px)",
         background: "rgba(45,212,191,0.05)",
         border: "1px solid rgba(45,212,191,0.22)",
         borderRadius: "var(--radius-xl)",
@@ -191,9 +191,9 @@ export default function ChatPanel({
           </div>
           <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
             {topic.trim()
-              ? `Knows your “${topic}” business${profile ? " and your Startup Doctor answers" : ""} — follow-ups come straight from your report.`
+              ? `Knows your “${topic}” business${profile ? " and your Business Check-up answers" : ""} — follow-ups come straight from your report.`
               : profile
-                ? "Knows your Startup Doctor answers — ask follow-ups about your plan anytime."
+                ? "Knows your Business Check-up answers — ask follow-ups about your plan anytime."
                 : sessionId
                   ? "Remembers this conversation — run a research above and I'll learn your business."
                   : "Chatting without saved memory."}
@@ -272,7 +272,7 @@ export default function ChatPanel({
           <span style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
             {topic.trim()
               ? `Personalised for your “${topic}” business — answers are grounded in your report, not generic advice.`
-              : "Personalised from your Startup Doctor answers — advice and follow-up questions are shaped by them."}
+              : "Personalised from your Business Check-up answers — advice and follow-up questions are shaped by them."}
           </span>
         </div>
       )}

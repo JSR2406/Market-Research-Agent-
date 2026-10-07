@@ -1,4 +1,4 @@
-# GrameenAI Advisor Demo Guide
+# Your AI Business Saathi — Demo Guide
 
 ## Local Run Commands
 To run the full application locally, you will need two terminal tabs.
@@ -43,7 +43,7 @@ For the best live demonstration experience, copy and paste one of these sample i
 
 ## Competitive Positioning
 
-| Feature / Target Audience | Existing MSME-AI Tools (e.g. msmeindia.ai, YojanaRadar, TenderKart) | GrameenAI Advisor (This Prototype) |
+| Feature / Target Audience | Existing MSME-AI Tools (e.g. msmeindia.ai, YojanaRadar, TenderKart) | Your AI Business Saathi (This Prototype) |
 |---------------------------|----------------------------------------------------------------------|------------------------------------|
 | **Target Audience** | Formal, GST-registered businesses, already somewhat digitized. | Informal, cash-only, pre-Udyam micro-entrepreneurs. |
 | **User Inputs** | Complex forms, structured financial data, PAN/GST numbers. | Plain-language, conversational input. |

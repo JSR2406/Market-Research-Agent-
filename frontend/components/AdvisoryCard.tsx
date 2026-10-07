@@ -183,7 +183,7 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
       {/* Header */}
       <div
         style={{
-          padding: "18px 24px",
+          padding: "18px clamp(16px, 5vw, 24px)",
           borderBottom: "1px solid var(--border)",
           background: "linear-gradient(135deg, rgba(79,142,247,0.06) 0%, rgba(139,92,246,0.04) 100%)",
           display: "flex",
@@ -284,7 +284,7 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
         </div>
       </div>
 
-      <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div style={{ padding: "clamp(16px, 5vw, 24px)", display: "flex", flexDirection: "column", gap: "24px" }}>
         {/* Loan-Ready Score */}
         {data.loan_ready_score && typeof data.loan_ready_score.score === "number" && (
           <motion.div

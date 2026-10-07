@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText, ExternalLink } from "lucide-react";
+import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText, ExternalLink, Link2 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
 interface CashFlow {
@@ -15,6 +15,7 @@ interface AdvisoryData {
   documents_needed?: string[];
   next_step?: string;
   loan_ready_score?: { score?: number; level?: string; why?: string[] };
+  sources?: string[];
 }
 
 interface Props {
@@ -481,6 +482,32 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
                 </motion.div>
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {/* Sources Used */}
+        {data.sources && data.sources.length > 0 && (
+          <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.28 }}>
+            <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--accent)", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Link2 size={16} /> Sources Used During Research
+            </h3>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "10px" }}>
+              Pages this advisory actually read — always double-check with your bank or the official portal before acting.
+            </p>
+            <ul style={{ margin: 0, padding: "0 0 0 18px", display: "flex", flexDirection: "column", gap: "6px" }}>
+              {data.sources.slice(0, 8).map((src, idx) => (
+                <li key={idx} style={{ fontSize: "0.82rem" }}>
+                  <a
+                    href={src}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--accent)", textDecoration: "underline", textDecorationColor: "rgba(79,142,247,0.4)", textUnderlineOffset: "3px", overflowWrap: "break-word" }}
+                  >
+                    {src}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </motion.div>
         )}
 

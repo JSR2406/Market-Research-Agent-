@@ -28,12 +28,13 @@ from backend.workflows.routing import AGENT_REGISTRY, SYNTHESIS_AGENTS, route_st
 logger = logging.getLogger(__name__)
 
 
-def _finalize_report(report: str) -> str:
+def _finalize_report(report: str, sources: list | None = None) -> str:
     """
     Single deterministic post-pass on the LLM-written advisory:
-    1. attach the deterministic loan_ready_score, and
+    1. attach the deterministic loan_ready_score,
     2. annotate every matched-scheme line with its official source URL +
-       last-verified date from schemes.json (never trusts the model).
+       last-verified date from schemes.json (never trusts the model), and
+    3. attach the run's genuinely-fetched source URLs under `sources`.
 
     Runs exactly once so a re-parse cannot drop the injected score.
     """
@@ -52,6 +53,8 @@ def _finalize_report(report: str) -> str:
     schemes = data.get("matched_schemes") or []
     if schemes:
         data["matched_schemes"] = annotate_scheme_sources([str(s) for s in schemes])
+    if sources:
+        data["sources"] = sources
     return json.dumps(data, ensure_ascii=False)
 
 
@@ -71,6 +74,12 @@ async def run_research_workflow(
     injected into synthesis explicitly and persisted for the chat advisor).
     """
     reset_session_state()
+
+    # Collect genuinely-fetched research source URLs for provenance on `done`.
+    from backend.core.web_research import set_run_source_sink
+
+    source_sink: list = []
+    set_run_source_sink(source_sink)
 
     # Guarantee the profile is present in the run topic even if the caller
     # only sent it as a separate field (never duplicate it if already folded in).
@@ -197,8 +206,9 @@ async def run_research_workflow(
     except Exception as e:
         final_report = written  # degrade gracefully
 
-    # ── Deterministic finalize: loan-ready score + scheme sources (no LLM) ────
-    final_report = _finalize_report(final_report)
+# ── Deterministic finalize: loan-ready score + scheme sources (no LLM) ────
+    final_report = _finalize_report(final_report, list(dict.fromkeys(source_sink)))
+    set_run_source_sink(None)
 
     # ── Simplified low-literacy document (GrameenAI use case) ─────────────────
     simplified_report = ""

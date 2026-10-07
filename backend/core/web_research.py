@@ -11,14 +11,27 @@ limits. All requests are time-boxed, send a browser User-Agent, and never follow
 more than a handful of results — safe enough for advisory snippets.
 """
 import asyncio
+import contextvars
 import logging
 import re
-from typing import List
+from typing import List, Optional
 
 import httpx
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
+
+# Run-scoped collector of genuinely fetched source URLs (only pages that
+# returned 200 + readable text). Set by the workflow executor so provenance
+# is real (pages we actually read) rather than anything an LLM invented.
+_RUN_SOURCES: contextvars.ContextVar = contextvars.ContextVar(
+    "run_source_sink", default=None
+)
+
+
+def set_run_source_sink(sink: Optional[List[str]]) -> None:
+    """Attach a list the executor will read at the end of a research run."""
+    _RUN_SOURCES.set(sink if sink is not None else None)
 
 _HEADERS = {
     "User-Agent": (
@@ -129,11 +142,14 @@ async def web_context(topic: str, max_results: int | None = None) -> str:
         return ""
 
     snippets: List[str] = []
+    sink = _RUN_SOURCES.get()
     # Fetch up to 3 pages (frugal — scraping is slow, 2 is plenty for context).
     for url in urls[:2]:
         text = await fetch_text(url)
         if text:
             snippets.append(f"• {url}\n  {text}")
+            if isinstance(sink, list) and url not in sink and len(sink) < 12:
+                sink.append(url)
         else:
             snippets.append(f"• {url}\n  (page could not be read)")
 

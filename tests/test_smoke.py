@@ -121,6 +121,47 @@ def test_annotate_scheme_sources():
     assert lines[4].count("Source:") == 1  # idempotent — never double-annotate
 
 
+# ── research provenance (Phase 21) ─────────────────────────────────────────
+
+def test_finalize_report_attaches_sources():
+    import json
+
+    import backend.workflows.executor as ex
+
+    out = ex._finalize_report(
+        '{"business_summary": "tea stall"}',
+        ["https://example.gov.in/scheme"],
+    )
+    data = json.loads(out)
+    assert "loan_ready_score" in data
+    assert data["sources"] == ["https://example.gov.in/scheme"]
+    # no sources passed → key stays absent (empty provenance is never faked)
+    assert "sources" not in json.loads(ex._finalize_report('{"business_summary": "x"}'))
+
+
+def test_research_source_sink_collects_only_fetched_pages(monkeypatch):
+    from backend.core import web_research
+    from backend.core.web_research import set_run_source_sink
+
+    async def _fake_search(query, max_results=None):
+        return ["https://gov.in/a", "https://broken.example/x"]
+
+    async def _fake_fetch(url, max_chars=1200):
+        return "real readable page content" if url == "https://gov.in/a" else ""
+
+    monkeypatch.setattr(web_research, "search", _fake_search)
+    monkeypatch.setattr(web_research, "fetch_text", _fake_fetch)
+    sink: list = []
+    set_run_source_sink(sink)
+    try:
+        ctx = asyncio.run(web_research.web_context("tea stall", max_results=2))
+        assert "https://gov.in/a" in ctx
+        assert "real readable page content" in ctx
+    finally:
+        set_run_source_sink(None)
+    assert sink == ["https://gov.in/a"]  # only the page we actually read
+
+
 # ── llm_client session state ──────────────────────────────────────────────
 
 def test_reset_session_state_zeroes_counter():

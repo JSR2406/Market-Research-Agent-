@@ -1,5 +1,4 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # config.py exits immediately if OPENROUTER_API_KEY is missing while "openrouter"
 # is in the provider priority — this surfaces the error before uvicorn starts.
 from backend.core import config  # noqa: F401  (import for side-effect / fail-fast)
+from backend.core.config import ALLOWED_ORIGINS
 from backend.api.voice import router as voice_router
 from backend.api.chat import router as chat_router
 from backend.api.sessions import router as sessions_router
@@ -21,14 +21,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-# ── CORS ──────────────────────────────────────────────────────────────────────
-_raw = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:3001,http://localhost:3002,"
-    "http://localhost:3003,http://localhost:3004,http://localhost:3005",
-)
-ALLOWED_ORIGINS: list[str] = [o.strip() for o in _raw.split(",") if o.strip()]
 
 
 @asynccontextmanager
@@ -67,8 +59,8 @@ app.include_router(whatsapp_router)
 
 @app.get("/health")
 async def health():
+    # Deliberately minimal — do not echo config/origins to the public internet.
     return {
         "status": "ok",
         "model": config.MODEL,
-        "allowed_origins": ALLOWED_ORIGINS,
     }

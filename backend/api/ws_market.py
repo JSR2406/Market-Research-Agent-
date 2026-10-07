@@ -18,6 +18,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.core.config import ALLOWED_ORIGINS
 from backend.core.memory import (
     build_resume_context,
     delete_session,
@@ -34,6 +35,27 @@ MAX_TOPIC_CHARS = 4000
 MAX_PROFILE_CHARS = 1500
 
 
+def _origin_allowed(websocket: WebSocket) -> bool:
+    """
+    Cross-site WebSocket hijacking guard. Browsers always send an Origin
+    header on a WS handshake; a page on another domain must not be able to
+    open this socket and drive the research pipeline.
+
+    - No Origin (curl, server-to-server, test clients) → allowed.
+    - Origin matching the request's own host (scheme://host[:port]) → allowed.
+    - Otherwise the origin must be listed in ALLOWED_ORIGINS.
+    """
+    origin = (websocket.headers.get("origin") or "").strip().rstrip("/")
+    if not origin:
+        return True
+    if origin in ALLOWED_ORIGINS:
+        return True
+    host = (websocket.headers.get("host") or "").strip()
+    if host and origin in (f"http://{host}", f"https://{host}"):
+        return True
+    return False
+
+
 def _as_str(value) -> str:
     return value.strip() if isinstance(value, str) else ""
 
@@ -47,6 +69,15 @@ def _safe_int(value, default: int) -> int:
 
 @router.websocket("/ws/market")
 async def market_research_websocket(websocket: WebSocket):
+    # Reject foreign browser origins BEFORE accepting the socket.
+    if not _origin_allowed(websocket):
+        logger.warning(
+            "Rejected WS connection from disallowed origin: %s",
+            websocket.headers.get("origin"),
+        )
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
     ws = SafeWebSocket(websocket)
 

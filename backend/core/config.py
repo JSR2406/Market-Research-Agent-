@@ -11,7 +11,6 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_API_KEY_2: str = os.getenv("OPENROUTER_API_KEY_2", "")  # optional second key for rate-limit rotation
 OPENROUTER_BASE_URL: str = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
 # Configured LLM model with fallbacks
 MODEL: str = os.getenv("LLM_MODEL", "meta-llama/llama-3.3-70b-instruct")
@@ -142,6 +141,22 @@ LIVEKIT_ADVISOR_ROOM: str = os.getenv("LIVEKIT_ADVISOR_ROOM", "advisory-room")
 WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
 WHATSAPP_TOKEN: str = os.getenv("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_NUMBER_ID: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+# Meta app secret — used to verify X-Hub-Signature-256 on webhook POSTs.
+# While unset the webhook still accepts posts (scaffold stays testable);
+# once set, unsigned/forgeable payloads are rejected with 403.
+WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Browser origins allowed for CORS *and* the WebSocket handshake
+# (cross-site WebSocket hijacking guard in backend/api/ws_market.py).
+# ──────────────────────────────────────────────────────────────────────────────
+_raw_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:3001,http://localhost:3002,"
+    "http://localhost:3003,http://localhost:3004,http://localhost:3005,"
+    "https://market-research-agent-neon.vercel.app",
+)
+ALLOWED_ORIGINS: list[str] = [o.strip().rstrip("/") for o in _raw_origins.split(",") if o.strip()]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fail-fast guard

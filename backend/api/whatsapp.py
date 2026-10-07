@@ -19,6 +19,8 @@ Then set the webhook URL to https://<your-backend>/api/whatsapp/webhook.
 Never hard-fails Meta: verification mismatches return 403 (per Meta spec);
 message handling always returns 200 so Meta does not retry-storm.
 """
+import hashlib
+import hmac
 import logging
 
 import httpx
@@ -26,6 +28,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import PlainTextResponse
 
 from backend.core.config import (
+    WHATSAPP_APP_SECRET,
     WHATSAPP_PHONE_NUMBER_ID,
     WHATSAPP_TOKEN,
     WHATSAPP_VERIFY_TOKEN,
@@ -52,6 +55,28 @@ async def whatsapp_verify(
         return PlainTextResponse(hub_challenge or "")
     logger.warning("[WhatsApp] verification failed (token mismatch).")
     return PlainTextResponse("Verification failed.", status_code=403)
+
+
+def _verify_signature(raw_body: bytes, header_value: str) -> bool:
+    """
+    Verify Meta's X-Hub-Signature-256 (HMAC-SHA256 of the raw body with the
+    app secret). Only enforced when WHATSAPP_APP_SECRET is configured —
+    an unset secret keeps the scaffold testable (documented behavior).
+    Never raises.
+    """
+    if not WHATSAPP_APP_SECRET or not header_value:
+        return not WHATSAPP_APP_SECRET  # unconfigured → pass-through; configured+missing → fail
+    try:
+        algo, _, digest = header_value.partition("=")
+        if algo != "sha256" or not digest:
+            return False
+        expected = hmac.new(
+            WHATSAPP_APP_SECRET.encode("utf-8"), raw_body, hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected, digest.strip().lower())
+    except Exception:
+        logger.warning("[WhatsApp] signature verification error", exc_info=True)
+        return False
 
 
 def _extract_texts(payload: dict) -> list[tuple[str, str]]:
@@ -107,6 +132,13 @@ async def _send_reply(to: str, text: str) -> bool:
 async def whatsapp_incoming(request: Request):
     """Handle incoming messages. Always 200 (Meta retries on anything else)."""
     try:
+        raw = await request.body()
+    except Exception:
+        return {"status": "ignored (cannot read body)"}
+    if not _verify_signature(raw, (request.headers.get("x-hub-signature-256") or "")):
+        logger.warning("[WhatsApp] rejected webhook — signature verification failed")
+        return PlainTextResponse("Forbidden.", status_code=403)
+    try:
         payload = await request.json()
     except Exception:
         return {"status": "ignored (not JSON)"}
@@ -116,17 +148,46 @@ async def whatsapp_incoming(request: Request):
         return {"status": "ignored (no text messages)"}
 
     from backend.agents.chat import chat_agent
+    from backend.core.memory import load_chat_history, load_last_session, save_chat_message
 
     for sender, body in pairs:
         session_id = f"wa-{sender}"
         try:
-            reply = await chat_agent(body, agent_hint="chat")
+            # Load minimal context if available (don't fail webhook on I/O)
+            advisory_context = ""
+            prior = None
+            try:
+                prior = load_last_session(session_id)
+            except Exception:
+                prior = None
+            if prior:
+                try:
+                    advisory_context = (prior.get("state", {}).get("final_report", "") or "")[:2000]
+                except Exception:
+                    advisory_context = ""
+            history = []
+            try:
+                history = load_chat_history(session_id, limit=12)
+            except Exception:
+                history = []
+            reply = await chat_agent(
+                body,
+                agent_hint="chat",
+                topic=(prior.get("topic", "") if prior else ""),
+                advisory_context=advisory_context,
+                chat_history=history,
+            )
         except Exception as e:
             logger.error(f"[WhatsApp] brain failed for {session_id}: {e}")
             reply = (
                 "Namaste! Main aapki AI Business Saathi hoon — business aur loan mein madad karta hoon. "
                 "Abhi thodi dikkat hai, thodi der baad fir se likhiye."
             )
+        try:
+            save_chat_message(session_id, "user", body)
+            save_chat_message(session_id, "assistant", reply)
+        except Exception as e:
+            logger.warning(f"[WhatsApp] chat memory save failed for {session_id}: {e}")
         await _send_reply(sender, reply)
 
     return {"status": "processed", "count": len(pairs)}

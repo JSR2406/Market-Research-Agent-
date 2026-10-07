@@ -100,7 +100,7 @@ market-research-agent/
         ├── AdvisoryCard.tsx    # advisory render, simplified doc, download/copy, listen
         ├── ChatPanel.tsx       # business advisory chatbot with saved chat memory
         ├── LiveAdvisorPanel.tsx # realtime voice (LiveKit): join room, mic, agent audio
-        ├── StartupQuiz.tsx     # 5-question Business Check-up (file name legacy; UI copy must say Business Check-up)
+        ├── StartupQuiz.tsx     # 6-question Business Check-up stepper incl. location (file name legacy; UI copy must say Business Check-up)
         ├── CashflowSimulator.tsx # client-side cash-flow projection + SVG chart
         └── Usps.tsx            # "why this isn't a generic chatbot" section
 
@@ -151,7 +151,7 @@ plan, step_start, step_end, token_usage, status, done (with simplified_report), 
 ## Frontend Novelty Features
 - **Loan-Ready Score** — deterministic 0–100 score added to the advisory JSON by `executor._attach_loan_ready_score()` (no LLM cost; rubric in `backend/core/heuristics.compute_loan_ready_score`). `AdvisoryCard.tsx` draws an SVG gauge + "why" reasons. Always present, even fully offline.
 - **Cash-Flow Simulator** (`CashflowSimulator.tsx`) — pure client-side cash-flow projection (capital/weekly sales/weekly expenses, 4–24 weeks), SVG line chart, break-even week, monthly surplus. No backend calls.
-- **Business Check-up quiz** (`StartupQuiz.tsx`) — 5 optional questions persisted in `localStorage["grameenai_profile"]`; answers are deterministically folded into the WS `start` topic via `buildProfileSnippet()` AND sent as a separate `profile` field on the `start` message (no extra LLM calls). The backend (`executor.run_research_workflow`) guarantees the profile is in the run topic, injects it into the writer's synthesis prompt (reflected in `business_summary`/`next_step`), persists it in session state (`state.profile`), and `POST /api/chat` uses it (request body, falling back to session state) so the advisor chat answers follow-up questions from the same answers — `chat_agent(profile=...)`.
+- **Business Check-up quiz** (`StartupQuiz.tsx`) — 6 optional questions (business type, age, earnings, **location**, loan history, need) shown one at a time as a stepper, persisted in `localStorage["grameenai_profile"]`; answers are deterministically folded into the WS `start` topic via `buildProfileSnippet()` AND sent as a separate `profile` field on the `start` message (no extra LLM calls). The backend (`executor.run_research_workflow`) guarantees the profile is in the run topic, injects it into the writer's synthesis prompt (reflected in `business_summary`/`next_step`), persists it in session state (`state.profile`), and `POST /api/chat` uses it (request body, falling back to session state) so the advisor chat answers follow-up questions from the same answers — `chat_agent(profile=...)`.
 - **Resume last advisory** — page mount calls `GET /api/sessions/{session_id}` and restores the saved advisory (report + simplified + grey-out of run state) until the user runs again. Backend lives in `backend/api/sessions.py`.
 
 ## Rules

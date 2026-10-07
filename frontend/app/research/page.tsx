@@ -49,6 +49,7 @@ export default function ResearchPage() {
     topic: string;
     maxSteps: number;
     sessionId: string;
+    profile: string;
   } | null>(null);
 
   const [isRunning, setIsRunning] = useState(false);
@@ -257,11 +258,14 @@ export default function ResearchPage() {
     const profileSnippet = buildProfileSnippet(profile);
     const startTopic = profileSnippet ? `${profileSnippet}. ${topic}` : topic;
 
+    // The profile also travels as its own field so the backend can inject it
+    // into synthesis explicitly and save it for follow-up chat questions.
     const payload = {
       type: "start",
       topic: startTopic,
       max_steps: maxSteps,
       session_id: sessionId,
+      profile: profileSnippet,
     };
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -269,7 +273,7 @@ export default function ResearchPage() {
       return;
     }
 
-    pendingStartRef.current = { topic: startTopic, maxSteps, sessionId };
+    pendingStartRef.current = { topic: startTopic, maxSteps, sessionId, profile: profileSnippet };
     connectWs((ws) => {
       const pending = pendingStartRef.current;
       if (pending) {
@@ -279,6 +283,7 @@ export default function ResearchPage() {
             topic: pending.topic,
             max_steps: pending.maxSteps,
             session_id: pending.sessionId,
+            profile: pending.profile,
           })
         );
         pendingStartRef.current = null;
@@ -463,8 +468,12 @@ export default function ResearchPage() {
       {/* Cash-flow simulator — self-serve financial viz, runs locally */}
       <CashflowSimulator />
 
-      {/* Personal business advisor chat — remembers this session and your report */}
-      <ChatPanel sessionId={sessionId} topic={currentTopic} />
+      {/* Personal business advisor chat — remembers this session, your report and Startup Doctor answers */}
+      <ChatPanel
+        sessionId={sessionId}
+        topic={currentTopic}
+        profile={buildProfileSnippet(profile)}
+      />
 
       {/* Realtime voice advisor (LiveKit) */}
       <LiveAdvisorPanel />

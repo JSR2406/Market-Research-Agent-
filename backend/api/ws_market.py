@@ -36,6 +36,9 @@ async def market_research_websocket(websocket: WebSocket):
                 topic = msg.get("topic", "").strip()
                 max_steps = min(int(msg.get("max_steps", 4)), 6)
                 session_id = msg.get("session_id", "").strip()
+                # Startup Doctor intake answers (plain-language snippet), e.g.
+                # "Business profile: street vendor / cart business; earning ₹10k-25k..."
+                profile = msg.get("profile", "").strip()
 
                 if not topic:
                     await ws.send_json({"type": "error", "message": "Topic is empty."})
@@ -71,6 +74,7 @@ async def market_research_websocket(websocket: WebSocket):
                         topic, max_steps, ws, cancel_flag,
                         session_context=session_context,
                         session_id=session_id,
+                        profile=profile,
                     )
                 )
 

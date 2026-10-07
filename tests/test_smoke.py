@@ -141,3 +141,116 @@ def test_whatsapp_post_always_200(client):
     # send is skipped gracefully.
     assert r.status_code == 200
     assert r.json()["status"] == "processed"
+
+
+# ── Startup Doctor profile → advisory + chat ──────────────────────────────
+
+def test_chat_agent_injects_profile(monkeypatch):
+    from backend.agents import chat as chat_mod
+
+    captured: dict = {}
+
+    async def _fake_llm(messages, **kwargs):
+        captured["messages"] = messages
+        return "Here is your tailored next step."
+
+    monkeypatch.setattr(chat_mod, "call_llm", _fake_llm)
+    reply = asyncio.run(
+        chat_mod.chat_agent(
+            "What loan can I get?",
+            profile="Business profile: street vendor / cart business; earning ₹10,000-25,000 per month",
+        )
+    )
+    assert reply == "Here is your tailored next step."
+    joined = " ".join(m["content"] for m in captured["messages"])
+    assert "Startup Doctor intake answers" in joined
+    assert "street vendor / cart business" in joined
+
+
+def test_chat_api_uses_saved_session_profile(client, monkeypatch):
+    from backend.agents import chat as chat_mod
+    from backend.core.memory import delete_session, save_session
+
+    sid = "test-profile-chat-session"
+    save_session(
+        sid,
+        "tea stall",
+        {"profile": "Business profile: shop or stall based business", "final_report": "{}"},
+    )
+    captured: dict = {}
+
+    async def _fake_llm(messages, **kwargs):
+        captured["messages"] = messages
+        return "ok"
+
+    monkeypatch.setattr(chat_mod, "call_llm", _fake_llm)
+    try:
+        r = client.post("/api/chat", json={"message": "what next?", "session_id": sid})
+        assert r.status_code == 200
+        joined = " ".join(m["content"] for m in captured["messages"])
+        assert "shop or stall based business" in joined
+    finally:
+        delete_session(sid)
+
+
+def test_workflow_injects_and_persists_profile(monkeypatch):
+    import backend.workflows.executor as ex
+    from backend.core.memory import delete_session, load_last_session
+
+    sid = "test-profile-workflow-session"
+    captured: dict = {}
+
+    class _FakeWS:
+        def __init__(self):
+            self.events = []
+
+        async def send_json(self, payload):
+            self.events.append(payload)
+
+    async def _planner(topic, previous_context="", agent_hint=None):
+        captured["planner_topic"] = topic
+        return ["research tea stall demand"]
+
+    async def _research(task, agent_hint=None):
+        return "local findings"
+
+    async def _writer(task, agent_hint=None):
+        captured["writer_task"] = task
+        return '{"business_summary": "tea stall"}'
+
+    async def _editor(task, agent_hint=None):
+        return '{"business_summary": "tea stall"}'
+
+    async def _simplifier(advisory_json, topic=""):
+        return "plain summary"
+
+    monkeypatch.setattr(ex, "planner_agent", _planner)
+    monkeypatch.setattr(ex, "writer_agent", _writer)
+    monkeypatch.setattr(ex, "editor_agent", _editor)
+    monkeypatch.setattr(ex, "simplifier_agent", _simplifier)
+    monkeypatch.setitem(ex.AGENT_REGISTRY, "research_agent", _research)
+
+    ws = _FakeWS()
+    profile = "Business profile: farm / dairy / agriculture business"
+    try:
+        asyncio.run(
+            ex.run_research_workflow(
+                "I run a dairy business",
+                1,
+                ws,
+                {"cancelled": False},
+                session_id=sid,
+                profile=profile,
+            )
+        )
+        # Profile reaches the planner (topic) and the synthesis prompt.
+        assert profile in captured["planner_topic"]
+        assert profile in captured["writer_task"]
+        assert "Startup Doctor" in captured["writer_task"]
+        # Profile persisted with the session for later chat questions.
+        saved = load_last_session(sid)
+        assert saved["state"]["profile"] == profile
+        assert ws.events[-1]["type"] == "done"
+        assert "loan_ready_score" in ws.events[-1]["final_report"]
+    finally:
+        delete_session(sid)

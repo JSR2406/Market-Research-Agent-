@@ -1,6 +1,6 @@
 # 🚀 GrameenAI Advisor (Market Research Agent)
 
-**Live Demo:** [https://market-research-agent-jsr2406.vercel.app](https://market-research-agent-jsr2406.vercel.app)
+**Live Demo:** [https://market-research-agent-neon.vercel.app](https://market-research-agent-neon.vercel.app)
 
 Multi-agent AI platform that turns a plain-language business description from a
 micro-entrepreneur into a **Loan Readiness Advisory**: a cash-flow snapshot,
@@ -21,7 +21,7 @@ Built with **Next.js 15**, **FastAPI**, and a multi-provider LLM client
 - **💬 Business Advisor Chat**: Specialised chatbot that builds your business and makes you loan-ready (schemes, documents, eligibility) — with saved chat memory per session and Hindi/Hinglish replies.
 - **📊 Loan-Ready Score**: Deterministic 0–100 gauge computed from the actual advisory (cash-flow specificity, income, scheme matches, document checklist) — with a plain-language "why". Zero extra AI cost, works fully offline.
 - **📈 Cash-Flow Simulator**: Self-serve, client-side. Type in capital, weekly sales and expenses → an SVG projection chart, break-even week and monthly surplus. No internet needed.
-- **🩺 Startup Doctor**: 5 optional quick questions before the run that sharpen the very first report.
+- **🩺 Startup Doctor**: 5 optional quick questions before the run that sharpen the very first report — the answers are saved with your session, so the advisor chat keeps answering follow-up questions from them too.
 - **📌 Resume last advisory**: Reopen your previous session's advisory automatically — no re-running research.
 - **📜 Simplified Document**: Low-literacy "In Simple Words" advisory, download/copy as `.txt`.
 - **🛟 Offline Resilience**: If every LLM provider is down, a deterministic engine still produces a full advisory from local scheme data.

@@ -31,6 +31,7 @@ class ChatRequest(BaseModel):
     session_id: str = ""
     topic: str = ""
     lang: str = "auto"  # "auto" | "hi" | "en"
+    profile: str = ""  # Startup Doctor intake snippet (falls back to session state)
 
 
 @router.post("")
@@ -38,12 +39,14 @@ async def chat(body: ChatRequest):
     message = body.message.strip()
     session_id = body.session_id.strip()
     topic = body.topic.strip()
+    profile = body.profile.strip()
 
     if not message:
         return {"reply": "Please type a question first.", "session_id": session_id, "history_count": 0}
 
     # Attach the latest written advisory (if any) for this session so the chat
-    # can answer "me" questions about the user's own report.
+    # can answer "me" questions about the user's own report. The Startup Doctor
+    # profile saved with the run is used when the client didn't send it.
     advisory_context = ""
     if session_id:
         try:
@@ -51,6 +54,7 @@ async def chat(body: ChatRequest):
             if prior:
                 topic = topic or prior.get("topic", "")
                 advisory_context = (prior.get("state", {}).get("final_report", "") or "")[:3000]
+                profile = profile or (prior.get("state", {}).get("profile", "") or "")
         except Exception as e:
             logger.error(f"[Chat] Failed to load advisory context for {session_id}: {e}")
 
@@ -63,6 +67,7 @@ async def chat(body: ChatRequest):
             advisory_context=advisory_context,
             chat_history=history,
             lang=body.lang,
+            profile=profile,
         )
     except Exception as e:
         logger.error(f"[Chat] chat_agent raised unexpectedly: {e}")

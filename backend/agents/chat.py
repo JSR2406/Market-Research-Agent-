@@ -138,12 +138,14 @@ async def chat_agent(
     chat_history: Optional[List[Dict[str, str]]] = None,
     agent_hint: str = "chat",
     lang: str = "auto",
+    profile: str = "",
 ) -> str:
     """
     Answer a single chat turn. `chat_history` is the recent remembered
     conversation; `advisory_context` is the latest written advisory for the
     session, used when the user asks about their own report. `lang` is one of
-    "auto" | "hi" | "en".
+    "auto" | "hi" | "en". `profile` is the Startup Doctor intake snippet —
+    the advisor tailors answers to it and asks follow-up questions from it.
     """
     effective = _effective_lang(message, lang)
 
@@ -175,6 +177,20 @@ async def chat_agent(
             ),
         })
 
+    if profile:
+        history.append({
+            "role": "system",
+            "content": (
+                "The user's Startup Doctor intake answers: "
+                + profile[:500]
+                + "\nTailor every answer to this profile (business type, stage, "
+                "earnings band, borrowing history, main need). When the user's "
+                "question needs more detail to answer well, ask ONE short "
+                "targeted follow-up question drawn from these answers — never "
+                "re-ask something already covered here."
+            ),
+        })
+
     if advisory_context:
         history.append({
             "role": "system",
@@ -201,14 +217,15 @@ async def chat_agent(
     except Exception as e:
         logger.error(f"[Chat] LLM failed, using heuristic fallback: {e}")
 
-    return _heuristic_reply(message, topic, effective)
+    return _heuristic_reply(message, topic, effective, profile)
 
 
-def _heuristic_reply(message: str, topic: str, lang: str) -> str:
+def _heuristic_reply(message: str, topic: str, lang: str, profile: str = "") -> str:
     """Deterministic, offline answer — specialised, actionable, on-scope."""
     lower = message.lower()
     hindi = lang == "hi"
-    schemes = match_schemes(topic or message)
+    # Profile labels (kiosk/vendor/farm…) widen scheme matching offline too.
+    schemes = match_schemes(f"{topic} {profile}".strip() or message)
 
     if any(k in lower for k in _DOC_KEYWORDS):
         body = _HI_DOC if hindi else _EN_DOC

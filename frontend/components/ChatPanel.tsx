@@ -48,9 +48,11 @@ function welcome(topic: string) {
 export default function ChatPanel({
   sessionId,
   topic,
+  profile = "",
 }: {
   sessionId: string;
   topic: string;
+  profile?: string;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -117,7 +119,7 @@ export default function ChatPanel({
         const res = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, session_id: sessionId, topic, lang }),
+          body: JSON.stringify({ message: text, session_id: sessionId, topic, lang, profile }),
         });
         const body = await res.json();
         const reply =
@@ -138,7 +140,7 @@ export default function ChatPanel({
         setIsLoading(false);
       }
     },
-    [input, isLoading, sessionId, topic, lang]
+    [input, isLoading, sessionId, topic, lang, profile]
   );
 
   const clearChat = useCallback(async () => {
@@ -196,10 +198,12 @@ export default function ChatPanel({
           </div>
           <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
             {topic.trim()
-              ? `Knows your “${topic}” business — follow-ups come straight from your report.`
-              : sessionId
-                ? "Remembers this conversation — run a research above and I'll learn your business."
-                : "Chatting without saved memory."}
+              ? `Knows your “${topic}” business${profile ? " and your Startup Doctor answers" : ""} — follow-ups come straight from your report.`
+              : profile
+                ? "Knows your Startup Doctor answers — ask follow-ups about your plan anytime."
+                : sessionId
+                  ? "Remembers this conversation — run a research above and I'll learn your business."
+                  : "Chatting without saved memory."}
           </div>
         </div>
         {/* Language toggle */}
@@ -257,7 +261,7 @@ export default function ChatPanel({
       </div>
 
       {/* Personalised context badge */}
-      {topic.trim() && (
+      {(topic.trim() || profile) && (
         <div
           style={{
             display: "flex",
@@ -273,7 +277,9 @@ export default function ChatPanel({
         >
           <Sparkles size={12} color="var(--accent)" />
           <span style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
-            Personalised for your “{topic}” business — answers are grounded in your report, not generic advice.
+            {topic.trim()
+              ? `Personalised for your “${topic}” business — answers are grounded in your report, not generic advice.`
+              : "Personalised from your Startup Doctor answers — advice and follow-up questions are shaped by them."}
           </span>
         </div>
       )}

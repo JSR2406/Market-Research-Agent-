@@ -48,12 +48,20 @@ async def run_research_workflow(
     cancel_flag: dict,
     session_context: str = "",
     session_id: str = "",
+    profile: str = "",
 ) -> None:
     """
     Main workflow. session_context is an optional string injected by ws_market.py
-    when a previous session is resumed.
+    when a previous session is resumed. profile is the Startup Doctor intake
+    snippet (frontend folds it into topic too; we keep it separate so it is
+    injected into synthesis explicitly and persisted for the chat advisor).
     """
     reset_session_state()
+
+    # Guarantee the profile is present in the run topic even if the caller
+    # only sent it as a separate field (never duplicate it if already folded in).
+    if profile and profile not in topic:
+        topic = f"{profile}. {topic}"
 
     await websocket.send_json({"type": "status", "message": "Planning your research..."})
 
@@ -136,8 +144,15 @@ async def run_research_workflow(
         for i, (s, _, r) in enumerate(history)
     )
     writer_task = (
-        f"Topic: {topic}\n\n"
-        f"Accumulated Findings:\n{combined_findings}\n\n"
+        f"Topic: {topic}\n"
+        + (
+            f"\nClient intake answers (Startup Doctor):\n{profile}\n"
+            "Reflect these answers inside business_summary and next_step — the "
+            "advisory must be written for THIS client, not a generic one.\n"
+            if profile
+            else ""
+        )
+        + f"\nAccumulated Findings:\n{combined_findings}\n\n"
         "Write a comprehensive Loan Readiness Advisory report in the JSON schema "
         "described in your instructions."
     )
@@ -196,6 +211,7 @@ async def run_research_workflow(
                 "final_report": final_report,
                 "simplified_report": simplified_report,
                 "token_usage": SESSION_TOKEN_USAGE.copy(),
+                "profile": profile,
             }
             save_session(session_id, topic, state)
         except Exception as e:

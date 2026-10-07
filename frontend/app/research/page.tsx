@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import TopicInput from "@/components/TopicInput";
 import AgentTimeline from "@/components/AgentTimeline";
 import AdvisoryCard from "@/components/AdvisoryCard";
 import ChatPanel from "@/components/ChatPanel";
 import Usps from "@/components/Usps";
-import LiveAdvisorPanel from "@/components/LiveAdvisorPanel";
+const LiveAdvisorPanel = dynamic(() => import("@/components/LiveAdvisorPanel"), { ssr: false });
 import StartupQuiz, { buildProfileSnippet, type ProfileInit } from "@/components/StartupQuiz";
-import CashflowSimulator from "@/components/CashflowSimulator";
+const CashflowSimulator = dynamic(() => import("@/components/CashflowSimulator"), { ssr: false });
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, MessageCircle, X } from "lucide-react";
 import { API_BASE, WS_URL } from "@/lib/api";

@@ -82,8 +82,8 @@ async def chat(body: ChatRequest):
 
     return {
         "reply": reply,
-        "session_id": session_id,
-        "history_count": len(history) + 2,
+        "session_id": session_id or "",
+        "history_count": len(history) + 2 if session_id else 2,
     }
 
 

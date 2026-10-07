@@ -10,25 +10,7 @@ import StartupQuiz, { buildProfileSnippet, type ProfileInit } from "@/components
 import CashflowSimulator from "@/components/CashflowSimulator";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, MessageCircle, X } from "lucide-react";
-
-// Use wss:// in production (HTTPS pages block ws://)
-const rawWsUrl =
-  process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/ws/market";
-
-const WS_URL =
-  typeof window !== "undefined" &&
-  window.location.protocol === "https:" &&
-  rawWsUrl.startsWith("ws://")
-    ? rawWsUrl.replace("ws://", "wss://")
-    : rawWsUrl;
-
-const rawApiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
-const API_BASE =
-  typeof window !== "undefined" &&
-  window.location.protocol === "https:" &&
-  rawApiBase.startsWith("http://")
-    ? rawApiBase.replace("http://", "https://")
-    : rawApiBase;
+import { API_BASE, WS_URL } from "@/lib/api";
 
 const WS_RECONNECT_DELAY_MS = 1500;
 const WS_MAX_RETRIES = 3;
@@ -45,6 +27,9 @@ type Step = {
 export default function ResearchPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
+  // Mirror of `isRunning` for use inside the WebSocket `onclose` closure —
+  // the closure captures the value at connect time and would otherwise go stale.
+  const isRunningRef = useRef(false);
   const pendingStartRef = useRef<{
     topic: string;
     maxSteps: number;
@@ -63,6 +48,10 @@ export default function ResearchPage() {
   const [sessionId, setSessionId] = useState("");
   const [profile, setProfile] = useState<ProfileInit>({});
   const [resumeNote, setResumeNote] = useState("");
+
+  useEffect(() => {
+    isRunningRef.current = isRunning;
+  }, [isRunning]);
 
   useEffect(() => {
     setMounted(true);
@@ -222,8 +211,10 @@ export default function ResearchPage() {
       };
 
       ws.onclose = (ev) => {
-        // Unexpected close while running — attempt reconnect
-        if (isRunning && retriesRef.current < WS_MAX_RETRIES && !ev.wasClean) {
+        // Unexpected close while running — attempt reconnect.
+        // Read the live value via ref; the captured `isRunning` state is stale.
+        const running = isRunningRef.current;
+        if (running && retriesRef.current < WS_MAX_RETRIES && !ev.wasClean) {
           retriesRef.current += 1;
           setStatusMessage(
             `Connection lost. Retrying (${retriesRef.current}/${WS_MAX_RETRIES})…`
@@ -231,16 +222,16 @@ export default function ResearchPage() {
           setTimeout(() => {
             connectWs();
           }, WS_RECONNECT_DELAY_MS * retriesRef.current);
-        } else if (isRunning) {
+        } else if (running) {
           setIsRunning(false);
           setErrorMessage(
-            "Backend connection closed unexpectedly. Please try again."
+            "The connection dropped while your research was running. Please try again."
           );
           setStatusMessage("");
         }
       };
     },
-    [handleMessage, isRunning]
+    [handleMessage]
   );
 
   const handleStart = async (topic: string, maxSteps: number) => {
@@ -295,7 +286,7 @@ export default function ResearchPage() {
       if (wsRef.current?.readyState !== WebSocket.OPEN) {
         setStatusMessage("");
         setErrorMessage(
-          "Could not connect to the backend. Make sure the backend server is running on port 8000 (run: uvicorn backend.main:app --reload)."
+          "We couldn't reach your Business Saathi just now. Please check your internet connection and try again."
         );
         setIsRunning(false);
       }

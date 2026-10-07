@@ -20,7 +20,7 @@ This project has two parts:
    |-----|-------|
    | `OPENROUTER_API_KEY` | your key from [openrouter.ai](https://openrouter.ai/keys) |
     | `ALLOWED_ORIGINS` | `https://market-research-agent-neon.vercel.app` |
-   | `MODEL` | `google/gemini-2.5-flash` |
+   | `LLM_MODEL` | `google/gemini-2.5-flash` |
 5. After deploy, copy your Railway URL, e.g. `https://market-research-agent-production.up.railway.app`
 
 ### Option B: Render

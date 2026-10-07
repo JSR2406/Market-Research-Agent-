@@ -59,6 +59,16 @@ function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
       )}
 
       <div
+        role={s.output ? "button" : undefined}
+        tabIndex={s.output ? 0 : undefined}
+        aria-expanded={s.output ? expanded : undefined}
+        onKeyDown={(e) => {
+          if (!s.output) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded((p) => !p);
+          }
+        }}
         style={{
           display: "flex",
           alignItems: "center",

@@ -67,8 +67,12 @@ async def run_research_workflow(
 
     try:
         plan_steps = await planner_agent(topic, previous_context=session_context)
-    except Exception as e:
-        await websocket.send_json({"type": "error", "message": f"Planning failed: {str(e)}"})
+    except Exception:
+        logger.error("Planning failed", exc_info=True)
+        await websocket.send_json({
+            "type": "error",
+            "message": "We could not prepare a research plan. Please try again.",
+        })
         return
 
     plan_steps = plan_steps[:max_steps]
@@ -110,8 +114,12 @@ async def run_research_workflow(
         agent_fn = AGENT_REGISTRY.get(agent_name, research_agent)
         try:
             output = await agent_fn(enriched_task, agent_hint=hint)
-        except Exception as e:
-            output = f"⚠️ Error in {agent_name}: {str(e)}"
+        except Exception:
+            logger.error("Agent %s failed", agent_name, exc_info=True)
+            output = (
+                f"⚠️ {agent_name.replace('_', ' ')} could not complete this step. "
+                "Continuing with the other steps."
+            )
 
         history.append((step, agent_name, output))
 
@@ -159,8 +167,9 @@ async def run_research_workflow(
 
     try:
         written = await writer_agent(writer_task, agent_hint="writer")
-    except Exception as e:
-        written = f"⚠️ Writer error: {e}\n\n" + combined_findings[:3000]
+    except Exception:
+        logger.error("Writer failed", exc_info=True)
+        written = combined_findings[:3000]
 
     editor_task = (
         f"Research Topic: {topic}\n\n"

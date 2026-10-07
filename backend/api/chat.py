@@ -12,7 +12,7 @@ reply, and the agent carries its own heuristic offline guarantee.
 import logging
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.agents.chat import chat_agent
 from backend.core.memory import (
@@ -25,13 +25,16 @@ from backend.core.memory import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+# Input caps (P0) — bounded prompts keep token costs sane and reject junk early.
+_SESSION_ID_PATTERN = r"^[A-Za-z0-9_-]{0,64}$"
+
 
 class ChatRequest(BaseModel):
-    message: str
-    session_id: str = ""
-    topic: str = ""
-    lang: str = "auto"  # "auto" | "hi" | "en"
-    profile: str = ""  # Startup Doctor intake snippet (falls back to session state)
+    message: str = Field(..., max_length=4000)
+    session_id: str = Field("", max_length=64, pattern=_SESSION_ID_PATTERN)
+    topic: str = Field("", max_length=2000)
+    lang: str = Field("auto", max_length=8)  # "auto" | "hi" | "en"
+    profile: str = Field("", max_length=1500)  # Startup Doctor snippet (falls back to session state)
 
 
 @router.post("")

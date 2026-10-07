@@ -21,6 +21,9 @@ Thumbs.db
 
 # Runtime data
 backend/sessions/
+*.log
+*.pid
+.pytest_cache/
 
 # IDEs
 .vscode/

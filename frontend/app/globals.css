@@ -150,6 +150,13 @@ body::before {
   50% { opacity: 1; }
   100% { opacity: 0.4; }
 }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Self-sufficient spinner — components reference `animation: spin …` inline and
+   `className="spin"`; do not rely on Tailwind's generated keyframe names. */
+.spin { animation: spin 1s linear infinite; }
 
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 

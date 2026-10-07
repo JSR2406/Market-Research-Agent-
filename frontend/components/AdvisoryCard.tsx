@@ -2,6 +2,7 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 interface CashFlow {
   [key: string]: string | number;
@@ -22,7 +23,7 @@ interface Props {
   simplified?: string;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = API_BASE;
 
 type AudioState = "idle" | "loading" | "playing" | "error";
 

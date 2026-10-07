@@ -13,14 +13,7 @@ import {
   TrendingUp,
   User,
 } from "lucide-react";
-
-const rawApiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
-const API_BASE =
-  typeof window !== "undefined" &&
-  window.location.protocol === "https:" &&
-  rawApiBase.startsWith("http://")
-    ? rawApiBase.replace("http://", "https://")
-    : rawApiBase;
+import { API_BASE } from "@/lib/api";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -133,7 +126,7 @@ export default function ChatPanel({
           {
             role: "assistant",
             content:
-              "I couldn't reach the backend. Make sure the server is running on port 8000 and try again.",
+              "I'm having trouble connecting right now. Please check your internet connection and try again.",
           },
         ]);
       } finally {

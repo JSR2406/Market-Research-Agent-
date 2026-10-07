@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Square, Zap, Sparkles, Mic, MicOff, Loader } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 interface Props {
   onStart: (topic: string, maxSteps: number) => void;
@@ -15,7 +16,7 @@ const EXAMPLE_TOPICS = [
   "Small dairy farmer in Gujarat, 3 cows, ₹20k/month",
 ];
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+const BACKEND_URL = API_BASE;
 
 type VoiceState = "idle" | "recording" | "transcribing" | "error";
 

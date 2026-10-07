@@ -12,7 +12,7 @@ import uuid
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.core.config import LIVEKIT_ADVISOR_ROOM, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL
 from backend.core.voice import speech_to_text, text_to_speech
@@ -21,9 +21,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
+MAX_AUDIO_BYTES = 5 * 1024 * 1024  # 5 MB — reject oversized uploads early
+
 
 class SpeakRequest(BaseModel):
-    text: str
+    text: str = Field(..., max_length=5000)
 
 
 class LiveKitTokenRequest(BaseModel):
@@ -37,7 +39,9 @@ async def transcribe(file: UploadFile = File(...)):
     Falls back gracefully — never crashes.
     """
     try:
-        audio_bytes = await file.read()
+        audio_bytes = await file.read(MAX_AUDIO_BYTES + 1)
+        if len(audio_bytes) > MAX_AUDIO_BYTES:
+            raise HTTPException(status_code=413, detail="Audio file too large (max 5 MB).")
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="Empty audio file.")
         text = await speech_to_text(audio_bytes)

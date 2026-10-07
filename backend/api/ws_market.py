@@ -6,17 +6,43 @@ Messages handled:
 - `cancel`: cancel the running workflow
 - `delete_session`: GDPR right-to-delete
 - `export_session`: export stored session data
+
+Hardening notes (P0):
+- All client input is type-checked and size-capped before use.
+- `session_id` is validated against the strict allowlist in core.memory
+  (path-traversal guard) before it touches disk.
+- Client-facing errors are generic; details go to server logs only.
 """
 import asyncio
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.core.memory import (
+    build_resume_context,
+    delete_session,
+    is_valid_session_id,
+    load_last_session,
+)
 from backend.core.ws import SafeWebSocket
 from backend.workflows.executor import run_research_workflow
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+MAX_TOPIC_CHARS = 4000
+MAX_PROFILE_CHARS = 1500
+
+
+def _as_str(value) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _safe_int(value, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 @router.websocket("/ws/market")
@@ -29,19 +55,35 @@ async def market_research_websocket(websocket: WebSocket):
 
     try:
         while True:
-            msg = await ws.receive_json()
+            try:
+                msg = await ws.receive_json()
+            except WebSocketDisconnect:
+                raise
+            except Exception:
+                await ws.send_json({
+                    "type": "error",
+                    "message": "That message could not be read. Please refresh and try again.",
+                })
+                continue
+
+            if not isinstance(msg, dict):
+                await ws.send_json({"type": "error", "message": "Unsupported message."})
+                continue
+
             msg_type = msg.get("type")
 
             if msg_type == "start":
-                topic = msg.get("topic", "").strip()
-                max_steps = min(int(msg.get("max_steps", 4)), 6)
-                session_id = msg.get("session_id", "").strip()
-                # Startup Doctor intake answers (plain-language snippet), e.g.
-                # "Business profile: street vendor / cart business; earning ₹10k-25k..."
-                profile = msg.get("profile", "").strip()
+                topic = _as_str(msg.get("topic"))[:MAX_TOPIC_CHARS]
+                profile = _as_str(msg.get("profile"))[:MAX_PROFILE_CHARS]
+                session_id = _as_str(msg.get("session_id"))
+                max_steps = max(1, min(_safe_int(msg.get("max_steps", 4), 4), 6))
 
                 if not topic:
                     await ws.send_json({"type": "error", "message": "Topic is empty."})
+                    continue
+
+                if session_id and not is_valid_session_id(session_id):
+                    await ws.send_json({"type": "error", "message": "Invalid session id."})
                     continue
 
                 cancel_flag["cancelled"] = False
@@ -50,7 +92,6 @@ async def market_research_websocket(websocket: WebSocket):
                 session_context = ""
                 if session_id:
                     try:
-                        from backend.core.memory import build_resume_context, load_last_session
                         prior = load_last_session(session_id)
                         if prior:
                             session_context = build_resume_context(prior)
@@ -60,10 +101,9 @@ async def market_research_websocket(websocket: WebSocket):
                                 "previous_topic": prior.get("topic", ""),
                                 "summary": session_context[:300],
                             })
-                    except ImportError:
-                        pass  # memory module not present
                     except Exception:
-                        pass  # never block a run because of memory errors
+                        logger.warning("Failed to load resume context", exc_info=True)
+                        # never block a run because of memory errors
 
                 # Cancel the previous task if still running.
                 if workflow_task and not workflow_task.done():
@@ -85,55 +125,62 @@ async def market_research_websocket(websocket: WebSocket):
                 await ws.send_json({"type": "cancelled"})
 
             elif msg_type == "delete_session":
-                session_id = msg.get("session_id", "").strip()
+                session_id = _as_str(msg.get("session_id"))
+                if not is_valid_session_id(session_id):
+                    await ws.send_json({"type": "error", "message": "Invalid session id."})
+                    continue
                 try:
-                    from backend.core.memory import delete_session
                     delete_session(session_id)
                     await ws.send_json({
                         "type": "session_deleted",
                         "session_id": session_id,
                     })
-                except ImportError:
+                except Exception:
+                    logger.error("Failed to delete session", exc_info=True)
                     await ws.send_json({
                         "type": "error",
-                        "message": "Memory module not available.",
+                        "message": "Could not delete this session. Please try again.",
                     })
 
             elif msg_type == "export_session":
-                session_id = msg.get("session_id", "").strip()
+                session_id = _as_str(msg.get("session_id"))
+                if not is_valid_session_id(session_id):
+                    await ws.send_json({"type": "error", "message": "Invalid session id."})
+                    continue
                 try:
-                    from backend.core.memory import load_last_session
                     data = load_last_session(session_id)
-                    if data:
-                        await ws.send_json({
-                            "type": "session_export",
-                            "session_id": session_id,
-                            "data": data,
-                        })
-                    else:
-                        await ws.send_json({
-                            "type": "error",
-                            "message": f"No session found for id: {session_id}",
-                        })
-                except ImportError:
+                except Exception:
+                    logger.error("Failed to export session", exc_info=True)
+                    data = None
+                if data:
+                    await ws.send_json({
+                        "type": "session_export",
+                        "session_id": session_id,
+                        "data": data,
+                    })
+                else:
                     await ws.send_json({
                         "type": "error",
-                        "message": "Memory module not available.",
+                        "message": "No saved session found.",
                     })
 
             else:
                 await ws.send_json({
                     "type": "error",
-                    "message": f"Unknown message type: {msg_type}",
+                    "message": "Unsupported message.",
                 })
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")
         if workflow_task and not workflow_task.done():
             workflow_task.cancel()
-    except Exception as e:
+    except Exception:
+        logger.error("WebSocket handler failed", exc_info=True)
         try:
-            await ws.send_json({"type": "error", "message": str(e)})
+            await ws.send_json({
+                "type": "error",
+                "message": "Something went wrong on our side. Please try again.",
+            })
         except Exception:
             pass
         if workflow_task and not workflow_task.done():

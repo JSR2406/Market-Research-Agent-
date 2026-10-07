@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -10,10 +11,30 @@ SESSIONS_DIR = Path(os.path.join(os.path.dirname(os.path.dirname(__file__)), "se
 # Chat history cap per session (safe window for the LLM context, bounded storage)
 MAX_CHAT_MESSAGES = 40
 
+# Session ids are client-controlled and are used to build file paths — they are
+# therefore restricted to a strict allowlist (frontend generates `s-<ts>-<rand>`,
+# WhatsApp uses `wa-<number>`). Anything else would enable path traversal
+# (e.g. `../../data/schemes` resolving outside SESSIONS_DIR).
+_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def is_valid_session_id(session_id) -> bool:
+    """True when the id is a safe, path-free session identifier."""
+    return isinstance(session_id, str) and bool(_SESSION_ID_RE.match(session_id))
+
+
+def _require_valid_session_id(session_id: str, *, allow_empty: bool = False) -> str:
+    if allow_empty and not session_id:
+        return session_id
+    if not is_valid_session_id(session_id):
+        raise ValueError("Invalid session id.")
+    return session_id
+
 def _init_dir():
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
 def save_session(session_id: str, topic: str, state: dict):
+    _require_valid_session_id(session_id)
     _init_dir()
     file_path = SESSIONS_DIR / f"{session_id}.json"
     data = {
@@ -29,6 +50,8 @@ def save_session(session_id: str, topic: str, state: dict):
         logger.error(f"Failed to save session {session_id}: {e}")
 
 def load_last_session(session_id: str):
+    if not is_valid_session_id(session_id):
+        return None
     file_path = SESSIONS_DIR / f"{session_id}.json"
     if file_path.exists():
         try:
@@ -55,6 +78,7 @@ def build_resume_context(prior_data: dict) -> str:
     return f"Previous business context: {topic}. Summary: {business_summary}"
 
 def delete_session(session_id: str):
+    _require_valid_session_id(session_id)
     file_path = SESSIONS_DIR / f"{session_id}.json"
     if file_path.exists():
         try:
@@ -76,6 +100,7 @@ def _chat_path(session_id: str) -> Path:
 
 def save_chat_message(session_id: str, role: str, content: str):
     """Append one chat message (cap at MAX_CHAT_MESSAGES, drop oldest)."""
+    _require_valid_session_id(session_id)
     _init_dir()
     data = {"session_id": session_id, "messages": [], "updated_at": time.time()}
     path = _chat_path(session_id)
@@ -97,7 +122,7 @@ def save_chat_message(session_id: str, role: str, content: str):
 
 def load_chat_history(session_id: str, limit: int = 20) -> list:
     """Return the most recent chat messages as [{"role", "content"}, ...]."""
-    if not session_id:
+    if not session_id or not is_valid_session_id(session_id):
         return []
     path = _chat_path(session_id)
     if not path.exists():
@@ -114,6 +139,7 @@ def load_chat_history(session_id: str, limit: int = 20) -> list:
 
 
 def clear_chat(session_id: str):
+    _require_valid_session_id(session_id)
     path = _chat_path(session_id)
     if path.exists():
         try:

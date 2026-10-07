@@ -3,15 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Mic, MicOff, Radio, PhoneOff, Sparkles } from "lucide-react";
 import { Room, RoomEvent, Track } from "livekit-client";
-
-// Use wss:// in production (HTTPS pages block ws:// for LiveKit too)
-const rawApiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
-const API_BASE =
-  typeof window !== "undefined" &&
-  window.location.protocol === "https:" &&
-  rawApiBase.startsWith("http://")
-    ? rawApiBase.replace("http://", "https://")
-    : rawApiBase;
+import { API_BASE } from "@/lib/api";
 
 type Status = "idle" | "connecting" | "connected" | "error";
 
@@ -66,14 +58,19 @@ export default function LiveAdvisorPanel() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        let detail = `LiveKit setup failed (${res.status}).`;
+        // Server details (setup instructions, status codes) go to the console
+        // only — the user sees a friendly fallback.
+        let detail = `livekit-token failed with status ${res.status}`;
         try {
           const body = await res.json();
           if (typeof body?.detail === "string") detail = body.detail;
         } catch {
           /* keep default */
         }
-        throw new Error(detail);
+        console.error("[LiveAdvisor]", detail);
+        throw new Error(
+          "The voice advisor isn't available right now. Please use the text chat instead."
+        );
       }
       const { url, token } = await res.json();
 
@@ -105,8 +102,9 @@ export default function LiveAdvisorPanel() {
       setMicOn(true);
     } catch (err) {
       setStatus("error");
+      console.error("[LiveAdvisor]", err);
       setMessage(
-        err instanceof Error ? err.message : "Could not connect to the voice advisor."
+        "Could not connect to the voice advisor. Please try again, or use the text chat below."
       );
     }
   }, [attachAgentAudio]);
@@ -270,7 +268,7 @@ export default function LiveAdvisorPanel() {
           {message}
         </p>
       )}
-      {status === "error" && (
+      {status === "error" && process.env.NODE_ENV !== "production" && (
         <p
           style={{
             marginTop: "6px",

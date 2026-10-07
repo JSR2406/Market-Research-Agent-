@@ -116,44 +116,49 @@ export default function StartupQuiz({
         overflow: "hidden",
       }}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", gap: "10px",
-          background: "transparent", border: "none", padding: "12px 18px",
-          cursor: "pointer", color: "var(--text-primary)", fontFamily: "inherit", textAlign: "left",
-        }}
-      >
-        <div style={{ width: "30px", height: "30px", borderRadius: "9px", background: "linear-gradient(135deg, var(--accent), var(--accent2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Stethoscope size={15} color="#fff" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: "0.85rem", fontWeight: 700 }}>
-            Startup Doctor — 5 quick questions{" "}
-            <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>(optional)</span>
-          </p>
-          <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-            {answered === 0
-              ? "Answer in 30 seconds — the very first report gets sharper."
-              : `${answered}/5 answered — each one is already shaping your advice.`}
-          </p>
-        </div>
+      {/* Header row — reset control is a SIBLING of the toggle, never nested
+          (nested <button> is invalid HTML and breaks keyboard/AT semantics). */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 18px" }}>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          style={{
+            flex: 1, display: "flex", alignItems: "center", gap: "10px",
+            background: "transparent", border: "none", padding: 0,
+            cursor: "pointer", color: "var(--text-primary)", fontFamily: "inherit", textAlign: "left",
+          }}
+        >
+          <div style={{ width: "30px", height: "30px", borderRadius: "9px", background: "linear-gradient(135deg, var(--accent), var(--accent2))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Stethoscope size={15} color="#fff" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: "0.85rem", fontWeight: 700 }}>
+              Startup Doctor — 5 quick questions{" "}
+              <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>(optional)</span>
+            </p>
+            <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+              {answered === 0
+                ? "Answer in 30 seconds — the very first report gets sharper."
+                : `${answered}/5 answered — each one is already shaping your advice.`}
+            </p>
+          </div>
+          <motion.div animate={{ rotate: open ? 180 : 0 }} style={{ color: "var(--text-muted)", display: "flex" }}>
+            <ChevronDown size={16} />
+          </motion.div>
+        </button>
         {answered > 0 && (
           <button
             type="button"
             title="Reset answers"
-            onClick={(e) => { e.stopPropagation(); onChange({}); }}
-            style={{ border: "none", background: "rgba(255,255,255,0.06)", borderRadius: "8px", padding: "6px", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center" }}
+            aria-label="Reset check-up answers"
+            onClick={() => onChange({})}
+            style={{ border: "none", background: "rgba(255,255,255,0.06)", borderRadius: "8px", padding: "6px", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", flexShrink: 0 }}
           >
             <RotateCcw size={13} />
           </button>
         )}
-        <motion.div animate={{ rotate: open ? 180 : 0 }} style={{ color: "var(--text-muted)", display: "flex" }}>
-          <ChevronDown size={16} />
-        </motion.div>
-      </button>
+      </div>
 
       {open && (
         <div style={{ padding: "4px 18px 18px", display: "flex", flexDirection: "column", gap: "14px" }}>

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from backend.core.config import WEB_SEARCH_ENABLED, WEB_SEARCH_MAX_RESULTS
-from backend.core.heuristics import extract_topic, match_schemes, parse_amount, schemes_json
+from backend.core.heuristics import extract_topic, match_schemes, parse_amount, schemes_brief
 from backend.core.llm_client import call_llm
 from backend.core.web_research import web_context
 
@@ -31,6 +31,8 @@ def heuristic_research(task: str) -> str:
         for m in matched:
             lines.append(f"- {m['name']} | loan ceiling {m['loan_ceiling']}")
             lines.append(f"    Eligibility: {m['eligibility']}")
+            if m.get("source_url"):
+                lines.append(f"    (Source: {m['source_url']})")
     else:
         lines.append("No specific scheme matched — start with a MUDRA loan (collateral-free) "
                      "or a CGTMSE-backed loan from your bank.")
@@ -42,7 +44,7 @@ def heuristic_research(task: str) -> str:
 
 async def research_agent(task: str, agent_hint: Optional[str] = "research") -> str:
     today = datetime.now().strftime("%B %d, %Y")
-    schemes_data = schemes_json()
+    schemes_data = schemes_brief()
 
     user_content = f"Date: {today}.\nTask: {task}\n\nAvailable Schemes Data:\n{schemes_data}"
 

@@ -17,12 +17,12 @@ import uuid
 
 from livekit.agents import llm as agents_llm
 
-from backend.core.heuristics import schemes_json
+from backend.core.heuristics import schemes_brief
 from backend.core.llm_client import call_llm
 
 logger = logging.getLogger("backend.voice_agent.llm")
 
-_SCHEMES_EXCERPT = schemes_json()[:1500]
+_SCHEMES_EXCERPT = schemes_brief()
 
 SYSTEM_PROMPT = (
     "You are Your AI Business Saathi, a friendly spoken business and loan advisor "

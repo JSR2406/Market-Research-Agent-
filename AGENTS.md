@@ -29,7 +29,7 @@ Order of authority for every output the product produces:
 **Official/verified data → deterministic rules/calculations → AI explanation → recommendation.**
 
 - The LLM is NOT a source of truth. It may explain and recommend, never establish facts.
-- Never let the model invent scheme names, loan amounts, interest rates, eligibility claims, or approval guarantees. Scheme data comes only from `backend/data/schemes.json` (curated, with `sourceUrl` + `lastVerifiedAt`); amounts/eligibility shown to users must be traceable to that data or a cited source.
+- Never let the model invent scheme names, loan amounts, interest rates, eligibility claims, or approval guarantees. Scheme data comes only from `backend/data/schemes.json` (curated, each entry with `source_url` + `last_verified_at`); amounts/eligibility shown to users must be traceable to that data or a cited source.
 - Every financial or government-scheme claim shown to a user must carry its source (URL or "curated dataset" provenance). Where a number is computed (e.g. loan-ready score, cash-flow projection), the calculation must be deterministic code, not an LLM output.
 - Scores and projections: deterministic functions in `backend/core/heuristics.py` / client-side calculators — never ask the LLM to compute them.
 - Offline guarantee: every agent must still produce usable output (heuristic tier) when all LLM providers are down.
@@ -71,7 +71,7 @@ market-research-agent/
 │   │   ├── executor.py         # run orchestration, emits WS events, loan-ready score attach
 │   │   └── routing.py          # keyword step→agent mapping (zero LLM calls)
 │   ├── data/
-│   │   └── schemes.json        # curated Indian MSME schemes (sourceUrl, lastVerifiedAt)
+│   │   └── schemes.json        # curated Indian MSME schemes (id, source_url, last_verified_at, eligibility_rules, documents)
 │   ├── sessions/               # runtime JSON stores (gitignored)
 │   └── api/
 │       ├── __init__.py

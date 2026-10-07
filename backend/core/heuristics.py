@@ -29,30 +29,35 @@ def extract_topic(task: str) -> str:
     return match.group(1).strip() if match else task
 
 # Scheme keyword guides (lowercase) used for deterministic matching.
+# `scheme` is a stable lowercase fragment that appears in the scheme's name
+# (both the short legacy name and the expanded full name in schemes.json).
 _SCHEME_RULES: List[Dict] = [
     {
-        "name_key": "street vendor",
-        "scheme": "PM SVANidhi",
+        "scheme": "svanidhi",
         "keywords": ["street vendor", "thela", "rehri", "vendor", "food cart", "stall"],
     },
     {
-        "name_key": "first time",
-        "scheme": "MUDRA - Shishu",
+        "scheme": "shishu",
         "keywords": ["start", "new business", "first time", "begin", "launch"],
     },
     {
-        "name_key": "expansion",
-        "scheme": "MUDRA - Kishore",
+        "scheme": "kishore",
         "keywords": ["expand", "growing", "scale", "machine", "equipment", "shop"],
     },
     {
-        "name_key": "manufacturing",
-        "scheme": "PMEGP",
+        "scheme": "pmegp",
         "keywords": ["manufactur", "production", "unit", "workshop", "factory", "artisan"],
     },
     {
-        "name_key": "collateral free",
-        "scheme": "CGTMSE",
+        "scheme": "mudra",
+        "keywords": ["dairy", "farm", "farming", "livestock", "cow", "poultry", "goat", "sheep", "milk", "beek", "honey", "fish"],
+    },
+    {
+        "scheme": "mudra",
+        "keywords": ["freelance", "designer", "consultant", "home based", "home-based", "tiffin", "catering", "salon", "parlour", "repair", "delivery", "painting", "stitching", "beauty", "carpenter", "plumber"],
+    },
+    {
+        "scheme": "cgtmse",
         "keywords": ["sewing", "motor", "vehicle", "collateral", "loan without security", "udyam"],
     },
 ]
@@ -71,6 +76,24 @@ def load_schemes() -> List[Dict]:
 def schemes_json() -> str:
     """Serialized scheme data, used by agents for inline context."""
     return json.dumps(load_schemes(), indent=2, ensure_ascii=False)
+
+
+def schemes_brief() -> str:
+    """Compact, cited per-scheme summary for agent prompts.
+
+    Single line per scheme (name, benefit, ceiling, eligibility, documents) so
+    prompts stay small instead of embedding a truncated/huge JSON blob, while
+    every figure the LLM sees is still traceable to the curated dataset.
+    """
+    lines = []
+    for scheme in load_schemes():
+        lines.append(
+            f"- {scheme.get('scheme_name', '')} | benefit: {scheme.get('benefit_type', '')} | "
+            f"loan ceiling: {scheme.get('loan_ceiling', '')} | "
+            f"eligibility: {scheme.get('one_line_eligibility', '')} | "
+            f"documents: {'; '.join(scheme.get('documents', []))}"
+        )
+    return "\n".join(lines) or "(scheme dataset unavailable)"
 
 
 def parse_amount(topic: str) -> Optional[int]:
@@ -127,15 +150,12 @@ def match_schemes(topic: str, limit: int = 3) -> List[Dict]:
 
     for scheme in schemes:
         name = scheme.get("scheme_name", "")
-        text = lower + " " + name.lower() + " " + scheme.get("target_segment", "").lower()
         score = 0
         for rule in _SCHEME_RULES:
             if rule["scheme"].lower() in name.lower():
                 if any(kw in lower for kw in rule["keywords"]):
                     score += 2
-                else:
-                    score += 1
-        if any(kw in text for kw in ["collateral", "security"]):
+        if any(kw in lower for kw in ["collateral", "security", "loan without security"]):
             score += 1
         amount = parse_amount(topic)
         if amount:
@@ -143,7 +163,9 @@ def match_schemes(topic: str, limit: int = 3) -> List[Dict]:
                 score += 2
             if 50_000 <= amount <= 5_000_000 and "kishore" in name.lower():
                 score += 2
-            if amount > 5_000_000 and ("cgtsme" in name.lower() or "pmegp" in name.lower()):
+            if amount > 5_000_000 and ("cgtmse" in name.lower() or "pmegp" in name.lower()):
+                score += 2
+            if 5_000_000 < amount <= 20_000_000 and "tarun" in name.lower():
                 score += 2
         if "manufactur" in lower and "pmegp" in name.lower():
             score += 2
@@ -158,6 +180,8 @@ def match_schemes(topic: str, limit: int = 3) -> List[Dict]:
             "name": s["scheme"].get("scheme_name", ""),
             "loan_ceiling": s["scheme"].get("loan_ceiling", ""),
             "eligibility": s["scheme"].get("one_line_eligibility", ""),
+            "source_url": s["scheme"].get("source_url", ""),
+            "last_verified_at": s["scheme"].get("last_verified_at", ""),
         }
         for s in scored[:limit]
     ]
@@ -223,6 +247,7 @@ def build_heuristic_advisory(topic: str) -> Dict:
     if matched:
         scheme_lines = [
             f"{m['name']} — loan ceiling {m['loan_ceiling']}."
+            + (f" (Source: {m['source_url']}, verified {m['last_verified_at']})" if m.get("source_url") else "")
             for m in matched
         ]
         matched_text_lines = scheme_lines

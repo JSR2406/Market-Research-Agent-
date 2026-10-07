@@ -6,6 +6,7 @@ Covers the offline guarantee tier (heuristics), the never-raise contracts
 Run from the repo root:  .venv\\Scripts\\python.exe -m pytest tests/ -q
 """
 import asyncio
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -43,6 +44,63 @@ def test_scheme_matching_returns_list():
 
     matches = match_schemes(extract_topic("street food cart"))
     assert isinstance(matches, list)
+
+
+def test_schemes_dataset_integrity():
+    from backend.core.heuristics import load_schemes
+
+    schemes = load_schemes()
+    assert len(schemes) >= 6
+    for s in schemes:
+        assert s.get("id") and s.get("scheme_name")
+        assert s.get("benefit_type")
+        assert s.get("loan_ceiling")
+        assert s.get("source_url", "").startswith("https://")
+        assert isinstance(s.get("last_verified_at"), str)
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", s["last_verified_at"])
+        assert isinstance(s.get("eligibility_rules"), list) and s["eligibility_rules"]
+        assert isinstance(s.get("exclusions"), list)
+        assert isinstance(s.get("documents"), list) and s["documents"]
+
+
+def test_schemes_current_figures():
+    # Guards against stale ceilings: CGTMSE raised to ₹10 cr (01.04.2025),
+    # PM SVANidhi restructured (16.09.2025) with new tranches to ₹50,000.
+    from backend.core.heuristics import load_schemes
+
+    by_id = {s["id"]: s for s in load_schemes()}
+    assert "₹10 crore" in by_id["cgtmse"]["loan_ceiling"].lower()
+    assert "₹15,000" in by_id["pm-svanidhi"]["loan_ceiling"]
+    svanidhi_rules = " ".join(by_id["pm-svanidhi"]["eligibility_rules"])
+    assert "31.03.2030" in svanidhi_rules
+    assert "₹20,00,000" in by_id["mudra-tarun-plus"]["loan_ceiling"]
+
+
+def test_schemes_brief_is_compact_and_cited():
+    from backend.core.heuristics import schemes_brief
+
+    brief = schemes_brief()
+    assert "CGTMSE" in brief
+    assert "MUDRA" in brief
+    assert "{" not in brief  # plain text, never raw/truncated JSON
+
+
+def test_match_schemes_no_freebie():
+    # A topic with no matching keyword must not match every scheme (this was a
+    # bug: `score += 1` on bare name hits made the score meaningless).
+    from backend.core.heuristics import match_schemes
+
+    assert match_schemes("xyzzy unrelated gibberish nothing here") == []
+
+
+def test_matched_schemes_carry_source():
+    from backend.core.heuristics import match_schemes
+
+    matches = match_schemes("I want to expand my kirana shop", limit=2)
+    assert matches
+    for m in matches:
+        assert m.get("source_url", "").startswith("https://")
+        assert m.get("last_verified_at")
 
 
 # ── llm_client session state ──────────────────────────────────────────────

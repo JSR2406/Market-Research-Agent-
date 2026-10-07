@@ -12,6 +12,8 @@ def _heuristic_opportunity(task: str) -> str:
         for m in matched:
             lines.append(f"- **{m['name']}** — loan ceiling {m['loan_ceiling']}")
             lines.append(f"    Eligibility: {m['eligibility']}")
+            if m.get("source_url"):
+                lines.append(f"    (Source: {m['source_url']})")
     else:
         lines.append("- **MUDRA (Shishu/Kishore)** — collateral-free starter loans from any bank.")
         lines.append("- **CGTMSE-backed loan** — for registered micro/small enterprises without security.")

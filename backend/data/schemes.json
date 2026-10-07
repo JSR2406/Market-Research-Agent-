@@ -1,42 +1,219 @@
 [
   {
+    "id": "cgtmse",
     "scheme_name": "CGTMSE (Credit Guarantee Fund Trust for Micro and Small Enterprises)",
-    "target_segment": "MSEs (Micro and Small Enterprises) without collateral",
-    "loan_ceiling": "₹500 lakh (₹5 Crore)",
-    "collateral_requirement": "None (Collateral-free)",
-    "nodal_agency": "Ministry of MSME & SIDBI",
-    "one_line_eligibility": "Both existing and new MSEs are eligible; requires formal business registration (Udyam)."
+    "benefit_type": "Collateral-free guarantee for bank/MSME loans",
+    "target_segment": "Micro and Small Enterprises (MSEs) without collateral",
+    "loan_ceiling": "₹10 crore guarantee cover per borrower (raised from ₹5 crore, w.e.f. 01.04.2025; ₹200 lakh for SFBs/RRBs/urban co-op banks, ₹50 lakh for MFIs)",
+    "collateral_requirement": "None — the guarantee covers 85% of the loan for micro loans up to ₹5 lakh and 75% above",
+    "nodal_agency": "Ministry of MSME & SIDBI (CGTMSE Trust)",
+    "one_line_eligibility": "New and existing MSEs borrowing from a member lending institution (bank/SFB/RRB/NBFC); Udyam registration recommended.",
+    "eligibility_rules": [
+      "Business must qualify as a Micro or Small Enterprise under the MSME definition",
+      "Loan sanctioned by a Member Lending Institution (PSB, private/foreign bank, SFB, RRB, urban co-op bank or eligible NBFC/MFI)",
+      "Both new and existing enterprises are eligible",
+      "Udyam registration recommended (not strictly mandatory) to validate MSE status"
+    ],
+    "exclusions": [
+      "Loans fully backed by tangible collateral, cash or a third-party guarantee are not guaranteed (hybrid security is treated partially)",
+      "Only loans covered under the current CGTMSE operational guidelines qualify"
+    ],
+    "documents": [
+      "Udyam registration certificate (free, online)",
+      "PAN card / Aadhaar card",
+      "Business proof (shop agreement, licence or unit address)",
+      "Bank statements (last 6 months)",
+      "Passport-size photographs"
+    ],
+    "interest_rate": "Decided by the lending bank — the scheme guarantees the loan, it does not set the rate",
+    "source_url": "https://www.cgtmse.in/",
+    "last_verified_at": "2026-10-08",
+    "apply_via": "Any CGTMSE member lending institution (nearest bank branch)"
   },
   {
+    "id": "mudra-shishu",
     "scheme_name": "MUDRA (Micro Units Development & Refinance Agency Ltd.) - Shishu",
-    "target_segment": "Start-ups and first-time micro-entrepreneurs",
-    "loan_ceiling": "₹50,000",
-    "collateral_requirement": "None (Collateral-free)",
-    "nodal_agency": "Banks, NBFCs, MFIs",
-    "one_line_eligibility": "Any individual, including women, proprietary concern, partnership firm, private limited company or any other entity are eligible."
+    "benefit_type": "Collateral-free loan for new micro units",
+    "target_segment": "First-time micro-entrepreneurs",
+    "loan_ceiling": "Up to ₹50,000",
+    "collateral_requirement": "None (PMMY loans are collateral-free)",
+    "nodal_agency": "Banks, NBFCs, MFIs (Member Lending Institutions under MUDRA/SIDBI)",
+    "one_line_eligibility": "Any non-corporate, non-farm micro-individual or small unit — including women, proprietorships, partnerships and firms.",
+    "eligibility_rules": [
+      "Income-generating activity in manufacturing, trading or services sector (including activities allied to agriculture such as poultry, dairy, beekeeping)",
+      "Available to individuals, proprietorship concerns, partnership firms and other eligible entities",
+      "Non-corporate and non-farm (fanning/crop cultivation not covered)",
+      "No collateral and no guarantor needed"
+    ],
+    "exclusions": [
+      "Corporate/farm cultivation activities",
+      "Large enterprises above the micro-enterprise definition"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Business proof (shop/unit details)",
+      "Bank account details",
+      "Passport-size photographs"
+    ],
+    "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
+    "source_url": "https://www.mudra.org.in/",
+    "last_verified_at": "2026-10-08",
+    "apply_via": "Any bank branch, NBFC or MFI; online via mudra.org.in partners"
   },
   {
-    "scheme_name": "MUDRA - Kishore",
-    "target_segment": "Entrepreneurs who have started a business and want to expand",
-    "loan_ceiling": "₹5,00,000",
-    "collateral_requirement": "None (Collateral-free)",
-    "nodal_agency": "Banks, NBFCs, MFIs",
-    "one_line_eligibility": "Suitable for existing micro units seeking expansion funding."
+    "id": "mudra-kishore",
+    "scheme_name": "MUDRA (Micro Units Development & Refinance Agency Ltd.) - Kishore",
+    "benefit_type": "Collateral-free expansion loan for existing micro units",
+    "target_segment": "Micro-entrepreneurs who have started and want to expand",
+    "loan_ceiling": "₹50,001 – ₹5,00,000",
+    "collateral_requirement": "None (PMMY loans are collateral-free)",
+    "nodal_agency": "Banks, NBFCs, MFIs (Member Lending Institutions under MUDRA/SIDBI)",
+    "one_line_eligibility": "Existing micro units seeking expansion funding — stock, equipment or working capital.",
+    "eligibility_rules": [
+      "Existing or new income-generating micro unit in manufacturing, trading or services",
+      "Available to individuals, proprietorships, partnerships and firms",
+      "Higher tranches suit businesses already showing steady income",
+      "No collateral and no guarantor needed"
+    ],
+    "exclusions": [
+      "Corporate/farm cultivation activities",
+      "Enterprises above the micro-enterprise definition"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Business proof (shop/unit details)",
+      "Bank statements (last 6 months)",
+      "Passport-size photographs"
+    ],
+    "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
+    "source_url": "https://www.mudra.org.in/",
+    "last_verified_at": "2026-10-08",
+    "apply_via": "Any bank branch, NBFC or MFI"
   },
   {
+    "id": "mudra-tarun",
+    "scheme_name": "MUDRA (Micro Units Development & Refinance Agency Ltd.) - Tarun",
+    "benefit_type": "Collateral-free growth loan for established micro units",
+    "target_segment": "Micro-enterprises scaling up beyond ₹5 lakh",
+    "loan_ceiling": "₹5,00,001 – ₹10,00,000",
+    "collateral_requirement": "None (PMMY loans are collateral-free)",
+    "nodal_agency": "Banks, NBFCs, MFIs (Member Lending Institutions under MUDRA/SIDBI)",
+    "one_line_eligibility": "Growth-stage micro units needing a larger loan for equipment, stock or expansion.",
+    "eligibility_rules": [
+      "Micro enterprise in manufacturing, trading or services with a track record",
+      "Available to individuals, proprietorships, partnerships and firms",
+      "Banks assess the repayment track record before sanctioning this tranche",
+      "No collateral and no guarantor needed under PMMY"
+    ],
+    "exclusions": [
+      "Corporate/farm cultivation activities",
+      "Enterprises above the micro-enterprise definition"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Udyam registration (encouraged for larger tranches)",
+      "Bank statements / income proof (last 6–12 months)",
+      "Business proof and photographs"
+    ],
+    "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
+    "source_url": "https://www.mudra.org.in/",
+    "last_verified_at": "2026-10-08",
+    "apply_via": "Any bank branch, NBFC or MFI"
+  },
+  {
+    "id": "mudra-tarun-plus",
+    "scheme_name": "MUDRA (Micro Units Development & Refinance Agency Ltd.) - Tarun Plus",
+    "benefit_type": "Collateral-free larger loan for Tarun graduates",
+    "target_segment": "Micro-enterprises that repaid a Tarun loan",
+    "loan_ceiling": "₹10,00,001 – ₹20,00,000 (new tranche, w.e.f. 24.10.2024)",
+    "collateral_requirement": "None (PMMY loans are collateral-free up to ₹20 lakh)",
+    "nodal_agency": "Banks, NBFCs, MFIs (Member Lending Institutions under MUDRA/SIDBI)",
+    "one_line_eligibility": "Entrepreneurs who have availed and successfully repaid a loan under the Tarun category.",
+    "eligibility_rules": [
+      "Must have availed and successfully repaid a loan under the MUDRA Tarun category",
+      "Introduces the next stage of growth after Tarun (added in Union Budget 2024-25)",
+      "Loans up to ₹20 lakh extended collateral-free by Member Lending Institutions"
+    ],
+    "exclusions": [
+      "Borrowers without a successfully repaid Tarun loan",
+      "Corporate/farm cultivation activities"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Udyam registration (encouraged)",
+      "Repayment track record for the earlier Tarun loan",
+      "Bank statements / income proof"
+    ],
+    "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
+    "source_url": "https://www.mudra.org.in/",
+    "last_verified_at": "2026-10-08",
+    "apply_via": "Any bank branch, NBFC or MFI"
+  },
+  {
+    "id": "pmegp",
     "scheme_name": "PMEGP (Prime Minister's Employment Generation Programme)",
-    "target_segment": "New micro enterprises in non-farm sector (manufacturing/services)",
-    "loan_ceiling": "₹50 Lakh (Manufacturing) / ₹20 Lakh (Services)",
-    "collateral_requirement": "None for loans up to ₹10 lakh (under CGTMSE)",
-    "nodal_agency": "KVIC (Khadi and Village Industries Commission)",
-    "one_line_eligibility": "Any individual above 18 years of age setting up a new project/micro enterprise; at least VIII standard pass for projects above ₹10 lakh (Mfg) / ₹5 lakh (Service)."
+    "benefit_type": "New micro-enterprise loan with margin money subsidy",
+    "target_segment": "New micro enterprises in the non-farm sector (manufacturing/services)",
+    "loan_ceiling": "₹50 lakh (manufacturing) / ₹20 lakh (service)",
+    "collateral_requirement": "None for loans up to ₹10 lakh (CGTMSE-backed); beyond that banks may ask for security",
+    "nodal_agency": "KVIC (Khadi and Village Industries Commission) with banks",
+    "one_line_eligibility": "Any individual above 18 years setting up a new project/micro enterprise; at least VIII standard pass for projects above ₹10 lakh (Mfg) / ₹5 lakh (Service).",
+    "eligibility_rules": [
+      "Indian citizen aged 18 years or above",
+      "New micro-enterprise in manufacturing or business/service sector (non-farm)",
+      "Minimum VIII standard for projects above ₹10 lakh (manufacturing) or ₹5 lakh (service)",
+      "Only one unit per family under PMEGP; a second loan is available for units that have successfully repaid",
+      "Margin money subsidy 25–35% in rural areas and 15–25% in urban areas (higher for special categories)"
+    ],
+    "exclusions": [
+      "Units already financed under PMEGP / REGP / MUDRA in the same family (unless a repaid 2nd loan case)",
+      "Activities in the negative list under PMEGP guidelines"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card (if applicable)",
+      "Project proposal / business plan",
+      "Educational qualification certificate (VIII pass for larger projects)",
+      "Bank account details and photographs"
+    ],
+    "interest_rate": "Bank rate on the loan portion — the government subsidy (margin money) reduces the effective cost",
+    "source_url": "https://www.msme.gov.in/",
+    "last_verified_at": "2026-10-08",
+    "apply_via": "Nearest KVIC / KVIB office or participating bank — application through pmegp.msme.gov.in"
   },
   {
+    "id": "pm-svanidhi",
     "scheme_name": "PM SVANidhi",
-    "target_segment": "Street vendors (informal micro-entrepreneurs)",
-    "loan_ceiling": "₹10,000 (first tranche)",
-    "collateral_requirement": "None (Collateral-free)",
+    "benefit_type": "Collateral-free working-capital loan for street vendors",
+    "target_segment": "Street vendors (informal micro-entrepreneurs) in urban areas",
+    "loan_ceiling": "₹15,000 (12 months) first tranche; up to ₹25,000 (18 months) and ₹50,000 (36 months) on timely repayment",
+    "collateral_requirement": "None (no guarantor needed)",
     "nodal_agency": "Ministry of Housing and Urban Affairs & SIDBI",
-    "one_line_eligibility": "Street vendors vending in urban areas, formal registration (Udyam) not strictly required but ULB certificate needed."
+    "one_line_eligibility": "Street vendors vending in scheme-covered areas holding a vending certificate / ULB identification.",
+    "eligibility_rules": [
+      "Street vendor vending in a covered city/town (scheme extended to more areas and to 31.03.2030 under the 16.09.2025 restructuring)",
+      "Holds a valid vending certificate / ULB identification letter",
+      "Interest subsidy for timely repayment; next tranche after repaying the earlier one",
+      "UPI-linked RuPay credit card available after the second tranche (use of digital payments)"
+    ],
+    "exclusions": [
+      "Vendors without vending certificate / ULB identification",
+      "Non-vending businesses"
+    ],
+    "documents": [
+      "Vending certificate / ULB identification (letter from the municipal body)",
+      "Aadhaar card",
+      "Mobile number",
+      "Bank account (PMJDY / Jan Dhan account works)",
+      "Passport-size photographs"
+    ],
+    "interest_rate": "Bank rate under the scheme, with government interest subsidy for on-time repayment",
+    "source_url": "https://pmsvanidhi.mohua.gov.in/",
+    "last_verified_at": "2026-10-08",
+    "apply_via": "pmsvanidhi.mohua.gov.in portal or through the local Urban Local Body / Common Service Centre"
   }
 ]

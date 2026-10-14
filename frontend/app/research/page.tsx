@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import TopicInput from "@/components/TopicInput";
-import AgentTimeline from "@/components/AgentTimeline";
+import AgentTimeline, { type TraceNode } from "@/components/AgentTimeline";
 import AdvisoryCard from "@/components/AdvisoryCard";
 import ChatPanel from "@/components/ChatPanel";
 import Usps from "@/components/Usps";
@@ -18,13 +18,6 @@ const WS_MAX_RETRIES = 3;
 const SESSION_KEY = "grameenai_session";
 const PROFILE_KEY = "grameenai_profile";
 
-type Step = {
-  step: string;
-  agent?: string;
-  status: "pending" | "running" | "done";
-  output?: string;
-};
-
 export default function ResearchPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
@@ -39,7 +32,9 @@ export default function ResearchPage() {
   } | null>(null);
 
   const [isRunning, setIsRunning] = useState(false);
-  const [steps, setSteps] = useState<Step[]>([]);
+  const [nodes, setNodes] = useState<TraceNode[]>([]);
+  const [planSteps, setPlanSteps] = useState<string[]>([]);
+  const [engine, setEngine] = useState("");
   const [finalReport, setFinalReport] = useState<string | null>(null);
   const [simplifiedReport, setSimplifiedReport] = useState<string>("");
   const [currentTopic, setCurrentTopic] = useState("");
@@ -121,56 +116,119 @@ export default function ResearchPage() {
       case "status":
         setStatusMessage(data.message as string);
         break;
+      case "graph":
+        setEngine((data.engine as string) ?? "");
+        break;
       case "plan":
-        setSteps(
-          (data.plan as string[]).map((step) => ({
-            step,
-            status: "pending" as const,
-          }))
-        );
+        setPlanSteps((data.plan as string[]) ?? []);
         setStatusMessage("");
         break;
-      case "step_start":
-        setSteps((prev) =>
-          prev.map((s, i) =>
-            i === data.step_index
-              ? { ...s, status: "running", agent: data.agent as string }
-              : s
-          )
-        );
-        setStatusMessage(
-          `Running ${(data.agent as string)?.replace("_agent", "")}…`
-        );
+      case "node_start":
+        setNodes((prev) => [
+          ...prev,
+          {
+            id: (data.index as number) ?? Date.now(),
+            node: data.node as string,
+            label: (data.label as string) ?? (data.node as string),
+            icon: (data.icon as string) ?? "",
+            iteration: (data.iteration as number) ?? 0,
+            status: "running",
+            thoughts: [],
+            tools: [],
+            reflections: [],
+          },
+        ]);
+        setStatusMessage(`Running ${(data.label as string) ?? (data.node as string)}…`);
         break;
-      case "step_end":
-        setSteps((prev) =>
-          prev.map((s, i) =>
-            i === data.step_index
+      case "node_end":
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.status === "running"
               ? {
-                  ...s,
+                  ...n,
                   status: "done",
-                  agent: data.agent as string,
-                  output: data.output as string,
+                  summary: (data.summary as string) ?? "",
+                  output: data.output as string | undefined,
+                  ok: data.ok as boolean | undefined,
                 }
-              : s
+              : n
           )
         );
         setStatusMessage("");
         break;
+      case "thought": {
+        const text = (data.text as string) ?? "";
+        if (!text) break;
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.status === "running" && n.node === data.node
+              ? { ...n, thoughts: [...n.thoughts, text] }
+              : n
+          )
+        );
+        break;
+      }
+      case "tool_call": {
+        const tool = (data.tool as string) ?? "";
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.status === "running" && n.node === data.node
+              ? { ...n, tools: [...n.tools, { tool, input: (data.input as string) ?? "" }] }
+              : n
+          )
+        );
+        break;
+      }
+      case "tool_result": {
+        const tool = (data.tool as string) ?? "";
+        const summary = (data.summary as string) ?? "";
+        const ok = data.ok as boolean;
+        setNodes((prev) =>
+          prev.map((n) => {
+            if (n.status !== "running" || n.node !== data.node) return n;
+            const idx = [...n.tools].reverse().findIndex((t) => t.tool === tool && t.summary === undefined);
+            if (idx === -1) return n;
+            const target = n.tools.length - 1 - idx;
+            return {
+              ...n,
+              tools: n.tools.map((t, i) => (i === target ? { ...t, summary, ok } : t)),
+            };
+          })
+        );
+        break;
+      }
+      case "reflection": {
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.status === "running" && n.node === data.node
+              ? {
+                  ...n,
+                  reflections: [
+                    ...n.reflections,
+                    { text: (data.text as string) ?? "", action: (data.action as string) ?? "" },
+                  ],
+                }
+              : n
+          )
+        );
+        break;
+      }
       case "done":
         setFinalReport(data.final_report as string);
         setSimplifiedReport(((data.simplified_report as string) ?? "").trim());
         setIsRunning(false);
-        setStatusMessage("Research complete ✓");
+        setStatusMessage("Research complete.");
         retriesRef.current = 0;
         break;
       case "cancelled":
         setIsRunning(false);
+        setNodes((prev) => prev.map((n) => (n.status === "running" ? { ...n, status: "done" } : n)));
         setStatusMessage("Research cancelled.");
         retriesRef.current = 0;
         break;
       case "error":
         setIsRunning(false);
+        setNodes((prev) => prev.map((n) => (n.status === "running" ? { ...n, status: "done", ok: false } : n)));
         setErrorMessage(data.message as string);
         setStatusMessage("");
         retriesRef.current = 0;
@@ -237,7 +295,9 @@ export default function ResearchPage() {
 
   const handleStart = async (topic: string, maxSteps: number) => {
     setIsRunning(true);
-    setSteps([]);
+    setNodes([]);
+    setPlanSteps([]);
+    setEngine("");
     setFinalReport(null);
     setSimplifiedReport("");
     setCurrentTopic(topic);
@@ -415,8 +475,14 @@ export default function ResearchPage() {
       {/* Why Saathi — what makes this different from a generic chatbot */}
       <Usps />
 
-      {/* Agent timeline */}
-      <AgentTimeline steps={steps} statusMessage={statusMessage} isRunning={isRunning} />
+      {/* Agent trace */}
+      <AgentTimeline
+        nodes={nodes}
+        planSteps={planSteps}
+        engine={engine}
+        statusMessage={statusMessage}
+        isRunning={isRunning}
+      />
 
       {/* Resume banner */}
       <AnimatePresence>

@@ -1,21 +1,31 @@
 """
-backend/api/voice.py — HTTP endpoints for speech and realtime voice (LiveKit).
+backend/api/voice.py — HTTP endpoints for speech, realtime voice (LiveKit) and
+engine diagnostics.
 
-STT/TTS (/transcribe, /speak) are REST-based and degrade gracefully.
-/livekit-token mints a short-lived LiveKit access token so the browser can join
-the voice advisory room the agent worker is listening in on. It never hard-fails
-the client: missing credentials or a missing optional dependency return a clear
-503 instead of crashing.
+STT/TTS (/transcribe, /speak) are REST-based and degrade gracefully and are
+private-by-default: with no API key they run on open-source local engines
+(faster-whisper STT, Piper TTS). /status reports which engines are available so
+the frontend can show an honest "voice runs locally" chip and operators can
+diagnose the deployment. /livekit-token mints a short-lived LiveKit access token
+so the browser can join the voice advisory room the agent worker is listening in
+on. It never hard-fails the client: missing credentials or a missing optional
+dependency return a clear 503 instead of crashing.
 """
 import logging
 import uuid
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
 
+from backend.api.schemas import (
+    LiveKitTokenRequest,
+    LiveKitTokenResponse,
+    SpeakRequest,
+    TranscribeResponse,
+    VoiceStatusResponse,
+)
 from backend.core.config import LIVEKIT_ADVISOR_ROOM, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL
-from backend.core.voice import speech_to_text, text_to_speech
+from backend.core.voice import speech_to_text, text_to_speech, voice_status
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +34,16 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 MAX_AUDIO_BYTES = 5 * 1024 * 1024  # 5 MB — reject oversized uploads early
 
 
-class SpeakRequest(BaseModel):
-    text: str = Field(..., max_length=5000)
+@router.get("/status", response_model=VoiceStatusResponse)
+async def voice_status_endpoint() -> dict:
+    """
+    Engine diagnostics: which STT/TTS engines are available and the active
+    defaults. Cheap (spec probes only) — does not start models or download.
+    """
+    return voice_status()
 
 
-class LiveKitTokenRequest(BaseModel):
-    topic: str = ""  # optional context — not stored, kept for future room scoping
-
-
-@router.post("/transcribe")
+@router.post("/transcribe", response_model=TranscribeResponse)
 async def transcribe(file: UploadFile = File(...)):
     """
     Accept an uploaded audio file, return {"text": "..."}.
@@ -58,7 +69,7 @@ async def transcribe(file: UploadFile = File(...)):
 @router.post("/speak")
 async def speak(body: SpeakRequest):
     """
-    Accept {"text": "..."}, return MP3 audio bytes.
+Accept {"text": "..."}, return audio bytes (MP3 or WAV by engine).
     Falls back gracefully — never crashes.
     """
     try:
@@ -67,7 +78,14 @@ async def speak(body: SpeakRequest):
         audio_bytes = await text_to_speech(body.text)
         if not audio_bytes:
             raise HTTPException(status_code=503, detail="Voice synthesis unavailable right now.")
-        return Response(content=audio_bytes, media_type="audio/mpeg")
+        # The open-source Piper tier returns RIFF/WAV while cloud tiers return MP3 —
+        # sniff the container so the browser always gets the right media type.
+        media_type = (
+            "audio/wav"
+            if audio_bytes.startswith(b"RIFF") and b"WAVE" in audio_bytes[:16]
+            else "audio/mpeg"
+        )
+        return Response(content=audio_bytes, media_type=media_type)
     except HTTPException:
         raise
     except Exception as e:
@@ -75,7 +93,7 @@ async def speak(body: SpeakRequest):
         raise HTTPException(status_code=503, detail="Voice synthesis unavailable right now.")
 
 
-@router.post("/livekit-token")
+@router.post("/livekit-token", response_model=LiveKitTokenResponse)
 async def livekit_token(body: LiveKitTokenRequest | None = None):
     """
     Mint a short-lived LiveKit access token for the advisory voice room.

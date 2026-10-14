@@ -76,6 +76,8 @@ AGENT_TOKEN_BUDGETS: dict[str, int] = {
     "simplifier":  200,   # very short plain-language summary
     "voice":       250,   # live voice advisor — short spoken answers
     "chat":        400,   # conversational chatbot — concise, with memory
+    "supervisor":  300,   # agentic router — picks the next node (JSON decision)
+    "critic":      400,   # reflection/self-critique of the draft advisory
     "default":     500,
 }
 
@@ -98,8 +100,31 @@ AGENT_OPENROUTER_MODELS: dict[str, list[str]] = {
     "simplifier":   ["openrouter/auto"],
     "voice":        ["openrouter/auto"],
     "chat":         ["mistralai/mistral-7b-instruct"],  # open-source
+    "supervisor":   ["qwen/qwen-2.5-72b-instruct"],
+    "critic":       ["deepseek/deepseek-chat"],
     "default":      [],
 }
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Agentic engine (LangGraph orchestration)
+# ──────────────────────────────────────────────────────────────────────────────
+# The advisory pipeline is a LangGraph StateGraph (see backend/agentic/). These
+# knobs bound the autonomy: how many supervisor→worker cycles are allowed before
+# the graph is forced to synthesize, and whether the reflection (self-critique)
+# loop runs at all. Budgets keep a runaway ReAct loop from burning free-tier
+# quota — the graph is deterministic-capped even when the LLM is creative.
+AGENTIC_ENGINE_ENABLED: bool = os.getenv("AGENTIC_ENGINE_ENABLED", "true").strip().lower() in (
+    "1", "true", "yes",
+)
+AGENTIC_MAX_ITERATIONS: int = int(os.getenv("AGENTIC_MAX_ITERATIONS", "8"))
+AGENTIC_REFLECTION_ENABLED: bool = os.getenv("AGENTIC_REFLECTION_ENABLED", "true").strip().lower() in (
+    "1", "true", "yes",
+)
+# When the graph can't reach a usable advisory it still emits the deterministic
+# heuristic tier — never a blank report (offline guarantee).
+AGENTIC_CHECKPOINTING: bool = os.getenv("AGENTIC_CHECKPOINTING", "true").strip().lower() in (
+    "1", "true", "yes",
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Real-time web research
@@ -120,6 +145,19 @@ HF_TTS_FALLBACK_MODELS: list[str] = [
     HF_TTS_MODEL,
     "espnet/kan-bayashi_ljspeech_vits",
 ]
+
+# Piper TTS — fully open-source, local, no API key (MIT). ONNX voices are
+# downloaded once from Hugging Face (rhasspy/piper-voices) on first use and then
+# cached under PIPER_VOICE_DIR; synthesis itself runs 100% offline after that.
+# en = default English voice, hi = used automatically when the text contains
+# Devanagari characters (the advisory is bilingual). Model downloads are lazy —
+# the first /api/voice/speak warms the cache, all later calls are pure local.
+PIPER_VOICE_DIR: str = os.getenv(
+    "PIPER_VOICE_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "piper"),
+)
+PIPER_VOICE_EN: str = os.getenv("PIPER_VOICE_EN", "en_US-lessac-medium")
+PIPER_VOICE_HI: str = os.getenv("PIPER_VOICE_HI", "hi_IN-pratham-medium")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # LiveKit realtime voice (advisory voice agent)

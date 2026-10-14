@@ -6,7 +6,7 @@ Ollama/HF/OpenRouter are unreachable).
 
 Covers, per persona (street vendor, kirana, tailor, home food business, dairy
 farmer, repair shop, freelancer, new founder):
-  - WS start -> plan -> step_start/step_end/token_usage -> done
+  - WS start -> graph -> plan -> node_start/node_end/token_usage -> done
   - final_report parses with the canonical advisory keys + loan_ready_score
   - matched_schemes contain a parseable, cited scheme line
   - simplified_report is present
@@ -21,15 +21,18 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-AGENTS_WITH_LLM = [
-    "planner",
-    "research",
-    "analyst",
-    "opportunity",
-    "writer",
-    "editor",
-    "simplifier",
-    "chat",
+# Every module that calls the LLM directly (agents + the agentic router/critic).
+LLM_MODULES = [
+    "backend.agents.planner",
+    "backend.agents.research",
+    "backend.agents.analyst",
+    "backend.agents.opportunity",
+    "backend.agents.writer",
+    "backend.agents.editor",
+    "backend.agents.simplifier",
+    "backend.agents.chat",
+    "backend.agentic.supervisor",
+    "backend.agentic.nodes",
 ]
 
 PERSONAS = [
@@ -77,12 +80,15 @@ PERSONAS = [
 ]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", autouse=True)
 def llm_forced_down():
-    """Point every agent's local call_llm reference at a hard failure."""
+    """Point every LLM caller's local call_llm reference at a hard failure,
+    and neutralize live web so the whole suite runs offline + deterministically."""
     import importlib
 
-    modules = [importlib.import_module(f"backend.agents.{name}") for name in AGENTS_WITH_LLM]
+    from backend.agentic import tools as agentic_tools
+
+    modules = [importlib.import_module(m) for m in LLM_MODULES]
     saved = {m: m.call_llm for m in modules}
 
     async def _boom(*args, **kwargs):
@@ -90,9 +96,18 @@ def llm_forced_down():
 
     for m in modules:
         m.call_llm = _boom
+
+    async def _no_web(query):  # no network in tests
+        return ""
+
+    original_web = agentic_tools._web_search_async
+    agentic_tools._web_search_async = _no_web
+    agentic_tools.TOOLS["web_search"].afn = _no_web
     yield
     for m, fn in saved.items():
         m.call_llm = fn
+    agentic_tools._web_search_async = original_web
+    agentic_tools.TOOLS["web_search"].afn = original_web
 
 
 @pytest.fixture(scope="module")
@@ -114,7 +129,7 @@ def _run_ws(client, topic, profile="", max_steps=2, session_id=""):
             "max_steps": max_steps,
             "session_id": session_id,
         })
-        for _ in range(60):
+        for _ in range(140):
             event = ws.receive_json()
             events.append(event)
             if event.get("type") in ("done", "cancelled", "error"):
@@ -144,7 +159,7 @@ def test_persona_full_flow(llm_forced_down, client, topic, profile, expect_schem
         assert "cancelled" not in types
         assert types[-1] == "done"
         assert "plan" in types
-        assert "step_start" in types
+        assert "node_start" in types
         assert "token_usage" in types
 
         advisory, done = _advisory(events)
@@ -189,7 +204,7 @@ def test_empty_topic_emits_friendly_error(llm_forced_down, client):
         # Connection stays open — a valid message still works.
         ws.send_json({"type": "start", "topic": "tea stall", "max_steps": 1})
         seen = []
-        for _ in range(30):
+        for _ in range(140):
             t = ws.receive_json()["type"]
             seen.append(t)
             if t in ("done", "error", "cancelled"):
@@ -205,7 +220,7 @@ def test_cancel_stops_run_and_sends_no_done(llm_forced_down, client):
         for _ in range(40):
             ev = ws.receive_json()
             seen.append(ev["type"])
-            if ev["type"] == "step_start":
+            if ev["type"] == "node_start":
                 ws.send_json({"type": "cancel", "session_id": ""})
             if ev["type"] == "cancelled":
                 cancelled = True
@@ -227,28 +242,23 @@ def test_no_matching_scheme_still_produces_done(llm_forced_down, client):
 def test_one_agent_failing_never_blocks_done(client):
     # Partial-research: an agent that raises mid-run must be absorbed and the
     # pipeline must still finish with a done advisory.
-    import backend.workflows.executor as ex
+    from backend.agentic import nodes as agentic_nodes
     from backend.core.memory import delete_session, load_last_session
 
-    async def _raise(_task, agent_hint=None):
+    async def _raise(_task, agent_hint=None, live_context=None):
         raise ValueError("opportunity agent crashed (test)")
 
     sid = "e2e_partial_research"
-    original = dict(ex.AGENT_REGISTRY)
-    ex.AGENT_REGISTRY["opportunity_agent"] = _raise
+    original = agentic_nodes.opportunity_agent
+    agentic_nodes.opportunity_agent = _raise
     try:
         events = _run_ws(client, "kirana shop expansion", max_steps=2, session_id=sid)
         assert events[-1]["type"] == "done", [e["type"] for e in events]
-        # The failed step is reported on the step_end output as a warning,
-        # and the report still carries a deterministic advisory.
-        stumbles = [e for e in events if e.get("type") == "step_end"
-                    and "could not complete" in e.get("output", "")]
-        assert stumbles or True  # at least one agent step may fallback; the run must reach done
+        # The failed node still yields a deterministic (heuristic) advisory.
         advisory, _ = _advisory(events)
         assert "business_summary" in advisory
     finally:
-        ex.AGENT_REGISTRY.clear()
-        ex.AGENT_REGISTRY.update(original)
+        agentic_nodes.opportunity_agent = original
         delete_session(sid)
 
 

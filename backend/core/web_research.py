@@ -33,6 +33,12 @@ def set_run_source_sink(sink: Optional[List[str]]) -> None:
     """Attach a list the executor will read at the end of a research run."""
     _RUN_SOURCES.set(sink if sink is not None else None)
 
+
+def get_run_sources() -> List[str]:
+    """Return the current run's genuinely-fetched source URLs (or [])."""
+    sink = _RUN_SOURCES.get()
+    return list(sink) if isinstance(sink, list) else []
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

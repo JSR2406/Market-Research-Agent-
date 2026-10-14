@@ -1,148 +1,181 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Loader2, Circle, ChevronDown, ChevronUp, Bot } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  Circle,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  Landmark,
+  Gauge,
+  ClipboardList,
+  Calculator,
+  Wrench,
+  Sparkles,
+  Lightbulb,
+  Cpu,
+  Brain,
+  Scale,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 
-const AGENT_CONFIG: Record<string, { label: string; color: string; bg: string; glow: string }> = {
-  research_agent:    { label: "Research",    color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  glow: "rgba(96,165,250,0.2)" },
-  analyst_agent:     { label: "Analyst",     color: "#a78bfa", bg: "rgba(167,139,250,0.12)", glow: "rgba(167,139,250,0.2)" },
-  opportunity_agent: { label: "Opportunity", color: "#fb923c", bg: "rgba(251,146,60,0.12)",  glow: "rgba(251,146,60,0.2)" },
-  writer_agent:      { label: "Writer",      color: "#2dd4bf", bg: "rgba(45,212,191,0.12)",  glow: "rgba(45,212,191,0.2)" },
-  editor_agent:      { label: "Editor",      color: "#f97316", bg: "rgba(249,115,22,0.12)",  glow: "rgba(249,115,22,0.2)" },
-};
-
-type Step = {
-  step: string;
-  agent?: string;
-  status: "pending" | "running" | "done";
+export type TraceNode = {
+  id: number;
+  node: string;
+  label: string;
+  icon: string;
+  iteration: number;
+  status: "running" | "done";
+  summary?: string;
   output?: string;
+  ok?: boolean;
+  thoughts: string[];
+  tools: Array<{ tool: string; input: string; summary?: string; ok?: boolean }>;
+  reflections: Array<{ text: string; action: string }>;
 };
 
 interface Props {
-  steps: Step[];
+  nodes: TraceNode[];
+  planSteps?: string[];
   statusMessage?: string;
   isRunning?: boolean;
+  engine?: string;
 }
 
-function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
+const NODE_COLORS: Record<string, { color: string; bg: string; glow: string }> = {
+  planner:    { color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  glow: "rgba(96,165,250,0.2)" },
+  supervisor: { color: "#a78bfa", bg: "rgba(167,139,250,0.12)", glow: "rgba(167,139,250,0.2)" },
+  research:   { color: "#22d3ee", bg: "rgba(34,211,238,0.12)",  glow: "rgba(34,211,238,0.2)" },
+  analyst:    { color: "#fbbf24", bg: "rgba(251,191,36,0.12)",  glow: "rgba(251,191,36,0.2)" },
+  schemes:    { color: "#fb923c", bg: "rgba(251,146,60,0.12)",  glow: "rgba(251,146,60,0.2)" },
+  writer:     { color: "#2dd4bf", bg: "rgba(45,212,191,0.12)",  glow: "rgba(45,212,191,0.2)" },
+  critic:     { color: "#f472b6", bg: "rgba(244,114,182,0.12)",  glow: "rgba(244,114,182,0.2)" },
+  refine:     { color: "#34d399", bg: "rgba(52,211,153,0.12)",  glow: "rgba(52,211,153,0.2)" },
+  finalize:   { color: "#4ade80", bg: "rgba(74,222,128,0.12)",  glow: "rgba(74,222,128,0.2)" },
+};
+
+function nodeColor(node: string) {
+  return NODE_COLORS[node] ?? { color: "var(--accent)", bg: "rgba(0,0,0,0.06)", glow: "rgba(0,0,0,0.1)" };
+}
+
+function ToolIcon({ tool }: { tool: string }) {
+  const map: Record<string, LucideIcon> = {
+    web_search: Globe,
+    scheme_match: Landmark,
+    loan_ready_score: Gauge,
+    document_checklist: ClipboardList,
+    cashflow_projection: Calculator,
+  };
+  const Icon = map[tool] ?? Wrench;
+  return <Icon size={12} />;
+}
+
+function NodeCard({ n, i }: { n: TraceNode; i: number }) {
   const [expanded, setExpanded] = useState(false);
-  const cfg = s.agent ? AGENT_CONFIG[s.agent] : null;
+  const cfg = nodeColor(n.node);
+  const busy = n.status === "running";
+  const expandable = Boolean(n.output) || n.thoughts.length + n.tools.length + n.reflections.length > 0;
+  const open = expanded || busy;
 
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className={s.status === "running" ? "running-border" : ""}
+      transition={{ delay: Math.min(i * 0.05, 0.4), duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className={busy ? "running-border" : ""}
       style={{
         background: "var(--bg-card)",
-        border: `1px solid ${s.status === "running" ? "transparent" : "var(--border)"}`,
+        border: `1px solid ${busy ? "transparent" : "var(--border)"}`,
         borderRadius: "var(--radius-md)",
         overflow: "hidden",
         boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
         transition: "border-color 0.3s, box-shadow 0.3s",
       }}
     >
-      {/* Progress bar for running step */}
-      {s.status === "running" && (
+      {busy && (
         <div style={{ height: "2px", background: "var(--border)" }}>
           <motion.div
             initial={{ width: "0%" }}
             animate={{ width: "100%" }}
-            transition={{ duration: 25, ease: "linear" }}
-            style={{ height: "100%", background: `linear-gradient(90deg, ${cfg?.color ?? "var(--accent)"}, var(--accent2))` }}
+            transition={{ duration: 30, ease: "linear" }}
+            style={{ height: "100%", background: `linear-gradient(90deg, ${cfg.color}, var(--accent2))` }}
           />
         </div>
       )}
-      {s.status === "done" && (
-        <div style={{ height: "2px", background: cfg?.color ?? "var(--success)" }} />
-      )}
+      {!busy && <div style={{ height: "2px", background: n.ok === false ? "var(--error)" : cfg.color }} />}
 
       <div
-        role={s.output ? "button" : undefined}
-        tabIndex={s.output ? 0 : undefined}
-        aria-expanded={s.output ? expanded : undefined}
+        role={expandable ? "button" : undefined}
+        tabIndex={expandable ? 0 : undefined}
+        aria-expanded={expandable ? open : undefined}
         onKeyDown={(e) => {
-          if (!s.output) return;
+          if (!expandable) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setExpanded((p) => !p);
           }
         }}
+        onClick={() => expandable && setExpanded((p) => !p)}
         style={{
           display: "flex",
           alignItems: "center",
           gap: "12px",
           padding: "14px 16px",
-          cursor: s.output ? "pointer" : "default",
+          cursor: expandable ? "pointer" : "default",
         }}
-        onClick={() => s.output && setExpanded((p) => !p)}
       >
-        {/* Status icon */}
         <div style={{ flexShrink: 0 }}>
-          {s.status === "done" ? (
+          {!busy ? (
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 300, damping: 15 }}
             >
-              <CheckCircle2 size={18} color={cfg?.color ?? "var(--success)"} />
+              {n.ok === false ? (
+                <Circle size={18} color="var(--error)" />
+              ) : (
+                <CheckCircle2 size={18} color={cfg.color} />
+              )}
             </motion.div>
-          ) : s.status === "running" ? (
-            <Loader2 size={18} color={cfg?.color ?? "var(--accent)"} className="animate-spin" style={{ animation: "spin 1s linear infinite" }} />
           ) : (
-            <Circle size={18} color="var(--text-muted)" />
+            <Loader2 size={18} color={cfg.color} className="animate-spin" style={{ animation: "spin 1s linear infinite" }} />
           )}
         </div>
 
-        {/* Step label */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{
             fontSize: "0.85rem",
-            fontWeight: 500,
-            color: s.status === "pending" ? "var(--text-muted)" : "var(--text-primary)",
+            fontWeight: 600,
+            color: busy ? "var(--text-primary)" : "var(--text-primary)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}>
-            <span style={{ color: "var(--text-muted)", fontSize: "0.78rem", marginRight: "6px" }}>
-              {i + 1}/{total}
-            </span>
-            {s.step}
+            {n.label}
+            {n.iteration > 0 && (
+              <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginLeft: "6px" }}>
+                pass {n.iteration}
+              </span>
+            )}
           </p>
+          {n.summary && (
+            <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {n.summary}
+            </p>
+          )}
         </div>
 
-        {/* Agent badge */}
-        {cfg && (
-          <span style={{
-            flexShrink: 0,
-            fontSize: "0.72rem",
-            fontWeight: 600,
-            color: cfg.color,
-            background: cfg.bg,
-            border: `1px solid ${cfg.color}33`,
-            borderRadius: "20px",
-            padding: "3px 10px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}>
-            <Bot size={10} />
-            {cfg.label}
-          </span>
-        )}
-
-        {/* Expand toggle */}
-        {s.output && (
+        {expandable && (
           <div style={{ color: "var(--text-muted)", flexShrink: 0, marginLeft: "4px" }}>
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </div>
         )}
       </div>
 
-      {/* Expanded output */}
       <AnimatePresence>
-        {expanded && s.output && (
+        {open && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -152,21 +185,91 @@ function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
           >
             <div style={{
               borderTop: "1px solid var(--border)",
-              padding: "14px 16px",
+              padding: "12px 16px",
               background: "var(--bg-surface)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
             }}>
-              <pre style={{
-                fontSize: "0.78rem",
-                color: "var(--text-secondary)",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                maxHeight: "220px",
-                overflowY: "auto",
-                lineHeight: "1.7",
-                fontFamily: "inherit",
-              }}>
-                {s.output}
-              </pre>
+              {/* Thoughts */}
+              {n.thoughts.map((t, ti) => (
+                <div key={`t-${ti}`} style={{ display: "flex", gap: "8px", alignItems: "flex-start", color: "var(--text-secondary)", fontSize: "0.78rem" }}>
+                  <Lightbulb size={12} color={cfg.color} style={{ flexShrink: 0, marginTop: "2px" }} />
+                  <span style={{ lineHeight: 1.6 }}>{t}</span>
+                </div>
+              ))}
+
+              {/* Tool calls */}
+              {n.tools.map((tool, ti) => (
+                <div
+                  key={`tool-${ti}`}
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "flex-start",
+                    fontSize: "0.76rem",
+                    padding: "7px 10px",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <div style={{ color: cfg.color, flexShrink: 0, marginTop: "1px" }}>
+                    <ToolIcon tool={tool.tool} />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{tool.tool}</span>
+                    {tool.input && <span style={{ color: "var(--text-muted)", marginLeft: "6px", wordBreak: "break-word" }}>{tool.input}</span>}
+                    {tool.summary && (
+                      <p style={{ marginTop: "3px", color: tool.ok === false ? "var(--error)" : "var(--text-muted)", lineHeight: 1.5 }}>
+                        → {tool.summary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Reflections */}
+              {n.reflections.map((r, ri) => (
+                <div
+                  key={`r-${ri}`}
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "flex-start",
+                    fontSize: "0.76rem",
+                    padding: "7px 10px",
+                    borderRadius: "var(--radius-sm)",
+                    background: "rgba(244,114,182,0.06)",
+                    border: "1px solid rgba(244,114,182,0.2)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <Sparkles size={12} color="#f472b6" style={{ flexShrink: 0, marginTop: "1px" }} />
+                  <span style={{ lineHeight: 1.6 }}>{r.text}</span>
+                </div>
+              ))}
+
+              {/* Node output */}
+              {n.output && (
+                <pre style={{
+                  fontSize: "0.76rem",
+                  color: "var(--text-secondary)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  lineHeight: "1.7",
+                  fontFamily: "inherit",
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "10px",
+                }}>
+                  {n.output}
+                </pre>
+              )}
             </div>
           </motion.div>
         )}
@@ -175,11 +278,13 @@ function StepCard({ s, i, total }: { s: Step; i: number; total: number }) {
   );
 }
 
-export default function AgentTimeline({ steps, statusMessage, isRunning }: Props) {
-  if (steps.length === 0 && !statusMessage && !isRunning) return null;
+export default function AgentTimeline({ nodes, planSteps, statusMessage, isRunning, engine }: Props) {
+  const hasContent = nodes.length + (planSteps?.length ?? 0) > 0 || Boolean(statusMessage && isRunning);
+  if (!hasContent) return null;
 
-  const doneCount = steps.filter((s) => s.status === "done").length;
-  const progress = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0;
+  const doneCount = nodes.filter((n) => n.status === "done").length;
+  const progress = nodes.length > 0 ? Math.round((doneCount / nodes.length) * 100) : 0;
+  const active = nodes.filter((n) => n.status === "running").length;
 
   return (
     <motion.div
@@ -188,107 +293,78 @@ export default function AgentTimeline({ steps, statusMessage, isRunning }: Props
       style={{ width: "100%", maxWidth: "760px", margin: "0 auto", marginTop: "20px" }}
     >
       {/* Progress header */}
-      {steps.length > 0 && (
+      {(nodes.length > 0 || isRunning) && (
         <div style={{ marginBottom: "16px" }}>
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "8px",
-          }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 500 }}>
-              {statusMessage || `${doneCount} of ${steps.length} steps complete`}
+              {statusMessage || (active > 0 ? "Working…" : `${doneCount} of ${nodes.length} agents done`)}
             </span>
-            <span style={{ fontSize: "0.78rem", color: "var(--accent)", fontWeight: 700 }}>
-              {progress}%
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {engine && (
+                <span style={{
+                  fontSize: "0.66rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
+                  color: engine === "langgraph" ? "#a78bfa" : "#fbbf24",
+                  background: engine === "langgraph" ? "rgba(167,139,250,0.12)" : "rgba(251,191,36,0.12)",
+                  border: `1px solid ${engine === "langgraph" ? "rgba(167,139,250,0.3)" : "rgba(251,191,36,0.3)"}`,
+                  borderRadius: "20px", padding: "2px 8px",
+                  display: "flex", alignItems: "center", gap: "4px",
+                }}>
+                  {engine === "langgraph" ? <Cpu size={9} /> : <Brain size={9} />}
+                  {engine === "langgraph" ? "LangGraph" : "Native"}
+                </span>
+              )}
+              <span style={{ fontSize: "0.78rem", color: "var(--accent)", fontWeight: 700 }}>{progress}%</span>
             </span>
           </div>
-          <div style={{
-            height: "4px",
-            background: "var(--border)",
-            borderRadius: "99px",
-            overflow: "hidden",
-          }}>
+          <div style={{ height: "4px", background: "var(--border)", borderRadius: "99px", overflow: "hidden" }}>
             <motion.div
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.4 }}
-              style={{
-                height: "100%",
-                background: "linear-gradient(90deg, var(--accent), var(--accent2))",
-                borderRadius: "99px",
-              }}
+              style={{ height: "100%", background: "linear-gradient(90deg, var(--accent), var(--accent2))", borderRadius: "99px" }}
             />
           </div>
         </div>
       )}
 
-      {/* Status-only message (before plan arrives) */}
-      {steps.length === 0 && statusMessage && !isRunning && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "14px 18px",
-            background: "var(--bg-card)",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--border-bright)",
-          }}
-        >
-          <Loader2
-            size={16}
-            color="var(--accent)"
-            style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}
-          />
-          <span style={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}>{statusMessage}</span>
-        </motion.div>
-      )}
-
-      {/* Loading Skeletons */}
-      {isRunning && steps.length === 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
-          {[0, 1, 2, 3].map((i) => (
-            <motion.div
-              key={`skeleton-${i}`}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              style={{
-                height: "56px",
-                background: "var(--bg-card)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                overflow: "hidden",
-                position: "relative"
-              }}
-            >
-              <div 
-                style={{
-                  position: "absolute",
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent)",
-                  backgroundSize: "200% 100%",
-                  animation: "shimmer 1.5s infinite linear"
-                }}
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", height: "100%", padding: "0 16px" }}>
-                <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "var(--border)", flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ height: "10px", width: i === 0 ? "40%" : i === 1 ? "60%" : i === 2 ? "50%" : "30%", background: "var(--border)", borderRadius: "4px" }} />
-                </div>
-              </div>
-            </motion.div>
+      {/* Reserved plan chips */}
+      {planSteps && planSteps.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+          {planSteps.map((s, i) => (
+            <span key={`plan-${i}`} style={{
+              fontSize: "0.7rem",
+              color: "var(--text-secondary)",
+              background: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              borderRadius: "20px",
+              padding: "4px 10px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px",
+            }}>
+              <Scale size={10} color="var(--accent)" />
+              {s}
+            </span>
           ))}
         </div>
       )}
 
-      {/* Step cards */}
+      {/* Empty-state live banner (before first node_start) */}
+      {nodes.length === 0 && isRunning && statusMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 18px", background: "var(--bg-card)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-bright)" }}
+        >
+          <Loader2 size={16} color="var(--accent)" style={{ animation: "spin 1s linear infinite", flexShrink: 0 }} />
+          <span style={{ fontSize: "0.86rem", color: "var(--text-secondary)" }}>{statusMessage}</span>
+        </motion.div>
+      )}
+
+      {/* Node cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         <AnimatePresence>
-          {steps.map((s, i) => (
-            <StepCard key={i} s={s} i={i} total={steps.length} />
+          {nodes.map((n, i) => (
+            <NodeCard key={n.id} n={n} i={i} />
           ))}
         </AnimatePresence>
       </div>

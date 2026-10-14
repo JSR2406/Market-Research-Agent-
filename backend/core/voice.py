@@ -1,29 +1,38 @@
 """
 backend/core/voice.py
-Phase 6 — Voice I/O module.
+Phase 6 — Voice I/O module. Private-by-default: when no API key is configured,
+every engine used here is open-source and runs locally (or via free public
+endpoints) — nothing sends microphone audio to a third party.
 
 speech_to_text():
   Primary:  ElevenLabs Scribe v2 (async via httpx, not the sync SDK, avoids threading issues in
-            an async FastAPI app).
-  Secondary: faster-whisper (fully open-source, local, no API key; handles WebM/Opus
+            an async FastAPI app). Used only when ELEVENLABS_API_KEY is set.
+  Default (no key): faster-whisper (fully open-source, local, no API key; handles WebM/Opus
             directly and supports Hindi). Model size via WHISPER_MODEL_SIZE (default "tiny").
   Fallback: SpeechRecognition + Google free STT (WAV only). If all fail → return ""
             (caller shows graceful message).
 
 text_to_speech():
   Primary:  ElevenLabs TTS flash v2.5 (streaming via httpx, assembled into bytes).
-  Secondary: Hugging Face TTS models (free, no API key required for public models).
+            Used only when ELEVENLABS_API_KEY is set.
+  Default (no key): Piper TTS (MIT, local ONNX, fully offline after a one-time
+            model download; auto-switches English/Hindi via Devanagari detection).
+  Fallback: Hugging Face TTS models (free, no API key required for public models).
   Fallback: pyttsx3 offline TTS (written to a temp WAV, read back, deleted).
             If that also fails → return b"" (caller shows graceful message).
 
 Both functions NEVER raise — they catch all exceptions and return the empty sentinel.
-Server-side logs always say which engine was used.
+Server-side logs always say which engine was used. voice_status() reports engine
+availability for operators / the frontend privacy chip.
 """
 import asyncio
+import importlib.util
 import io
 import logging
 import os
 import tempfile
+import threading
+import wave
 from io import BytesIO
 from typing import Optional
 
@@ -32,6 +41,9 @@ import httpx
 from backend.core.config import (
     HF_TTS_MODEL,
     HF_TTS_FALLBACK_MODELS,
+    PIPER_VOICE_DIR,
+    PIPER_VOICE_EN,
+    PIPER_VOICE_HI,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +56,91 @@ WHISPER_MODEL_SIZE: str = os.getenv("WHISPER_MODEL_SIZE", "tiny")
 # Lazily-loaded faster-whisper singleton (kept module-level so the model
 # weights load once per process, not once per request).
 _whisper_model = None
+
+# ── Piper TTS (open-source, local, no API key) ────────────────────────────────
+# Models live under PIPER_VOICE_DIR; singletons cache loaded PiperVoice objects.
+# _piper_lock guards download + load so concurrent first calls don't race.
+_piper_models_dir = PIPER_VOICE_DIR
+_piper_voices: dict = {}
+_piper_lock = threading.Lock()
+
+# Naming convention ex: gridder en_US-les-sac-medium → hi_IN-pratham-medium.
+_PIPER_VOICES_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
+
+
+def _importable(module: str) -> bool:
+    """Cheap spec probe — no import side-effects (used by voice_status())."""
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _is_devanagari(text: str) -> bool:
+    """True when the text contains Devanagari script (Hindi) — selects the hi voice."""
+    return any("\u0900" <= ch <= "\u097F" for ch in text)
+
+
+def _piper_voice_url(voice_name: str, ext: str = ".onnx") -> str:
+    """Resolve the canonical HF folder layout for a piper voice name."""
+    lang_code, speaker, quality = voice_name.split("-", 2)
+    language = lang_code.split("_")[0]
+    return (
+        f"{_PIPER_VOICES_BASE}/{language}/{lang_code}/{speaker}/{quality}/"
+        f"{voice_name}{ext}"
+    )
+
+
+def _download_piper_voice_file(voice_name: str, path: str) -> None:
+    """Download one piper file (.onnx or .onnx.json). Raises on any failure."""
+    ext = ".onnx.json" if path.endswith(".onnx.json") else ".onnx"
+    url = _piper_voice_url(voice_name, ext)
+    with httpx.Client(timeout=300.0, follow_redirects=True) as client:
+        resp = client.get(url)
+        if resp.status_code != 200:
+            raise RuntimeError(f"[Voice/TTS] piper download failed HTTP {resp.status_code} for {url}")
+        tmp = path + ".part"
+        with open(tmp, "wb") as f:
+            f.write(resp.content)
+        os.replace(tmp, path)
+
+
+def _load_piper_sync(voice_name: str):
+    """
+    Download (once) + load a PiperVoice singleton. Runs inside a worker thread.
+    Returns the voice object or None (never raises).
+    """
+    with _piper_lock:
+        if voice_name in _piper_voices:
+            return _piper_voices[voice_name]
+        try:
+            os.makedirs(_piper_models_dir, exist_ok=True)
+            base = os.path.join(_piper_models_dir, voice_name)
+            for suffix in (".onnx", ".onnx.json"):
+                path = base + suffix
+                if not (os.path.isfile(path) and os.path.getsize(path) > 0):
+                    _download_piper_voice_file(voice_name, path)
+            from piper import PiperVoice  # type: ignore  # noqa: F401 — optional dep
+
+            voice = PiperVoice.load(base + ".onnx")
+            _piper_voices[voice_name] = voice
+            logger.info(f"[Voice/TTS] piper voice '{voice_name}' ready.")
+            return voice
+        except Exception as e:
+            logger.warning(f"[Voice/TTS] piper voice '{voice_name}' unavailable: {e}")
+            _piper_voices[voice_name] = None
+            return None
+
+
+async def _load_piper_voice(voice_name: str):
+    """Async wrapper — heavy download/load stays off the event loop."""
+    if voice_name in _piper_voices and _piper_voices[voice_name] is not None:
+        return _piper_voices[voice_name]
+    if not _importable("piper"):
+        logger.warning("[Voice/TTS] piper package not installed.")
+        return None
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _load_piper_sync, voice_name)
 
 
 def _get_elevenlabs_key() -> str:
@@ -231,8 +328,17 @@ async def _stt_speech_recognition(audio_bytes: bytes) -> str:
 
 async def text_to_speech(text: str) -> bytes:
     """
-    Convert text to MP3 audio bytes.
+    Convert text to audio bytes.
     Returns b"" on total failure (never raises).
+
+    Engine ladder (first success wins):
+      1. ElevenLabs        — only when ELEVENLABS_API_KEY is set (cloud, best quality)
+      2. Piper TTS        — open-source, local, no API key (offline after warm-up)
+      3. Hugging Face     — free public TTS models (network, no key)
+      4. pyttsx3          — offline device TTS (robotic, last resort)
+
+    The output container varies by engine (MP3 vs WAV); callers that need a
+    hard media type sniff the bytes before responding.
     """
     if not text.strip():
         return b""
@@ -243,7 +349,15 @@ async def text_to_speech(text: str) -> bytes:
         if result:
             logger.info("[Voice/TTS] ElevenLabs engine used.")
             return result
-        logger.warning("[Voice/TTS] ElevenLabs failed, trying Hugging Face fallback.")
+        logger.warning("[Voice/TTS] ElevenLabs failed, trying piper fallback.")
+    else:
+        logger.info("[Voice/TTS] No ElevenLabs key — open-source piper engine first.")
+
+    result = await _tts_piper(text)
+    if result:
+        logger.info("[Voice/TTS] piper (open-source local) engine used.")
+        return result
+    logger.warning("[Voice/TTS] piper failed, trying Hugging Face fallback.")
 
     result = await _tts_huggingface(text)
     if result:
@@ -286,6 +400,35 @@ async def _tts_elevenlabs(text: str, api_key: str) -> bytes:
             return b""
     except Exception as e:
         logger.warning(f"[Voice/TTS] ElevenLabs exception: {e}")
+        return b""
+
+
+async def _tts_piper(text: str) -> bytes:
+    """
+    Fully open-source, local, no-key TTS via Piper (MIT, ONNX). Auto-selects a
+    voice by script: Devanagari text → Hindi voice, otherwise English. Returns
+    the synthesized bytes (RIFF/WAV) or b"" — never raises.
+    """
+    try:
+        voice_name = PIPER_VOICE_HI if _is_devanagari(text) else PIPER_VOICE_EN
+        voice = await _load_piper_voice(voice_name)
+        if voice is None:
+            return b""
+        truncated = text[:1000]
+
+        def _synth() -> bytes:
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as wav:
+                voice.synthesize_wav(truncated, wav)
+            return buf.getvalue()
+
+        loop = asyncio.get_event_loop()
+        audio = await loop.run_in_executor(None, _synth)
+        if audio:
+            logger.info(f"[Voice/TTS] piper voice '{voice_name}' synthesized {len(audio)} bytes.")
+        return audio
+    except Exception as e:
+        logger.warning(f"[Voice/TTS] piper exception: {e}")
         return b""
 
 
@@ -363,3 +506,41 @@ async def _tts_pyttsx3(text: str) -> bytes:
     except Exception as e:
         logger.warning(f"[Voice/TTS] pyttsx3 exception: {e}")
         return b""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Engine diagnostics (drives GET /api/voice/status and the frontend privacy chip)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def voice_status() -> dict:
+    """
+    Report which STT/TTS engines are available in this deployment and which the
+    ladder defaults to. Availability is a cheap spec probe (no engine startup),
+    so this endpoint is always fast and never triggers model downloads.
+    """
+    has_key = bool(_get_elevenlabs_key())
+
+    stt_map = {
+        "elevenlabs": has_key,
+        "faster_whisper": _importable("faster_whisper"),
+        "speech_recognition": _importable("speech_recognition"),
+    }
+    tts_map = {
+        "elevenlabs": has_key,
+        "piper": _importable("piper"),
+        "huggingface": True,  # httpx + public HF Inference API — no key, always eligible
+        "pyttsx3": _importable("pyttsx3"),
+    }
+
+    stt_order = ["elevenlabs", "faster_whisper", "speech_recognition"]
+    tts_order = ["elevenlabs", "piper", "huggingface", "pyttsx3"]
+
+    return {
+        "whisper_model": WHISPER_MODEL_SIZE,
+        "stt_engines": stt_map,
+        "tts_engines": tts_map,
+        "stt_default": next((k for k in stt_order if stt_map[k]), "none"),
+        "tts_default": next((k for k in tts_order if tts_map[k]), "none"),
+        "piper_voices": {"en": PIPER_VOICE_EN, "hi": PIPER_VOICE_HI},
+        "private_by_default": not has_key,  # no key → every engine is local/free
+    }

@@ -42,23 +42,27 @@ def heuristic_research(task: str) -> str:
     return "\n".join(lines)
 
 
-async def research_agent(task: str, agent_hint: Optional[str] = "research") -> str:
+async def research_agent(task: str, agent_hint: Optional[str] = "research", live_context: Optional[str] = None) -> str:
     today = datetime.now().strftime("%B %d, %Y")
     schemes_data = schemes_brief()
 
     user_content = f"Date: {today}.\nTask: {task}\n\nAvailable Schemes Data:\n{schemes_data}"
 
     # Real-time web scraping: enrich with live snippets when enabled and available.
-    if WEB_SEARCH_ENABLED:
+    # `live_context` lets the agentic engine supply context it already fetched via
+    # the web_search tool, so the page is never scraped twice.
+    if live_context is None and WEB_SEARCH_ENABLED:
         try:
-            live = await web_context(task, max_results=WEB_SEARCH_MAX_RESULTS)
-            if live:
-                user_content += (
-                    "\n\nLive Web Context (auto-scraped — may be noisy, verify facts):\n"
-                    f"{live}"
-                )
+            live_context = await web_context(task, max_results=WEB_SEARCH_MAX_RESULTS)
         except Exception as e:
             logger.warning(f"[Research] Web scraping unavailable: {e}")
+            live_context = ""
+
+    if live_context:
+        user_content += (
+            "\n\nLive Web Context (auto-scraped — may be noisy, verify facts):\n"
+            f"{live_context}"
+        )
 
     messages = [
         {

@@ -95,11 +95,23 @@ def client():
 def test_chat_rejects_oversized_message(client):
     r = client.post("/api/chat", json={"message": "x" * 4001})
     assert r.status_code == 422
+    # Friendly, generic validation message — no internal field/error leakage.
+    detail = r.json().get("detail")
+    assert isinstance(detail, str) and len(detail) < 200
 
 
 def test_chat_rejects_traversal_session_id(client):
     r = client.post("/api/chat", json={"message": "hi", "session_id": "../data/schemes"})
     assert r.status_code == 422
+
+
+def test_chat_delete_rejects_traversal_session_id(client):
+    # GDPR delete must refuse a bad session id, not silently report "cleared".
+    r = client.delete("/api/chat/semi;colon")
+    assert r.status_code == 422
+    r2 = client.delete("/api/chat/ok-session_123")
+    assert r2.status_code == 200
+    assert r2.json() == {"status": "cleared", "session_id": "ok-session_123"}
 
 
 def test_speak_rejects_oversized_text(client):

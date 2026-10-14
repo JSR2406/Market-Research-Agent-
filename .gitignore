@@ -21,6 +21,7 @@ Thumbs.db
 
 # Runtime data
 backend/sessions/
+backend/data/piper/
 *.log
 *.pid
 .pytest_cache/

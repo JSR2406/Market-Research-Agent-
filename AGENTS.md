@@ -20,7 +20,7 @@ Never report a phase complete without all four passing.
 - Backend: Python, FastAPI, WebSockets, httpx, uvicorn, python-dotenv
 - Frontend: Next.js 15 App Router, TypeScript, Tailwind CSS, Framer Motion, react-markdown, remark-gfm, lucide-react
 - LLM: Multi-provider via backend/core/llm_client.py — Ollama (local, free), Hugging Face Inference API (free tier), OpenRouter (cloud)
-- LangChain (optional): `backend/core/langchain_adapter.py` exposes the same multi-provider stack as a LangChain `BaseChatModel` (`GrameenChatModel`) + tools + `build_advisory_chain()`; REST via `backend/api/langchain.py` (`GET /api/langchain/status`, `POST /api/langchain/run`). Requires `langchain-core` (in `backend/requirements.txt`).
+- LangChain / LangGraph: the advisory engine is **agentic** (`backend/agentic/`) — a LangGraph StateGraph (planner → supervisor → research/analyst/schemes → writer → critic/refine → finalize) with a native pure-asyncio fallback runner, so the same topology runs with or without `langgraph`/`langchain-core` installed. `backend/core/langchain_adapter.py` additionally exposes the multi-provider stack as a LangChain `BaseChatModel` (`GrameenChatModel`) + tools + `build_advisory_chain()`; REST via `backend/api/langchain.py` (`GET /api/langchain/status` incl. agentic engine info, `POST /api/langchain/run`). Requires `langchain-core` + `langgraph` (in `backend/requirements.txt`).
 - Web research: googlesearch-python + httpx + BeautifulSoup (no keys, Google → DuckDuckGo fallback)
 
 ## Data & Accuracy Principles (non-negotiable)
@@ -69,19 +69,30 @@ market-research-agent/
 │   │   └── worker.py           # AgentSession: faster-whisper STT → AdvisoryLLM → ElevenLabs TTS
 │   ├── workflows/
 │   │   ├── __init__.py
-│   │   ├── executor.py         # run orchestration, emits WS events, loan-ready score attach
-│   │   └── routing.py          # keyword step→agent mapping (zero LLM calls)
+│   │   ├── executor.py         # thin adapter: runs the agentic graph, emits done, persists session + loan-ready score attach
+│   │   └── routing.py          # legacy keyword step→agent mapping (kept for chat advisor classification)
+│   ├── agentic/                # the agentic advisory engine (LangGraph + native fallback)
+│   │   ├── __init__.py         # public exports: run_agentic_workflow, EventEmitter, engine_name
+│   │   ├── state.py            # AgenticState TypedDict + Annotated reducers + initial_state
+│   │   ├── events.py           # EventEmitter (graph/plan/node_start/node_end/thought/tool_call/tool_result/reflection), WorkflowCancelled
+│   │   ├── runtime.py          # LANGGRAPH_AVAILABLE / LANGCHAIN_AVAILABLE / run_coro_sync / engine_name
+│   │   ├── supervisor.py       # decide(): heuristic routing + guardrails (+LLM when up); ACTION_TO_NODE
+│   │   ├── nodes.py            # planner, supervisor, research, analyst, schemes, writer, critic, refine, finalize (+NODE_META)
+│   │   ├── graph.py            # topology + conditional routers + build_langgraph() + graph_topology()
+│   │   ├── runner.py           # run_agentic_workflow; _run_langgraph + _run_native (identical events/state)
+│   │   └── tools.py            # deterministic tools: web_search, scheme_match, loan_ready_score, document_checklist, cashflow_projection (+langchain_tools())
 │   ├── data/
 │   │   └── schemes.json        # curated Indian MSME schemes (id, source_url, last_verified_at, eligibility_rules, documents)
 │   ├── sessions/               # runtime JSON stores (gitignored)
 │   └── api/
 │       ├── __init__.py
+│       ├── schemas.py          # shared pydantic request/response models for the REST surface (response_model on every route)
 │       ├── ws_market.py        # WS endpoint (start/cancel/export/delete) + input validation
 │       ├── chat.py             # /api/chat (POST/GET history/DELETE) + chat memory, pydantic caps
 │       ├── sessions.py         # GET /api/sessions/{session_id} — resume a saved advisory
 │       ├── langchain.py        # GET /api/langchain/status, POST /api/langchain/run (heuristic fallback, never 500)
 │       ├── whatsapp.py         # OPTIONAL WhatsApp Cloud API: GET verify, POST incoming → chat_agent → Graph reply (always 200)
-│       └── voice.py            # /api/voice/{transcribe,speak,livekit-token}, 5 MB audio cap
+│       └── voice.py            # /api/voice/{status,transcribe,speak,livekit-token}, 5 MB audio cap, WAV/MP3 sniffing
 ├── tests/
 │   ├── test_smoke.py           # offline contracts, route surface, profile plumbing
 │   └── test_security.py        # path traversal, WS/API input validation
@@ -97,7 +108,7 @@ market-research-agent/
     │   └── research/page.tsx   # WS client, run/cancel, report state
     └── components/
         ├── TopicInput.tsx      # text + voice input, step selector
-        ├── AgentTimeline.tsx   # step progress + status (keyboard-operable expand)
+        ├── AgentTimeline.tsx   # live agentic trace (nodes, thoughts, tool calls, reflections) + engine badge
         ├── AdvisoryCard.tsx    # advisory render, simplified doc, download/copy, listen
         ├── ChatPanel.tsx       # business advisory chatbot with saved chat memory
         ├── LiveAdvisorPanel.tsx # realtime voice (LiveKit): join room, mic, agent audio
@@ -119,7 +130,9 @@ market-research-agent/
 ## Voice / TTS
 - `backend/core/voice.py` — never raises, always falls back through:
   - STT: ElevenLabs Scribe (if key) → faster-whisper (open-source, local, no key; handles WebM + Hindi; model size via `WHISPER_MODEL_SIZE`, default `tiny`) → SpeechRecognition/Google (free, WAV only).
-  - TTS: ElevenLabs (if key) → Hugging Face Inference API (`HF_TTS_MODEL`, default `facebook/mms-tts-eng`, free) → pyttsx3 (offline).
+  - TTS: ElevenLabs (if key) → **Piper TTS** (open-source/local/MIT, no key; ONNX voices `en_US-lessac-medium` + `hi_IN-pratham-medium` auto-selected by Devanagari detection, one-time model download to `PIPER_VOICE_DIR` (default `backend/data/piper`, gitignored), fully offline after warm-up) → Hugging Face Inference API (`HF_TTS_MODEL`, default `facebook/mms-tts-eng`, free) → pyttsx3 (offline).
+  - **Private-by-default:** when no `ELEVENLABS_API_KEY` is set, every engine is open-source and local — microphone audio never leaves the server. `voice_status()` reports engine availability; `GET /api/voice/status` exposes it and drives the frontend privacy chip in `TopicInput.tsx`.
+  - Engine containers vary (MP3 from cloud tiers, RIFF/WAV from Piper) — `/api/voice/speak` sniffs the bytes and labels the media type correctly.
 - **Realtime voice (LiveKit)** — separate process, stack in `backend/requirements-voice.txt` (`pip install -r backend/requirements-voice.txt`).
   - `python -m backend.voice_agent.worker` joins `LIVEKIT_ADVISOR_ROOM` via `AgentSession`: faster-whisper local STT (`voice_agent/stt.py`, no key) → `AdvisoryLLM` (bridges to `call_llm`, agent_hint="voice") → ElevenLabs TTS. Targets livekit-agents==1.8.x.
   - Browser joins the same room via `POST /api/voice/livekit-token` (needs `LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`) and `LiveAdvisorPanel.tsx` (frontend, `livekit-client`).
@@ -138,16 +151,30 @@ market-research-agent/
 - Frontend: `ChatPanel.tsx` on `/research` — bubbles, history restore, clear button, Auto/हिंदी/EN language toggle (persisted in `localStorage["grameenai_chat_lang"]`); `session_id` comes from `localStorage["grameenai_session"]` (generated browser-side).
 - **Model rule: the `chat` agent's primary OpenRouter model must stay OPEN-SOURCE** (`mistralai/mistral-7b-instruct`). Call path follows the normal chain: Ollama (local) → Hugging Face (free) → OpenRouter.
 
+## Agentic Engine
+- The advisory pipeline is a LangGraph StateGraph in `backend/agentic/` (topology + routers + nodes), executed by LangGraph when importable and otherwise by the built-in native async runner — both produce identical state and an identical WebSocket event stream. `engine` (on `graph` and `done` events) is `"langgraph"` or `"native"`.
+- Topology: `START → planner → supervisor`; supervisor routes to `research | analyst | schemes | writer | finalize` (heuristic `decide()` in `supervisor.py`, LLM-assisted when a provider is up). `research/analyst/schemes → supervisor` (they loop until the supervisor has enough). `writer → critic | refine`; `critic → writer (revise) | refine` for up to `AGENTIC_MAX_ITERATIONS`; `refine → finalize → END`.
+- Nodes degrade to deterministic heuristic outputs whenever the LLM fails — the offline guarantee applies to every node. Deterministic tools (`backend/agentic/tools.py`) are bound where relevant: `web_search` (research), `scheme_match` (schemes), `cashflow_projection` (analyst), `loan_ready_score` + `document_checklist` (finalize).
+- `finalize` keeps the deterministic post-pass (`_finalize_report`): loan-ready score injection, scheme source annotation, provenance sources. Entity rule: planner/supervisor/critic routing and scores stay deterministic; the LLM only writes prose within the given schema.
+- Config: `AGENTIC_ENGINE_ENABLED`, `AGENTIC_MAX_ITERATIONS` (default 8), `AGENTIC_REFLECTION_ENABLED` (default true), `AGENTIC_CHECKPOINTING`. `supervisor` and `critic` have their own token budgets + OpenRouter model priority (see `AGENT_OPENROUTER_MODELS` in `backend/core/config.py`); they use the same `call_llm` chain as all agents.
+
 ## WebSocket Events
-plan, step_start, step_end, token_usage, status, done (with simplified_report), cancelled, error, resume_available, session_deleted, session_export
+Live agentic events: status, graph, plan, node_start, node_end, thought, tool_call, tool_result, reflection, token_usage
+
+Terminal/legacy events: done (with simplified_report + trace + engine), cancelled, error, resume_available, session_deleted, session_export
 
 - `start` payload: `{type, topic, max_steps?, session_id?, profile?}` — topic capped at 4000 chars, profile at 1500, `max_steps` coerced to 1–6, `session_id` validated against the allowlist (invalid → `error` event, no run).
 - A malformed frame or unknown type yields an `error` event and the connection stays open.
 
 ## Security & Input Validation (P0 — do not regress)
 - `session_id` is client-controlled and used for file paths. Validation lives in `backend/core/memory.py` (`is_valid_session_id`, allowlist `[A-Za-z0-9_-]{1,64}`); every write/delete entry point raises `ValueError` on invalid ids, reads return empty. WS + REST validate early and answer with friendly `error` events / 422s.
-- Client-facing errors are friendly and generic (no `str(e)`, no stack traces, no server paths, no "port 8000" hints in production UI). Details go to server logs (`logger.exception` / `console.error`) only. Dev-only setup hints in the UI must be gated behind `process.env.NODE_ENV !== "production"`.
+- Client-facing errors are friendly and generic (no `str(e)`, no stack traces, no server paths, no "port 8000" hints in production UI). **REST** has a unified JSON error contract (`detail` string): 422 for invalid input (single human message, validated via pydantic caps in `backend/api/schemas.py`), generic 500 JSON for anything uncaught — internals go to server logs only (`logger.exception` / `console.error`). **WS** errors are `error` events. Dev-only setup hints in the UI must be gated behind `process.env.NODE_ENV !== "production"`.
 - All frontend URLs come from `frontend/lib/api.ts` (`API_BASE`, `WS_URL`) — never read `NEXT_PUBLIC_*` env vars elsewhere; the module handles http→https / ws→wss upgrades in one place.
+
+## Observability
+- **HTTP request log** — `backend/main.py` logs one line per request (`[http] METHOD /path -> status (ms)`); path only, never query strings/bodies/headers, so no PII enters logs. Uncaught exceptions still fall through to the global 500 handler which logs the trace.
+- **Engine diagnostics** — `GET /api/voice/status` reports which STT/TTS engines are available + the active defaults (cheap spec probes, never starts models); drives the frontend privacy chip.
+- Engine usage is always logged in `backend/core/voice.py` (e.g. `[Voice/TTS] piper voice '…' used`), so operators can audit which engine handled which request.
 
 ## Frontend Novelty Features
 - **Loan-Ready Score** — deterministic 0–100 score added to the advisory JSON by `executor._finalize_report()` (no LLM cost; rubric in `backend/core/heuristics.compute_loan_ready_score`). `AdvisoryCard.tsx` draws an SVG gauge + "why" reasons. Always present, even fully offline.

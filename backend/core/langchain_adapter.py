@@ -239,3 +239,35 @@ async def run_prompt(
                 "I could not reach the language model right now. "
                 f"Your question was: {user_input[:200]}"
             )
+
+
+def agentic_status() -> Dict[str, Any]:
+    """Describe the agentic engine + its tools (lazy, never raises).
+
+    Used by ``GET /api/langchain/status`` so an operator can see whether the
+    LangGraph engine is active, the live graph topology, and the deterministic
+    tool set — without importing heavy modules at app startup.
+    """
+    info: Dict[str, Any] = {
+        "langchain_available": LANGCHAIN_AVAILABLE,
+        "langgraph_available": False,
+        "engine": "native",
+        "nodes": [],
+        "edges": [],
+        "tools": [],
+    }
+    try:
+        from backend.agentic import engine_name
+        from backend.agentic.graph import graph_topology
+        from backend.agentic.runtime import LANGGRAPH_AVAILABLE as _LG
+        from backend.agentic.tools import tool_names
+
+        topo = graph_topology()
+        info["langgraph_available"] = _LG
+        info["engine"] = engine_name()
+        info["nodes"] = topo.get("nodes", [])
+        info["edges"] = topo.get("edges", [])
+        info["tools"] = tool_names()
+    except Exception as e:  # pragma: no cover — native fallback info stands
+        logger.debug(f"[LangChain] agentic_status unavailable: {e}")
+    return info

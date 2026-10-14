@@ -1,7 +1,7 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Square, Zap, Sparkles, Mic, MicOff, Loader } from "lucide-react";
+import { Search, Square, Zap, Sparkles, Mic, MicOff, Loader, Check, ShieldCheck } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
 interface Props {
@@ -20,17 +20,55 @@ const BACKEND_URL = API_BASE;
 
 type VoiceState = "idle" | "recording" | "transcribing" | "error";
 
+interface VoiceCap {
+  whisper_model?: string;
+  stt_default: string;
+  tts_default: string;
+  private_by_default: boolean;
+}
+
+const ENGINE_LABELS: Record<string, string> = {
+  elevenlabs: "ElevenLabs",
+  faster_whisper: "local (no key)",
+  speech_recognition: "Google free",
+  piper: "local (no key)",
+  huggingface: "Hugging Face",
+  pyttsx3: "device",
+  none: "unavailable",
+};
+
+const engineLabel = (key: string): string => ENGINE_LABELS[key] ?? key;
+
 export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
   const [topic, setTopic] = useState("");
   const [maxSteps, setMaxSteps] = useState(4);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [voiceMsg, setVoiceMsg] = useState("");
+  const [voiceOk, setVoiceOk] = useState(false);
+  const [voiceCap, setVoiceCap] = useState<VoiceCap | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  // Reveal which engines back the voice button (privacy-by-default claim).
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${BACKEND_URL}/api/voice/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: VoiceCap | null) => {
+        if (d && !cancelled) setVoiceCap(d);
+      })
+      .catch(() => {
+        /* status is informational — no need for a global error surface */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const startRecording = useCallback(async () => {
     setVoiceMsg("");
+    setVoiceOk(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
@@ -48,12 +86,15 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
           const json = await res.json();
           if (json.text) {
             setTopic(json.text);
-            setVoiceMsg("✓ Transcribed — review and submit");
+            setVoiceMsg("Transcribed — review it and submit");
+            setVoiceOk(true);
           } else {
             setVoiceMsg(json.warning ?? "Could not understand audio — please type instead.");
+            setVoiceOk(false);
           }
         } catch {
           setVoiceMsg("Voice unavailable right now — please type instead.");
+          setVoiceOk(false);
         }
         setVoiceState("idle");
       };
@@ -174,6 +215,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
             onClick={handleMicClick}
             disabled={isRunning || voiceState === "transcribing"}
             title={voiceState === "recording" ? "Stop recording" : "Speak your business description"}
+            aria-label={voiceState === "recording" ? "Stop voice recording" : "Record voice description"}
             whileTap={{ scale: 0.9 }}
             animate={voiceState === "recording" ? { boxShadow: ["0 0 0 0px rgba(248,113,113,0.4)", "0 0 0 8px rgba(248,113,113,0)"] } : {}}
             transition={voiceState === "recording" ? { duration: 1, repeat: Infinity } : {}}
@@ -205,22 +247,36 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
         {/* Voice status/hint */}
         <AnimatePresence>
           {(voiceState !== "idle" || voiceMsg) && (
-            <motion.p
+            <motion.div
               key="voice-msg"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
                 fontSize: "0.76rem",
-                color: voiceMsg.startsWith("✓") ? "var(--success)" : voiceState === "recording" ? "#f87171" : "var(--text-muted)",
+                color:
+                  voiceOk ? "var(--success)"
+                  : voiceState === "recording" ? "#f87171"
+                  : "var(--text-muted)",
                 marginBottom: "8px",
                 paddingLeft: "2px",
+                overflow: "hidden",
               }}
             >
-              {voiceState === "recording" ? "🎙 Recording… click mic again to stop"
-                : voiceState === "transcribing" ? "Transcribing…"
-                : voiceMsg}
-            </motion.p>
+              {voiceState === "recording" && <Mic size={12} color="#f87171" />}
+              {voiceState === "transcribing" && (
+                <Loader size={12} color="var(--accent)" style={{ animation: "spin 1s linear infinite" }} />
+              )}
+              {voiceOk && <Check size={12} color="var(--success)" />}
+              <span>
+                {voiceState === "recording" ? "Recording — click the mic again to stop"
+                  : voiceState === "transcribing" ? "Transcribing…"
+                  : voiceMsg}
+              </span>
+            </motion.div>
           )}
         </AnimatePresence>
 
@@ -248,6 +304,47 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Voice privacy & engine chip (from /api/voice/status) */}
+        {voiceCap && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 12px",
+              marginBottom: "16px",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            <ShieldCheck
+              size={14}
+              color={voiceCap.private_by_default ? "var(--success)" : "var(--accent)"}
+              aria-hidden="true"
+            />
+            <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
+              {voiceCap.private_by_default ? (
+                <>
+                  Voice runs <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>privately on the
+                  server</strong> — open-source engines, your recording never leaves it. STT:{" "}
+                  <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                    {engineLabel(voiceCap.stt_default)}
+                  </strong>{" "}
+                  · TTS: <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                    {engineLabel(voiceCap.tts_default)}
+                  </strong>
+                </>
+              ) : (
+                <>
+                  Voice is powered by <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                    ElevenLabs cloud</strong> for the best quality.
+                </>
+              )}
+            </span>
+          </div>
+        )}
 
         {/* Footer row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>

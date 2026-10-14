@@ -230,6 +230,12 @@ def test_langchain_status(client):
     body = r.json()
     assert body["available"] is True
     assert "web_search_tool" in body["tools"]
+    # Agentic engine metadata is exposed for operators.
+    agentic = body["agentic"]
+    assert agentic["engine"] in ("langgraph", "native")
+    assert "web_search" in agentic["tools"]
+    node_ids = {n["id"] for n in agentic["nodes"]}
+    assert {"planner", "supervisor", "finalize"} <= node_ids
 
 
 def test_whatsapp_verify_unconfigured(client):
@@ -312,6 +318,9 @@ def test_chat_api_uses_saved_session_profile(client, monkeypatch):
 
 def test_workflow_injects_and_persists_profile(monkeypatch):
     import backend.workflows.executor as ex
+    from backend.agentic import nodes as nodes_mod
+    from backend.agentic import supervisor as supervisor_mod
+    from backend.agentic import tools as tools_mod
     from backend.core.memory import delete_session, load_last_session
 
     sid = "test-profile-workflow-session"
@@ -324,12 +333,18 @@ def test_workflow_injects_and_persists_profile(monkeypatch):
         async def send_json(self, payload):
             self.events.append(payload)
 
+    async def _boom(*args, **kwargs):
+        raise RuntimeError("LLM down (test)")
+
     async def _planner(topic, previous_context="", agent_hint=None):
         captured["planner_topic"] = topic
         return ["research tea stall demand"]
 
-    async def _research(task, agent_hint=None):
+    async def _research(task, agent_hint=None, live_context=None):
         return "local findings"
+
+    async def _schemes(task, agent_hint=None):
+        return "scheme text"
 
     async def _writer(task, agent_hint=None):
         captured["writer_task"] = task
@@ -341,11 +356,21 @@ def test_workflow_injects_and_persists_profile(monkeypatch):
     async def _simplifier(advisory_json, topic=""):
         return "plain summary"
 
-    monkeypatch.setattr(ex, "planner_agent", _planner)
-    monkeypatch.setattr(ex, "writer_agent", _writer)
-    monkeypatch.setattr(ex, "editor_agent", _editor)
-    monkeypatch.setattr(ex, "simplifier_agent", _simplifier)
-    monkeypatch.setitem(ex.AGENT_REGISTRY, "research_agent", _research)
+    # Force the routing/reflection LLM calls down to their deterministic tiers.
+    monkeypatch.setattr(nodes_mod, "call_llm", _boom)
+    monkeypatch.setattr(supervisor_mod, "call_llm", _boom)
+    # Neutralize the live web tool so the test stays offline.
+    async def _no_web(query):
+        return ""
+
+    monkeypatch.setattr(tools_mod.TOOLS["web_search"], "afn", _no_web)
+
+    monkeypatch.setattr(nodes_mod, "planner_agent", _planner)
+    monkeypatch.setattr(nodes_mod, "research_agent", _research)
+    monkeypatch.setattr(nodes_mod, "opportunity_agent", _schemes)
+    monkeypatch.setattr(nodes_mod, "writer_agent", _writer)
+    monkeypatch.setattr(nodes_mod, "editor_agent", _editor)
+    monkeypatch.setattr(nodes_mod, "simplifier_agent", _simplifier)
 
     ws = _FakeWS()
     profile = "Business profile: farm / dairy / agriculture business"

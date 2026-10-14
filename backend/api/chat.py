@@ -11,12 +11,19 @@ reply, and the agent carries its own heuristic offline guarantee.
 """
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.agents.chat import chat_agent
+from backend.api.schemas import (
+    ChatDeleteResponse,
+    ChatHistoryResponse,
+    ChatRequest,
+    ChatResponse,
+)
 from backend.core.memory import (
     clear_chat,
+    is_valid_session_id,
     load_chat_history,
     load_last_session,
     save_chat_message,
@@ -25,19 +32,8 @@ from backend.core.memory import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# Input caps (P0) — bounded prompts keep token costs sane and reject junk early.
-_SESSION_ID_PATTERN = r"^[A-Za-z0-9_-]{0,64}$"
 
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., max_length=4000)
-    session_id: str = Field("", max_length=64, pattern=_SESSION_ID_PATTERN)
-    topic: str = Field("", max_length=2000)
-    lang: str = Field("auto", max_length=8)  # "auto" | "hi" | "en"
-    profile: str = Field("", max_length=1500)  # Business Check-up snippet (falls back to session state)
-
-
-@router.post("")
+@router.post("", response_model=ChatResponse)
 async def chat(body: ChatRequest):
     message = body.message.strip()
     session_id = body.session_id.strip()
@@ -87,7 +83,7 @@ async def chat(body: ChatRequest):
     }
 
 
-@router.get("/history")
+@router.get("/history", response_model=ChatHistoryResponse)
 async def chat_history(session_id: str = ""):
     if not session_id:
         return {"messages": []}
@@ -99,10 +95,15 @@ async def chat_history(session_id: str = ""):
     return {"messages": messages}
 
 
-@router.delete("/{session_id}")
+@router.delete("/{session_id}", response_model=ChatDeleteResponse)
 async def delete_chat_route(session_id: str):
+    # P0: reject a bad session id up front instead of swallowing the failure
+    # and reporting "cleared" when nothing was deleted.
+    if not is_valid_session_id(session_id):
+        raise HTTPException(status_code=422, detail="Invalid session id.")
     try:
         clear_chat(session_id)
     except Exception as e:
         logger.error(f"[Chat] Failed to clear memory for {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not clear chat memory. Please try again.")
     return {"status": "cleared", "session_id": session_id}

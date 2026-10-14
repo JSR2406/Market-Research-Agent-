@@ -12,37 +12,36 @@ endpoint never returns a hard 500.
 import logging
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+
+from backend.api.schemas import (
+    LangChainRunRequest,
+    LangChainRunResponse,
+    LangChainStatusResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/langchain", tags=["langchain"])
 
 
-class LangChainRunRequest(BaseModel):
-    input: str = Field(..., min_length=1, max_length=4000)
-    system_prompt: str = Field(
-        default="You are a helpful business advisor for micro-entrepreneurs in India.",
-        max_length=2000,
-    )
-    agent_hint: str = "default"
-    temperature: float = 0.7
-    max_tokens: int = 500
-
-
-@router.get("/status")
+@router.get("/status", response_model=LangChainStatusResponse)
 async def langchain_status():
     from backend.core import config
-    from backend.core.langchain_adapter import ADVISORY_TOOLS, LANGCHAIN_AVAILABLE
+    from backend.core.langchain_adapter import (
+        ADVISORY_TOOLS,
+        LANGCHAIN_AVAILABLE,
+        agentic_status,
+    )
 
     return {
         "available": LANGCHAIN_AVAILABLE,
         "provider_priority": config.LLM_PROVIDER_PRIORITY,
         "model": config.MODEL,
         "tools": [getattr(t, "name", str(t)) for t in ADVISORY_TOOLS],
+        "agentic": agentic_status(),
     }
 
 
-@router.post("/run")
+@router.post("/run", response_model=LangChainRunResponse)
 async def langchain_run(body: LangChainRunRequest):
     from backend.core.langchain_adapter import (
         LANGCHAIN_AVAILABLE,

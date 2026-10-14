@@ -1,0 +1,21 @@
+# Vercel CLI uploads: only the Next.js app is built by this project
+# (Vercel project "market-research-agent" has Root Directory = frontend).
+# Everything else is excluded so the Python backend — including backend/.env
+# secrets and runtime session JSON — is never uploaded to Vercel.
+
+backend/
+tests/
+assets/
+.agents/
+.venv/
+__pycache__/
+.pytest_cache/
+
+dev*.log
+dev.pid
+run.ps1
+*.md
+
+frontend/.vercel/
+frontend/.next/
+frontend/node_modules/

@@ -110,6 +110,20 @@ def test_next_question_is_localised():
     assert re.search(r"[A-Za-z]", next_question(farm, "en"))
 
 
+def test_product_words_do_not_make_saathi_ask_farming_questions():
+    """
+    Regression: "goat milk soap from my home" is a home-based producer, not a
+    farmer. The adaptive question must not ask them what they grow.
+    """
+    soap = {"business": "I make and sell goat milk soap from my home in Pune"}
+    question = next_question(soap, "en")
+    assert "grow" not in question.lower()
+    assert "sell" in question.lower()
+
+    dairy = {"business": "I run a dairy farm with 8 cows"}
+    assert "grow" in next_question(dairy, "en").lower()
+
+
 def test_scale_question_is_land_specific_for_farmers():
     # Everything ahead of `scale` in the priority order answered, so the next
     # question is the size question — worded for the business already described.

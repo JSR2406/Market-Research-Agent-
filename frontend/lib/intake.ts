@@ -40,8 +40,18 @@ export function answerLabel(answers: IntakeAnswers, id: string): string {
   return (answers[id] || "").trim();
 }
 
-const isFarm = (a: IntakeAnswers) => /farm|dairy|cow|goat|poultry|chicken|agri|khet|zameen|kheti|दुग्ध|पशु|खेती/i.test(a.business || "");
-const isService = (a: IntakeAnswers) => /service|repair|tuition|home[- ]?based|freelance|salon|tailor|सेवा|सिलाई|ट्यूशन|फ्रीलांस/i.test(a.business || "");
+// Strong business-type signals only. Bare animal/product words are excluded:
+// someone who "makes goat milk soap from my home" is a home-based producer, not
+// a farmer — asking them what they grow would read as nonsense. Must stay in
+// sync with `_FARM_RE` / `_SERVICE_RE` in backend/core/intake.py.
+const isFarm = (a: IntakeAnswers) =>
+  /farm|farmland|dairy|cattle|poultry|goat\s*farm|cow\s*farm|chicken\s*farm|agr[iie]?|agriculture|kheti|khet|zameen|kisan|पशुपालन|पालन|डेयरी|खेती|किसान|खेत|ज़मीन/i.test(
+    a.business || ""
+  );
+const isService = (a: IntakeAnswers) =>
+  /service|repair|tuition|home[- ]?based|home\s*business|freelance|salon|tailor|सेवा|सिलाई|ट्यूशन|फ्रीलांस|घर\s*पर/i.test(
+    a.business || ""
+  );
 
 export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   {

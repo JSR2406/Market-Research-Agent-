@@ -114,14 +114,20 @@ GAP_PRIORITY: Tuple[str, ...] = (
 
 # Keywords that let the follow-up question adapt to the user's business type,
 # e.g. a farmer is asked what they grow rather than what they sell.
+#
+# These are deliberately STRONG signals only. Single animal/product words are
+# excluded on purpose: someone who "makes goat milk soap from my home" is a
+# home-based producer, not a farmer, and asking them what they grow reads as
+# nonsense. Bare "goat" / "cow" / "milk" only count next to a business noun.
 _FARM_RE = re.compile(
-    r"\b(farm|farming|dairy|cattle|cow|goat|poultry|chicken|agri|agriculture|"
-    r"khet|zameen|dairy|दुग्ध|पशु|खेती|किसान)\w*",
+    r"\b(farm|farming|farmland|dairy|cattle|poultry|goat\s*farm|cow\s*farm|"
+    r"chicken\s*farm|agr[iie]?|agriculture|kheti|khet|zameen|kisan|"
+    r"पशुपालन|पालन|डेयरी|खेती|किसान|खेत|ज़मीन)\w*",
     re.IGNORECASE,
 )
 _SERVICE_RE = re.compile(
-    r"\b(service|tailor|repair|tuition|home[- ]?based|freelance|salon|"
-    r"व्यापार|सेवा|सिलाई|ट्यूशन|फ्रीलांस)\w*",
+    r"\b(service|repair|tuition|home[- ]?based|home\s*business|freelance|salon|"
+    r"tailor|सेवा|सिलाई|ट्यूशन|फ्रीलांस|घर\s*पर)\w*",
     re.IGNORECASE,
 )
 

@@ -21,6 +21,7 @@ from backend.api.schemas import (
     ChatRequest,
     ChatResponse,
 )
+from backend.core.intake import build_intake_snippet, normalize_intake
 from backend.core.memory import (
     clear_chat,
     is_valid_session_id,
@@ -39,6 +40,8 @@ async def chat(body: ChatRequest):
     session_id = body.session_id.strip()
     topic = body.topic.strip()
     profile = body.profile.strip()
+    # Structured intake from the client, normalized before any agent sees it.
+    intake = normalize_intake(body.intake)
 
     if not message:
         return {"reply": "Please type a question first.", "session_id": session_id, "history_count": 0}
@@ -54,6 +57,10 @@ async def chat(body: ChatRequest):
                 topic = topic or prior.get("topic", "")
                 advisory_context = (prior.get("state", {}).get("final_report", "") or "")[:3000]
                 profile = profile or (prior.get("state", {}).get("profile", "") or "")
+                # The intake saved with the last run is the fallback when the
+                # client sends none — the same layer, still personalised.
+                if not intake:
+                    intake = normalize_intake(prior.get("state", {}).get("intake", {}) or {})
         except Exception as e:
             logger.error(f"[Chat] Failed to load advisory context for {session_id}: {e}")
 
@@ -66,7 +73,8 @@ async def chat(body: ChatRequest):
             advisory_context=advisory_context,
             chat_history=history,
             lang=body.lang,
-            profile=profile,
+            profile=profile or build_intake_snippet(intake),
+            intake=intake,
         )
     except Exception as e:
         logger.error(f"[Chat] chat_agent raised unexpectedly: {e}")

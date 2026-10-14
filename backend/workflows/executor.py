@@ -14,9 +14,11 @@ terminal ``done`` event (with the full agentic trace) and persists the session.
 import logging
 
 import json
+from typing import Dict, Optional
 
 from backend.agentic import EventEmitter, run_agentic_workflow
 from backend.agentic import engine_name
+from backend.core.intake import build_intake_snippet, normalize_intake
 from backend.core.llm_client import SESSION_TOKEN_USAGE, reset_session_state
 
 logger = logging.getLogger(__name__)
@@ -60,15 +62,22 @@ async def run_research_workflow(
     session_context: str = "",
     session_id: str = "",
     profile: str = "",
+    intake: Optional[Dict[str, str]] = None,
 ) -> None:
     """
     Run the agentic advisory graph. ``session_context`` is an optional string
-    injected by ws_market.py when a previous session is resumed. ``profile`` is
-    the Business Check-up intake snippet (frontend folds it into topic too; we
-    keep it separate so it is injected into synthesis explicitly and persisted
-    for the chat advisor).
+    injected by ws_market.py when a previous session is resumed.
+
+    ``intake`` is the structured Business Check-up answers ({field_id: text}).
+    This is the single intake layer: the canonical snippet built from it is what
+    the run topic, the synthesis prompts and the advisor chat all consume, so the
+    written advisory and any follow-up question answer agree. ``profile`` is the
+    legacy flat-string form and is only used when no structured intake arrived.
     """
     reset_session_state()
+
+    # One canonical profile string, built once, from the structured answers.
+    profile = build_intake_snippet(intake) or (profile or "").strip()
 
     # Collect genuinely-fetched research source URLs for provenance on `done`.
     from backend.core.web_research import set_run_source_sink
@@ -80,6 +89,9 @@ async def run_research_workflow(
     # only sent it as a separate field (never duplicate it if already folded in).
     if profile and profile not in topic:
         topic = f"{profile}. {topic}"
+
+    # Normalized once here so what we persist matches what the graph saw.
+    intake_answers = normalize_intake(intake)
 
     emitter = EventEmitter(websocket, cancel_flag)
     emitter.set_token_usage_getter(lambda: SESSION_TOKEN_USAGE)
@@ -143,6 +155,7 @@ async def run_research_workflow(
                 "simplified_report": simplified_report,
                 "token_usage": SESSION_TOKEN_USAGE.copy(),
                 "profile": profile,
+                "intake": intake_answers,
                 "trace": emitter.trace,
                 "engine": engine_name(),
                 "visited": state.get("visited") or [],

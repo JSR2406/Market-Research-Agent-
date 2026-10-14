@@ -21,7 +21,11 @@ class ChatRequest(BaseModel):
     session_id: str = Field("", max_length=64, pattern=_SESSION_ID_PATTERN)
     topic: str = Field("", max_length=2000)
     lang: str = Field("auto", max_length=8)  # "auto" | "hi" | "en"
-    profile: str = Field("", max_length=1500)  # Business Check-up snippet (falls back to session state)
+    profile: str = Field("", max_length=1500)
+    # Structured Business Check-up answers {field_id: text}. This is the single
+    # intake layer shared with the research run; normalize_intake() drops
+    # unknown ids and caps every value before it reaches an agent.
+    intake: Dict[str, str] = Field(default_factory=dict)
 
 
 class ChatResponse(BaseModel):

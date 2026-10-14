@@ -19,6 +19,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.core.config import ALLOWED_ORIGINS
+from backend.core.intake import normalize_intake
 from backend.core.memory import (
     build_resume_context,
     delete_session,
@@ -58,6 +59,11 @@ def _origin_allowed(websocket: WebSocket) -> bool:
 
 def _as_str(value) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _as_intake(value) -> dict:
+    """Structured Business Check-up answers — normalized before any agent sees them."""
+    return normalize_intake(value if isinstance(value, dict) else None)
 
 
 def _safe_int(value, default: int) -> int:
@@ -106,6 +112,7 @@ async def market_research_websocket(websocket: WebSocket):
             if msg_type == "start":
                 topic = _as_str(msg.get("topic"))[:MAX_TOPIC_CHARS]
                 profile = _as_str(msg.get("profile"))[:MAX_PROFILE_CHARS]
+                intake = _as_intake(msg.get("intake"))
                 session_id = _as_str(msg.get("session_id"))
                 max_steps = max(1, min(_safe_int(msg.get("max_steps", 4), 4), 6))
 
@@ -146,6 +153,7 @@ async def market_research_websocket(websocket: WebSocket):
                         session_context=session_context,
                         session_id=session_id,
                         profile=profile,
+                        intake=intake,
                     )
                 )
 

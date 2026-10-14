@@ -19,6 +19,13 @@ import re
 from typing import Dict, List, Optional
 
 from backend.core.heuristics import match_schemes, schemes_brief
+from backend.core.intake import (
+    build_intake_snippet,
+    followup_instruction,
+    missing_fields,
+    next_question,
+    normalize_intake,
+)
 from backend.core.llm_client import call_llm
 
 logger = logging.getLogger(__name__)
@@ -139,15 +146,24 @@ async def chat_agent(
     agent_hint: str = "chat",
     lang: str = "auto",
     profile: str = "",
+    intake: Optional[Dict] = None,
 ) -> str:
     """
     Answer a single chat turn. `chat_history` is the recent remembered
     conversation; `advisory_context` is the latest written advisory for the
     session, used when the user asks about their own report. `lang` is one of
-    "auto" | "hi" | "en". `profile` is the Business Check-up intake snippet —
-    the advisor tailors answers to it and asks follow-up questions from it.
+    "auto" | "hi" | "en". `intake` is the structured Business Check-up
+    answers ({field_id: text}) — the single intake layer shared with the
+    research run. From it we derive the profile snippet and, deterministically,
+    which detail is still missing so Saathi asks for it instead of guessing.
     """
     effective = _effective_lang(message, lang)
+
+    # One intake layer: the structured answers always win over a caller-supplied
+    # profile string, so the chat and the research run always agree.
+    intake_answers = normalize_intake(intake)
+    profile = build_intake_snippet(intake_answers) or (profile or "").strip()
+    missing = missing_fields(intake_answers)
 
     history: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
@@ -181,15 +197,36 @@ async def chat_agent(
         history.append({
             "role": "system",
             "content": (
-                "The user's Business Check-up intake answers: "
-                + profile[:500]
-                + "\nTailor every answer to this profile (business type, stage, "
-                "earnings band, borrowing history, main need). When the user's "
-                "question needs more detail to answer well, ask ONE short "
-                "targeted follow-up question drawn from these answers — never "
-                "re-ask something already covered here."
+                "The user's Business Check-up intake answers:\n"
+                + profile[:1000]
+                + "\nTailor every answer to this profile (business type, what they "
+                "sell, size, time running, earnings, location, registration, "
+                "borrowing history, main need). Never re-ask anything already "
+                "answered here."
             ),
         })
+
+    # Deterministic gap detection — this is the intake layer doing its job:
+    # we know exactly which detail is still missing, so Saathi asks for that
+    # one instead of giving generic advice. See backend/core/intake.py.
+    gap_note = followup_instruction(intake_answers, effective)
+    if gap_note:
+        history.append({"role": "system", "content": gap_note})
+
+    # First turn of a session with a nearly-empty intake: open with the intake
+    # question rather than answering blind.
+    if not chat_history and len(missing) >= 3:
+        opener = next_question(intake_answers, effective)
+        if opener:
+            history.append({
+                "role": "system",
+                "content": (
+                    "This is the first message of this conversation and the user "
+                    "has barely filled in their Business Check-up. Start by asking "
+                    f'them exactly this, in their language, then answer their '
+                    f'message: "{opener}"'
+                ),
+            })
 
     if advisory_context:
         history.append({
@@ -217,15 +254,34 @@ async def chat_agent(
     except Exception as e:
         logger.error(f"[Chat] LLM failed, using heuristic fallback: {e}")
 
-    return _heuristic_reply(message, topic, effective, profile)
+    return _heuristic_reply(message, topic, effective, profile, intake_answers)
 
 
-def _heuristic_reply(message: str, topic: str, lang: str, profile: str = "") -> str:
+def _heuristic_reply(
+    message: str,
+    topic: str,
+    lang: str,
+    profile: str = "",
+    intake: Optional[Dict] = None,
+) -> str:
     """Deterministic, offline answer — specialised, actionable, on-scope."""
     lower = message.lower()
     hindi = lang == "hi"
+    answers = normalize_intake(intake)
     # Profile labels (kiosk/vendor/farm…) widen scheme matching offline too.
     schemes = match_schemes(f"{topic} {profile}".strip() or message)
+
+    # The intake layer still works with every LLM provider down: when the user
+    # has not told us what their business is yet, ask instead of guessing.
+    if not answers.get("business") and not schemes:
+        question = next_question(answers, lang)
+        opener = (
+            f"सबसे पहले ये बताइए — {question}"
+            if hindi
+            else f"First, tell me one thing — {question}"
+        )
+        body = _HI_GENERIC if hindi else _EN_GENERIC
+        return f"{opener}\n\n{body}"
 
     if any(k in lower for k in _DOC_KEYWORDS):
         body = _HI_DOC if hindi else _EN_DOC

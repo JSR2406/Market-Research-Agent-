@@ -7,8 +7,9 @@ import AdvisoryCard from "@/components/AdvisoryCard";
 import ChatPanel from "@/components/ChatPanel";
 import Usps from "@/components/Usps";
 const LiveAdvisorPanel = dynamic(() => import("@/components/LiveAdvisorPanel"), { ssr: false });
-import StartupQuiz, { buildProfileSnippet, type ProfileInit } from "@/components/StartupQuiz";
+import StartupQuiz, { type ProfileInit } from "@/components/StartupQuiz";
 const CashflowSimulator = dynamic(() => import("@/components/CashflowSimulator"), { ssr: false });
+import { migrateIntake } from "@/lib/intake";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, MessageCircle, X } from "lucide-react";
 import { API_BASE, WS_URL } from "@/lib/api";
@@ -29,6 +30,7 @@ export default function ResearchPage() {
     maxSteps: number;
     sessionId: string;
     profile: string;
+    intake: ProfileInit;
   } | null>(null);
 
   const [isRunning, setIsRunning] = useState(false);
@@ -66,12 +68,13 @@ export default function ResearchPage() {
       // localStorage unavailable (private mode) — chat degrades to stateless.
     }
 
-    // Restore the optional Business Check-up answers.
+    // Restore the optional Business Check-up answers. migrateIntake() also
+    // upgrades the older chip-code format written by previous versions.
     try {
       const savedProfile = window.localStorage.getItem(PROFILE_KEY);
       if (savedProfile) {
-        const parsed = JSON.parse(savedProfile) as ProfileInit;
-        if (parsed && typeof parsed === "object") setProfile(parsed);
+        const parsed = migrateIntake(JSON.parse(savedProfile));
+        if (parsed && Object.keys(parsed).length) setProfile(parsed);
       }
     } catch {
       /* noop */
@@ -306,18 +309,16 @@ export default function ResearchPage() {
     setErrorMessage("");
     retriesRef.current = 0;
 
-    // Enrich the topic with the Business Check-up answers (deterministic — no LLM call).
-    const profileSnippet = buildProfileSnippet(profile);
-    const startTopic = profileSnippet ? `${profileSnippet}. ${topic}` : topic;
-
-    // The profile also travels as its own field so the backend can inject it
-    // into synthesis explicitly and save it for follow-up chat questions.
+    // The Business Check-up answers travel as STRUCTURED data ({field_id: text}).
+    // The backend owns the canonical snippet from them — it is folded into the
+    // run topic, injected into synthesis and persisted for the advisor chat, so
+    // every surface reads the same intake. No extra LLM calls.
     const payload = {
       type: "start",
-      topic: startTopic,
+      topic,
       max_steps: maxSteps,
       session_id: sessionId,
-      profile: profileSnippet,
+      intake: profile,
     };
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -325,7 +326,7 @@ export default function ResearchPage() {
       return;
     }
 
-    pendingStartRef.current = { topic: startTopic, maxSteps, sessionId, profile: profileSnippet };
+    pendingStartRef.current = { topic, maxSteps, sessionId, profile: "", intake: profile };
     connectWs((ws) => {
       const pending = pendingStartRef.current;
       if (pending) {
@@ -335,7 +336,7 @@ export default function ResearchPage() {
             topic: pending.topic,
             max_steps: pending.maxSteps,
             session_id: pending.sessionId,
-            profile: pending.profile,
+            intake: pending.intake,
           })
         );
         pendingStartRef.current = null;
@@ -527,11 +528,13 @@ export default function ResearchPage() {
       {/* Cash-flow simulator — self-serve financial viz, runs locally */}
       <CashflowSimulator />
 
-      {/* Personal business advisor chat — remembers this session, your report and Business Check-up answers */}
+      {/* Personal business advisor chat — one intake layer: it knows the same
+          Business Check-up answers the research run used, and asks for what is
+          still missing. */}
       <ChatPanel
         sessionId={sessionId}
         topic={currentTopic}
-        profile={buildProfileSnippet(profile)}
+        intake={profile}
       />
 
       {/* Realtime voice advisor (LiveKit) */}

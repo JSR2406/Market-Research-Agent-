@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Banknote,
   Bot,
+  CircleHelp,
   FileText,
   Languages,
   Loader2,
@@ -14,6 +15,11 @@ import {
   User,
 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import {
+  buildIntakeSummary,
+  describeMissingIntake,
+  type IntakeAnswers,
+} from "@/lib/intake";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -31,21 +37,26 @@ const QUICK_PROMPTS = [
   { icon: TrendingUp, label: "Start with ₹1 lakh?", lang: "en" },
 ];
 
-function welcome(topic: string) {
+function welcome(topic: string, intake: IntakeAnswers) {
+  const known = buildIntakeSummary(intake);
+  const missing = describeMissingIntake(intake);
   if (topic.trim()) {
-    return `I've read your “${topic}” business report — I'm your personal advisor now. Ask me about your loan eligibility, the documents to carry, or your next steps. आप हिंदी में भी पूछ सकते हैं।`;
+    return `I've read your “${topic}” business report — I'm your personal advisor now.${known ? ` I also have your Business Check-up answers (${known}).` : ""} Ask me about your loan eligibility, the documents to carry, or your next steps. आप हिंदी में भी पूछ सकते हैं।`;
   }
-  return "Hi, I'm your personal business advisor. Run a research above and I'll learn your business — then ask me about loans, schemes, documents, or how to get loan-ready.";
+  if (known) {
+    return `Hi, I'm your personal business advisor. I have your Business Check-up answers: ${known}.${missing ? ` ${missing} — tell me and I'll get more specific.` : " That's everything I need — ask me anything about your business or loan."}`;
+  }
+  return "Hi, I'm your personal business advisor. Fill in the Business Check-up above or just tell me about your business — then ask me about loans, schemes, documents, or how to get loan-ready.";
 }
 
 export default function ChatPanel({
   sessionId,
   topic,
-  profile = "",
+  intake,
 }: {
   sessionId: string;
   topic: string;
-  profile?: string;
+  intake: IntakeAnswers;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -112,7 +123,7 @@ export default function ChatPanel({
         const res = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, session_id: sessionId, topic, lang, profile }),
+          body: JSON.stringify({ message: text, session_id: sessionId, topic, lang, intake }),
         });
         const body = await res.json();
         const reply =
@@ -133,7 +144,7 @@ export default function ChatPanel({
         setIsLoading(false);
       }
     },
-    [input, isLoading, sessionId, topic, lang, profile]
+    [input, isLoading, sessionId, topic, lang, intake]
   );
 
   const clearChat = useCallback(async () => {
@@ -148,9 +159,12 @@ export default function ChatPanel({
     inputRef.current?.focus();
   }, [sessionId]);
 
+  const intakeSummary = buildIntakeSummary(intake);
+  const intakeMissing = describeMissingIntake(intake);
+
   const displayMessages: ChatMessage[] =
     messages.length === 0 && !isLoading
-      ? [{ role: "assistant", content: welcome(topic) }]
+      ? [{ role: "assistant", content: welcome(topic, intake) }]
       : messages;
 
   return (
@@ -191,9 +205,9 @@ export default function ChatPanel({
           </div>
           <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
             {topic.trim()
-              ? `Knows your “${topic}” business${profile ? " and your Business Check-up answers" : ""} — follow-ups come straight from your report.`
-              : profile
-                ? "Knows your Business Check-up answers — ask follow-ups about your plan anytime."
+              ? `Knows your “${topic}” business${intakeSummary ? " and your Business Check-up answers" : ""} — follow-ups come straight from your report.`
+              : intakeSummary
+                ? `Knows your Business Check-up answers (${intakeSummary}) — ask follow-ups about your plan anytime.`
                 : sessionId
                   ? "Remembers this conversation — run a research above and I'll learn your business."
                   : "Chatting without saved memory."}
@@ -254,7 +268,7 @@ export default function ChatPanel({
       </div>
 
       {/* Personalised context badge */}
-      {(topic.trim() || profile) && (
+      {(topic.trim() || intakeSummary) && (
         <div
           style={{
             display: "flex",
@@ -266,13 +280,37 @@ export default function ChatPanel({
             border: "1px solid rgba(255,255,255,0.1)",
             borderRadius: "999px",
             alignSelf: "flex-start",
+            maxWidth: "100%",
           }}
         >
-          <Sparkles size={12} color="var(--accent)" />
+          <Sparkles size={12} color="var(--accent)" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
             {topic.trim()
               ? `Personalised for your “${topic}” business — answers are grounded in your report, not generic advice.`
               : "Personalised from your Business Check-up answers — advice and follow-up questions are shaped by them."}
+          </span>
+        </div>
+      )}
+
+      {/* What Saathi still needs — the same gap list the backend asks from */}
+      {intakeMissing && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            marginBottom: "10px",
+            padding: "6px 12px",
+            background: "rgba(251,146,60,0.08)",
+            border: "1px solid rgba(251,146,60,0.25)",
+            borderRadius: "999px",
+            alignSelf: "flex-start",
+            maxWidth: "100%",
+          }}
+        >
+          <CircleHelp size={12} color="var(--warn)" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: "0.72rem", color: "var(--warn)" }}>
+            {intakeMissing} — ask me now, or fill the Business Check-up above.
           </span>
         </div>
       )}

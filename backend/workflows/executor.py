@@ -34,6 +34,8 @@ def _finalize_report(
     sources: list | None = None,
     eligibility: dict | None = None,
     ledger: dict | None = None,
+    plan: dict | None = None,
+    plan_run: dict | None = None,
 ) -> str:
     """
     Single deterministic post-pass on the LLM-written advisory:
@@ -72,6 +74,18 @@ def _finalize_report(
             "business_label": eligibility.get("business_label", ""),
             "amount": eligibility.get("amount"),
             "families": eligibility.get("families") or [],
+        }
+    if plan:
+        data["plan"] = {
+            "goal": plan.get("goal", ""),
+            "steps": plan.get("steps") or [],
+        }
+    if plan_run:
+        data["plan_run"] = {
+            "ok": plan_run.get("ok", False),
+            "completed": plan_run.get("completed", []),
+            "failed": plan_run.get("failed", []),
+            "results": plan_run.get("results") or [],
         }
     if ledger:
         data["action_ledger"] = {
@@ -177,6 +191,8 @@ async def run_research_workflow(
         sources=state.get("sources") or [],
         eligibility=eligibility,
         ledger=scored,
+        plan=state.get("compiled_plan"),
+        plan_run=state.get("plan_run"),
     )
     simplified_report = state.get("simplified") or ""
     plan_steps = state.get("plan") or []

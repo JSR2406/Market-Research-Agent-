@@ -97,6 +97,7 @@ async def run_research_workflow(
     session_id: str = "",
     profile: str = "",
     intake: Optional[Dict[str, str]] = None,
+    lang: str = "en",
 ) -> None:
     """
     Run the agentic advisory graph. ``session_context`` is an optional string
@@ -148,6 +149,7 @@ async def run_research_workflow(
     eligibility = evaluate_schemes(intake_answers, topic)
     scored = ledger_and_score(intake_answers, topic, completed=completed_actions, eligibility=eligibility)
     eligibility_note = eligibility_note_for(eligibility)
+    output_lang = lang if lang in ("en", "hi") else "en"
 
     emitter = EventEmitter(websocket, cancel_flag)
     emitter.set_token_usage_getter(lambda: SESSION_TOKEN_USAGE)
@@ -161,6 +163,7 @@ async def run_research_workflow(
             profile=profile,
             session_id=session_id,
             eligibility_note=eligibility_note,
+            output_lang=output_lang,
         )
     finally:
         set_run_source_sink(None)

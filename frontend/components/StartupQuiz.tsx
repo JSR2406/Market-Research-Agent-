@@ -11,11 +11,13 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
   activeQuestions,
   describeMissingIntake,
   intakeProgress,
   isCustomAnswer,
+  optionLabel,
   questionPrompt,
   type IntakeAnswers,
   type IntakeQuestion,
@@ -32,6 +34,7 @@ export default function StartupQuiz({
   value: IntakeAnswers;
   onChange: (v: IntakeAnswers) => void;
 }) {
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   // Stepper: show ONE question at a time (progressive disclosure — much easier
   // on small screens and for low-literacy users than a wall of questions).
@@ -45,6 +48,7 @@ export default function StartupQuiz({
     business_label?: string;
     families?: { name: string; status: string; status_label: string }[];
     coverage?: { score?: number };
+    questions?: Record<string, string>;
   } | null>(null);
 
   // The question list is dynamic — branching questions appear once the earlier
@@ -99,14 +103,10 @@ export default function StartupQuiz({
   };
 
   // Ask the rule engine what the answers so far mean. Debounced so typing a
-  // free-text answer doesn't fire a request per keystroke, and skipped
-  // entirely until there is something to judge.
-  const answeredCount = Object.keys(value).length;
+  // free-text answer doesn't fire a request per keystroke. This also carries
+  // the question wording, so it must load even with zero answers or the first
+  // question would render in English on a Hindi page.
   useEffect(() => {
-    if (answeredCount === 0) {
-      setVerdict(null);
-      return;
-    }
     const controller = new AbortController();
     const timer = setTimeout(() => {
       (async () => {
@@ -114,7 +114,7 @@ export default function StartupQuiz({
           const res = await fetch(`${API_BASE}/api/eligibility`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ intake: value }),
+            body: JSON.stringify({ intake: value, lang: locale }),
             signal: controller.signal,
           });
           if (!res.ok) return;
@@ -129,9 +129,16 @@ export default function StartupQuiz({
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(value)]);
+  }, [JSON.stringify(value), locale]);
 
   const openNow = (verdict?.families ?? []).filter((f) => f.status === "eligible" || f.status === "likely");
+
+  // Question wording comes from the backend so the stepper and the gap
+  // detection can never drift; the local registry stays the fallback.
+  const promptFor = (q: (typeof questions)[number]): string => {
+    const fromApi = verdict?.questions?.[q.id];
+    return typeof fromApi === "string" && fromApi ? fromApi : questionPrompt(q, value);
+  };
 
   const nextQuestion = describeMissingIntake(value);
 
@@ -166,15 +173,15 @@ export default function StartupQuiz({
           </div>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: "0.85rem", fontWeight: 700 }}>
-              Business Check-up{" "}
-              <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>(optional)</span>
+              {t("quiz.title")}{" "}
+              <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>{t("quiz.optional")}</span>
             </p>
             <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
               {answered === 0
-                ? "A few quick questions, or type your own answers — Saathi asks the rest."
+                ? t("quiz.sub0")
                 : answered >= total
-                  ? `All ${answered} answered — your Saathi now knows your business.`
-                  : `${answered}/${total} answered — Saathi will ask you about the rest.`}
+                  ? t("quiz.subDone", { total: answered })
+                  : t("quiz.subPartial", { answered, total })}
             </p>
           </div>
           <motion.div animate={{ rotate: open ? 180 : 0 }} style={{ color: "var(--text-muted)", display: "flex" }}>
@@ -185,7 +192,7 @@ export default function StartupQuiz({
           <button
             type="button"
             title="Reset answers"
-            aria-label="Reset check-up answers"
+            aria-label={t("quiz.reset")}
             onClick={() => { onChange({}); setStep(0); setDraft(""); }}
             style={{ border: "none", background: "rgba(255,255,255,0.06)", borderRadius: "8px", padding: "6px", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", flexShrink: 0 }}
           >
@@ -223,21 +230,21 @@ export default function StartupQuiz({
               ))}
             </div>
             <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 600 }}>
-              Question {currentStep + 1} of {total}
+              {t("quiz.questionOf", { n: currentStep + 1, total })}
             </span>
           </div>
 
           <div>
             <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "9px" }}>
               <p style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", margin: 0, flex: 1 }}>
-                {questionPrompt(question, value)}
+                {promptFor(question)}
               </p>
               {(value[question.id] || "").trim() && (
                 <button
                   type="button"
                   onClick={() => clearAnswer(question.id)}
                   title="Clear this answer"
-                  aria-label={`Clear answer: ${questionPrompt(question, value)}`}
+                  aria-label={`${t("quiz.clearAnswer")}: ${promptFor(question)}`}
                   style={{
                     border: "none", background: "transparent", color: "var(--text-muted)",
                     cursor: "pointer", display: "flex", padding: "2px", flexShrink: 0,
@@ -267,7 +274,7 @@ export default function StartupQuiz({
                         borderRadius: "20px", padding: "6px 14px", cursor: "pointer", transition: "all 0.15s",
                       }}
                     >
-                      {opt.label}
+                      {optionLabel(opt.label, locale)}
                     </button>
                   );
                 })}
@@ -284,7 +291,7 @@ export default function StartupQuiz({
                 }}
               >
                 <PencilLine size={11} />
-                {custom ? "Your answer" : "Or type your own answer"}
+                {custom ? t("quiz.yourAnswer") : t("quiz.typeOwn")}
               </label>
               <div style={{ display: "flex", gap: "6px" }}>
                 <input
@@ -299,7 +306,7 @@ export default function StartupQuiz({
                     }
                   }}
                   placeholder={question.hint}
-                  aria-label={`${questionPrompt(question, value)} — type your own answer`}
+                  aria-label={`${promptFor(question)} — ${t("quiz.typeOwn")}`}
                   style={{
                     flex: 1, minWidth: 0,
                     background: "var(--bg-surface)",
@@ -316,7 +323,7 @@ export default function StartupQuiz({
                     type="button"
                     onClick={() => commitDraft()}
                     title="Save this answer"
-                    aria-label="Save this answer and continue"
+                    aria-label={t("quiz.saveAnswer")}
                     style={{
                       border: "none",
                       background: "linear-gradient(135deg, var(--accent), var(--accent2))",
@@ -346,7 +353,7 @@ export default function StartupQuiz({
                 cursor: currentStep === 0 ? "default" : "pointer", opacity: currentStep === 0 ? 0.5 : 1,
               }}
             >
-              <ChevronLeft size={13} /> Back
+              <ChevronLeft size={13} /> {t("quiz.back")}
             </button>
             {currentStep < total - 1 && (
               <button
@@ -358,21 +365,21 @@ export default function StartupQuiz({
                   border: "none", padding: "5px 8px", cursor: "pointer",
                 }}
               >
-                Skip
+                {t("quiz.skip")}
               </button>
             )}
             {answered >= total && (
               <span style={{ fontSize: "0.74rem", fontWeight: 600, color: "var(--success)", marginLeft: "auto" }}>
-                All {answered} answered
+                {t("quiz.allAnswered", { total: answered })}
               </span>
             )}
           </div>
 
           <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "12px" }}>
             {nextQuestion
-              ? `Your Saathi will ask you about the rest in chat: ${nextQuestion.replace(/^Still to tell me: /, "")}.`
-              : "Your Saathi has everything it needs — it will use these answers everywhere."}{" "}
-            Nothing is shared anywhere — it stays on your device.
+              ? t("quiz.askRest", { list: nextQuestion.replace(/^Still to tell me: /, "") })
+              : t("quiz.allSet")}{" "}
+            {t("quiz.staysLocal")}
           </p>
 
           {/* Live rule-engine verdict — shown while they answer */}
@@ -400,19 +407,16 @@ export default function StartupQuiz({
                 }}
               >
                 <Gavel size={12} />
-                {verdict.business_label
-                  ? `Your business type: ${verdict.business_label}`
-                  : "Your eligibility so far"}
+                {t("quiz.liveTitle", { label: verdict.business_label ?? "" })}
               </p>
               {openNow.length > 0 && (
                 <p style={{ margin: "4px 0 0", fontSize: "0.71rem", color: "var(--text-secondary)" }}>
-                  Open for you:{" "}
-                  {openNow.slice(0, 4).map((f) => f.name).join(", ")}
+                  {t("quiz.openForYou", { list: openNow.slice(0, 4).map((f) => f.name).join(", ") })}
                 </p>
               )}
               {typeof verdict.coverage?.score === "number" && (
                 <p style={{ margin: "3px 0 0", fontSize: "0.68rem", color: "var(--text-muted)" }}>
-                  Details filled in: {verdict.coverage.score}%
+                  {t("quiz.filledIn", { pct: verdict.coverage.score })}
                 </p>
               )}
             </motion.div>

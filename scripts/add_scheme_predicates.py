@@ -29,6 +29,7 @@ MUDRA_NON_FARM = {
     "values": ["agriculture_crop"],
     "severity": "disqualifying",
     "label": "Crop cultivation is not covered by this scheme",
+    "label_hi": "फसल उगाने वाला काम इस स्कीम में शामिल नहीं है",
     "basis": "exclusions: Corporate/farm cultivation activities",
 }
 MUDRA_ALLIED_OK = {
@@ -37,6 +38,7 @@ MUDRA_ALLIED_OK = {
     "values": ["agriculture_allied"],
     "severity": "qualifying",
     "label": "Allied agriculture (dairy, poultry, beekeeping) is covered",
+    "label_hi": "डेयरी, मुर्गी पालन, मधुमक्खी पालन जैसे काम शामिल हैं",
     "basis": "eligibility_rules: activities allied to agriculture such as poultry, dairy, beekeeping",
 }
 
@@ -47,6 +49,7 @@ CHECKS = {
             "type": "collateral_note",
             "severity": "qualifying",
             "label": "Guarantee covers collateral-free MSME loans",
+            "label_hi": "बिना ज़मानत के MSME लोन के लिए गारंटी कवर होता है",
             "basis": "collateral_requirement: None — the guarantee covers 85% of the loan up to Rs 15 lakh",
         },
         {
@@ -54,6 +57,7 @@ CHECKS = {
             "type": "registration_preferred",
             "severity": "advisory",
             "label": "Udyam registration is recommended to prove MSE status",
+            "label_hi": "MSME होने का सबूत — Udyam रजिस्ट्रेशन कराना बेहतर है",
             "basis": "eligibility_rules: Udyam registration recommended (not strictly mandatory)",
         },
     ],
@@ -65,6 +69,7 @@ CHECKS = {
             "type": "advisory",
             "severity": "advisory",
             "label": "For individuals, proprietorships and partnerships (not companies)",
+            "label_hi": "व्यक्ति, एकल व्यवसाय और साझेदारी के लिए (कंपनियों के लिए नहीं)",
             "basis": "eligibility_rules: Available to individuals, proprietorship concerns, partnership firms",
         },
     ],
@@ -78,6 +83,7 @@ CHECKS = {
             "values": ["agriculture_crop"],
             "severity": "disqualifying",
             "label": "Crop cultivation is outside PMEGP (non-farm sector only)",
+            "label_hi": "फसल उगाना PMEGP में नहीं आता (यह सिर्फ़ गैर-कृषि क्षेत्र के लिए है)",
             "basis": "exclusions: Activities in the negative list / eligibility_rules: non-farm",
         },
         {
@@ -86,6 +92,7 @@ CHECKS = {
             "values": ["manufacturing", "services", "home_based"],
             "severity": "qualifying",
             "label": "Manufacturing or service sector micro unit",
+            "label_hi": "उत्पादन या सेवा क्षेत्र की माइक्रो यूनिट",
             "basis": "eligibility_rules: New micro-enterprise in manufacturing or business/service sector (non-farm)",
         },
         {
@@ -94,6 +101,7 @@ CHECKS = {
             "values": ["mudra", "pmegp", "regp"],
             "severity": "blocking",
             "label": "One unit per family — a second unit needs the first loan repaid",
+            "label_hi": "एक परिवार के लिए एक ही यूनिट — दूसरी यूनिट के लिए पहला लोन चुकाना ज़रूरी है",
             "basis": "exclusions: Units already financed under PMEGP / REGP / MUDRA in the same family",
         },
         {
@@ -101,6 +109,7 @@ CHECKS = {
             "type": "advisory",
             "severity": "advisory",
             "label": "Margin money subsidy is higher (25-35%) for rural units than urban (15-25%)",
+            "label_hi": "गाँव की यूनिट पर मार्जिन सब्सिडी ज़्यादा (25-35%) है, शहर में कम (15-25%)",
             "basis": "eligibility_rules: Margin money subsidy 25-35% rural, 15-25% urban",
         },
     ],
@@ -111,6 +120,7 @@ CHECKS = {
             "values": ["street_vending"],
             "severity": "disqualifying",
             "label": "Only for street vendors — other businesses are not covered",
+            "label_hi": "यह सिर्फ़ रेहड़ी-पटरी वालों के लिए है — दूसरे कामों के लिए नहीं",
             "basis": "exclusions: Non-vending businesses",
         },
         {
@@ -118,6 +128,7 @@ CHECKS = {
             "type": "requires_document",
             "severity": "blocking",
             "label": "Needs a vending certificate / ULB identification letter",
+            "label_hi": "वेंडिंग सर्टिफ़िकेट / UBL पहचान पत्र चाहिए",
             "basis": "eligibility_rules: Holds a valid vending certificate / ULB identification letter",
         },
         {
@@ -125,6 +136,7 @@ CHECKS = {
             "type": "advisory",
             "severity": "advisory",
             "label": "Vending in a covered city or town (scheme extended to 31.03.2030)",
+            "label_hi": "शामिल शहर या कस्बे में विक्रय (योजना 31.03.2030 तक बढ़ाई गई है)",
             "basis": "eligibility_rules: Street vendor vending in a covered city/town",
         },
     ],
@@ -136,11 +148,18 @@ MUDRA_TIERS = ["mudra-shishu", "mudra-kishore", "mudra-tarun", "mudra-tarun-plus
 raw = SCHEMES.read_text(encoding="utf-8")
 schemes = json.loads(raw)
 
+MANAGED = ("min_amount", "max_amount", "amount_band_note", "checks", "tier_group")
+
 for scheme in schemes:
     sid = scheme["id"]
     if sid not in CHECKS:
         raise SystemExit(f"no checks defined for {sid} — refusing to write a partial dataset")
     lo, hi = BANDS[sid]
+    # Idempotent: drop previously-managed keys first, otherwise re-running this
+    # script would copy the stale values back over the new ones.
+    for key in MANAGED:
+        scheme.pop(key, None)
+
     # Insert amount band + checks right after loan_ceiling so the JSON reads in
     # the same order the UI shows it.
     rebuilt = {}
@@ -155,10 +174,10 @@ for scheme in schemes:
             rebuilt["checks"] = CHECKS[sid]
             rebuilt["tier_group"] = "mudra" if sid in MUDRA_TIERS else sid
     if "checks" not in rebuilt:
-        rebuilt["checks"] = CHECKS[sid]
         rebuilt["min_amount"] = lo
         rebuilt["max_amount"] = hi
         rebuilt["amount_band_note"] = "No published ceiling" if hi is None else f"Up to Rs {hi:,}"
+        rebuilt["checks"] = CHECKS[sid]
         rebuilt["tier_group"] = "mudra" if sid in MUDRA_TIERS else sid
     scheme.clear()
     scheme.update(rebuilt)

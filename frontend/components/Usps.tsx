@@ -8,41 +8,19 @@ import {
   UserCheck,
   WifiOff,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 const USPS = [
-  {
-    icon: UserCheck,
-    title: "Your Personal Business Advisor",
-    text: "It reads your research and remembers the conversation — then answers follow-ups about YOUR business, not generic trivia.",
-  },
-  {
-    icon: Globe,
-    title: "Real Market Research",
-    text: "Lives on the web. It searches fresh, current facts about your industry instead of guessing from memory.",
-  },
-  {
-    icon: Landmark,
-    title: "Matched Indian Schemes",
-    text: "MUDRA, PMEGP, CGTMSE and more — mapped to your business and stage, not a fixed list of a few schemes.",
-  },
-  {
-    icon: WifiOff,
-    title: "Works Offline & Free",
-    text: "Runs on free + local AI models. No subscription, no paywall — and it still answers even when the internet drops.",
-  },
-  {
-    icon: Languages,
-    title: "जानिए हिंदी में",
-    text: "Asks in Hindi, Hinglish or English and gets an answer in the same language — even offline, with no extra cost.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Your Data Stays Yours",
-    text: "Stored locally on your device, with one-tap export and full delete (GDPR-aligned). Nothing is sold to anyone.",
-  },
+  { icon: UserCheck, key: "usps.1" },
+  { icon: Globe, key: "usps.2" },
+  { icon: Landmark, key: "usps.3" },
+  { icon: WifiOff, key: "usps.4" },
+  { icon: Languages, key: "usps.5" },
+  { icon: ShieldCheck, key: "usps.6" },
 ];
 
 export default function Usps() {
+  const { t } = useI18n();
   return (
     <motion.section
       initial={{ opacity: 0, y: 16 }}
@@ -60,7 +38,7 @@ export default function Usps() {
           marginBottom: "6px",
         }}
       >
-        Why Your AI Business Saathi
+        {t("usps.kicker")}
       </p>
       <p
         style={{
@@ -70,7 +48,7 @@ export default function Usps() {
           marginBottom: "4px",
         }}
       >
-        Built for your business — not a generic chatbot.
+        {t("usps.title")}
       </p>
       <p
         style={{
@@ -81,8 +59,7 @@ export default function Usps() {
           marginBottom: "16px",
         }}
       >
-        ChatGPT answers general questions. Your AI Business Saathi builds,
-        advises and gets your business loan-ready.
+        {t("usps.sub")}
       </p>
 
       <div
@@ -96,7 +73,7 @@ export default function Usps() {
           const Icon = usp.icon;
           return (
             <motion.div
-              key={usp.title}
+              key={usp.key}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.2 + i * 0.07 }}
@@ -136,7 +113,7 @@ export default function Usps() {
                     marginBottom: "4px",
                   }}
                 >
-                  {usp.title}
+                  {t(`${usp.key}.title`)}
                 </p>
                 <p
                   style={{
@@ -145,7 +122,7 @@ export default function Usps() {
                     color: "var(--text-muted)",
                   }}
                 >
-                  {usp.text}
+                  {t(`${usp.key}.text`)}
                 </p>
               </div>
             </motion.div>

@@ -17,6 +17,59 @@
  * the ids declared there. `tests/test_intake.py` fails if the two drift apart.
  */
 
+/**
+ * Hindi chip labels. An answer is stored as the label the user actually saw,
+ * so a Hindi session stores Hindi text — which is also what reaches the
+ * eligibility engine, where it classifies correctly for the same reason.
+ * Official terms (Udyam, GST) stay in English.
+ */
+export const OPTION_LABELS_HI: Record<string, string> = {
+  "Shop / stall": "दुकान / स्टॉल",
+  "Street vendor / cart": "रेहड़ी-पटरी / ठेला",
+  "Home-based / freelance": "घर से काम / फ्रीलांस",
+  "Service / repair": "सेवा / मरम्मत",
+  "Farm / dairy": "खेती / डेयरी",
+  "Something else": "कुछ और",
+  "Just started (under 3 months)": "अभी शुरू किया (3 महीने से कम)",
+  "3–12 months": "3–12 महीने",
+  "1–3 years": "1–3 साल",
+  "3+ years": "3 साल से ज़्यादा",
+  "Under ₹10k": "₹10,000 से कम",
+  "₹10k–25k": "₹10,000–25,000",
+  "₹25k–50k": "₹25,000–50,000",
+  "₹50k+": "₹50,000 से ज़्यादा",
+  "No, first time": "नहीं, पहली बार",
+  "Yes, MUDRA": "हाँ, मुद्रा लोन",
+  "Yes, bank loan": "हाँ, बैंक लोन",
+  "Only family / friends": "सिर्फ़ परिवार / दोस्तों से",
+  "Money to grow": "बढ़ने के लिए पैसा",
+  "More customers": "ज़्यादा ग्राहक",
+  "Documents / licence help": "काग़ज़ / लाइसेंस में मदद",
+  "A clear plan": "साफ़ प्लान",
+  Maharashtra: "महाराष्ट्र",
+  Gujarat: "गुजरात",
+  Rajasthan: "राजस्थान",
+  "Uttar Pradesh": "उत्तर प्रदेश",
+  Bihar: "बिहार",
+  "West Bengal": "पश्चिम बंगाल",
+  "Tamil Nadu": "तमिलनाडु",
+  Karnataka: "कर्नाटक",
+  "Telangana / AP": "तेलंगाना / आंध्र प्रदेश",
+  "MP / Chhattisgarh": "मध्य प्रदेश / छत्तीसगढ़",
+  "Another state": "दूसरा राज्य",
+  "Yes, registered": "हाँ, रजिस्टर्ड है",
+  "No, not yet": "नहीं, अभी नहीं",
+  "Working on it": "काम चल रहा है",
+};
+
+/** The label to show for a chip in the active language. */
+export function optionLabel(label: string, lang: string): string {
+  return lang === "hi" ? OPTION_LABELS_HI[label] ?? label : label;
+}
+
+/** Every label a Hindi session has ever stored — used by migrateIntake(). */
+export const HINDI_LABELS = new Set(Object.values(OPTION_LABELS_HI));
+
 export type IntakeAnswers = Record<string, string>;
 
 export type IntakeOption = { value: string; label: string };
@@ -301,9 +354,23 @@ export function migrateIntake(raw: unknown): IntakeAnswers {
     if (typeof value !== "string") continue;
     const text = value.trim();
     if (!text) continue;
-    out[key] = LEGACY_CODES[text] ?? text;
+    // Legacy chip codes ("kiosk") and the *other* language's label both map back
+    // to a canonical label, so switching language never loses an answer.
+    const canonical = LEGACY_CODES[text] ?? text;
+    out[key] = toCanonicalLabel(canonical);
   }
   return out;
+}
+
+const ALL_OPTION_LABELS = new Set(
+  INTAKE_QUESTIONS.flatMap((q) => (q.options ?? []).map((o) => o.label))
+);
+
+function toCanonicalLabel(label: string): string {
+  for (const english of ALL_OPTION_LABELS) {
+    if (OPTION_LABELS_HI[english] === label) return english;
+  }
+  return label;
 }
 
 /** One-line summary for the UI (the backend builds its own canonical snippet). */

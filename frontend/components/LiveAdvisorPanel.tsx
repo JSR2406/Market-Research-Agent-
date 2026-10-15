@@ -4,10 +4,12 @@ import { motion } from "framer-motion";
 import { Mic, MicOff, Radio, PhoneOff, Sparkles } from "lucide-react";
 import { Room, RoomEvent, Track } from "livekit-client";
 import { API_BASE } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 type Status = "idle" | "connecting" | "connected" | "error";
 
 export default function LiveAdvisorPanel() {
+  const { t } = useI18n();
   const roomRef = useRef<Room | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -104,7 +106,7 @@ export default function LiveAdvisorPanel() {
       setStatus("error");
       console.error("[LiveAdvisor]", err);
       setMessage(
-        "Could not connect to the voice advisor. Please try again, or use the text chat below."
+        "live.error"
       );
     }
   }, [attachAgentAudio]);
@@ -181,11 +183,11 @@ export default function LiveAdvisorPanel() {
         </div>
         <div style={{ flex: 1, minWidth: "200px" }}>
           <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            Talk to your Loan Advisor
-            <span style={{ marginLeft: "8px", fontSize: "0.6rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Live</span>
+            {t("live.title")}
+            <span style={{ marginLeft: "8px", fontSize: "0.6rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{t("live.badge")}</span>
           </div>
           <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-            Real-time voice via LiveKit — hear the advisor, speak back naturally.
+            {connected ? t("live.subConn") : t("live.sub")}
           </div>
         </div>
 
@@ -194,7 +196,7 @@ export default function LiveAdvisorPanel() {
             <button
               type="button"
               onClick={toggleMic}
-              title={micOn ? "Mute microphone" : "Unmute microphone"}
+              title={micOn ? t("live.mute") : t("live.unmute")}
               style={{
                 border: "1px solid rgba(255,255,255,0.15)",
                 background: "rgba(255,255,255,0.06)",
@@ -230,7 +232,7 @@ export default function LiveAdvisorPanel() {
               }}
             >
               <Sparkles size={15} />
-              {status === "connecting" ? "Connecting…" : "Start Voice"}
+              {status === "connecting" ? t("live.connecting") : t("live.start")}
             </button>
           ) : (
             <button

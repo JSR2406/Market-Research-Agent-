@@ -126,12 +126,15 @@ def _evaluate_check(
     check: Dict,
     classification: Dict,
     intake: Dict[str, str],
+    lang: str = "en",
 ) -> Optional[Dict]:
     """One predicate → one reason, or None when the rule simply doesn't fire."""
     ctype = check.get("type")
     primary = classification["primary"]
     severity = check.get("severity", "advisory")
-    label = check.get("label", "")
+    # User-facing consequence in the language the site is set to. The English
+    # label is always kept so a verdict never loses its meaning.
+    label = (check.get("label_hi") if lang == "hi" else None) or check.get("label", "")
     basis = check.get("basis", "")
 
     if ctype == "business_class_not_in":
@@ -232,6 +235,7 @@ def evaluate_schemes(
     intake: Optional[Dict[str, str]] = None,
     topic: str = "",
     amount: Optional[int] = None,
+    lang: str = "en",
 ) -> Dict:
     """
     Evaluate every curated scheme against one business.
@@ -241,7 +245,7 @@ def evaluate_schemes(
     *cannot* do as much as what they can.
     """
     answers = normalize_intake(intake)
-    classification = classify_business(answers, topic)
+    classification = classify_business(answers, topic, lang)
     schemes = load_schemes()
     wanted = _amount_for(topic, amount)
 
@@ -252,7 +256,7 @@ def evaluate_schemes(
             continue
         reasons = []
         for check in scheme.get("checks") or []:
-            fired = _evaluate_check(check, classification, answers)
+            fired = _evaluate_check(check, classification, answers, lang)
             if fired:
                 reasons.append(fired)
 

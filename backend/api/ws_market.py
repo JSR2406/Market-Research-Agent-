@@ -34,6 +34,12 @@ router = APIRouter()
 
 MAX_TOPIC_CHARS = 4000
 MAX_PROFILE_CHARS = 1500
+VALID_LANGS = ("en", "hi")
+
+
+def _as_lang(value) -> str:
+    """Client-declared output language; anything else falls back to English."""
+    return value.strip().lower() if isinstance(value, str) and value.strip().lower() in VALID_LANGS else "en"
 
 
 def _origin_allowed(websocket: WebSocket) -> bool:
@@ -113,6 +119,7 @@ async def market_research_websocket(websocket: WebSocket):
                 topic = _as_str(msg.get("topic"))[:MAX_TOPIC_CHARS]
                 profile = _as_str(msg.get("profile"))[:MAX_PROFILE_CHARS]
                 intake = _as_intake(msg.get("intake"))
+                lang = _as_lang(msg.get("lang"))
                 session_id = _as_str(msg.get("session_id"))
                 max_steps = max(1, min(_safe_int(msg.get("max_steps", 4), 4), 6))
 
@@ -154,6 +161,7 @@ async def market_research_websocket(websocket: WebSocket):
                         session_id=session_id,
                         profile=profile,
                         intake=intake,
+                        lang=lang,
                     )
                 )
 

@@ -61,6 +61,7 @@ class EligibilityRequest(BaseModel):
     # Optional explicit loan amount; when absent the engine reads it from the
     # topic only if the message actually mentions borrowing.
     amount: Optional[int] = None
+    lang: str = Field("en", max_length=8)  # "en" | "hi" — matches the site language
     intake: Dict[str, str] = Field(default_factory=dict)
 
 
@@ -73,6 +74,9 @@ class EligibilityResponse(BaseModel):
     summary: str = ""
     coverage: Dict[str, Any] = {}
     next_probe: str = ""
+    # Question wording in the requested language — response_model is strict, so
+    # this field must be declared or FastAPI silently strips it.
+    questions: Dict[str, str] = {}
 
 
 class LedgerTickRequest(BaseModel):

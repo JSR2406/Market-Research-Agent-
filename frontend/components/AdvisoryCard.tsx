@@ -5,6 +5,7 @@ import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volu
 import { API_BASE } from "@/lib/api";
 import EligibilityPanel, { type EligibilityFamily } from "@/components/EligibilityPanel";
 import ActionLedger, { type LedgerScore } from "@/components/ActionLedger";
+import { useI18n } from "@/lib/i18n";
 
 interface CashFlow {
   [key: string]: string | number;
@@ -101,6 +102,7 @@ function ScoreGauge({ score }: { score: number }) {
 }
 
 export default function AdvisoryCard({ report, topic, simplified, sessionId }: Props) {
+  const { t } = useI18n();
   const [audioState, setAudioState] = useState<AudioState>("idle");
   const [audioMsg, setAudioMsg] = useState("");
   const [copied, setCopied] = useState(false);
@@ -111,7 +113,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
     const cleanJSON = report.replace(/^```(json)?\s*/i, "").replace(/```\s*$/i, "").trim();
     data = JSON.parse(cleanJSON);
   } catch {
-    data = { business_summary: "Could not parse report. Raw data: " + report.slice(0, 200) };
+    data = { business_summary: t("report.parseError") };
   }
 
   const downloadText = () => {
@@ -250,7 +252,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
           <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
             <motion.button
               onClick={copyText}
-              title="Copy advisory text"
+              title={t("report.copyAria")}
               whileTap={{ scale: 0.95 }}
               style={{
                 display: "flex", alignItems: "center", gap: "5px",
@@ -266,11 +268,11 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
               }}
             >
               {copied ? <CheckCircle2 size={12} color="var(--success)" /> : <Share2 size={12} />}
-              {copied ? "Copied!" : "Copy"}
+              {copied ? t("report.copied") : t("report.copy")}
             </motion.button>
             <motion.button
               onClick={downloadText}
-              title="Download advisory as .txt"
+              title={t("report.downloadAria")}
               whileTap={{ scale: 0.95 }}
               style={{
                 display: "flex", alignItems: "center", gap: "5px",
@@ -286,7 +288,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
                 boxShadow: "0 4px 12px rgba(79,142,247,0.3)",
               }}
             >
-              <Download size={12} /> Download .txt
+              <Download size={12} /> {t("report.download")}
             </motion.button>
           </div>
           <motion.button
@@ -393,7 +395,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
             }}
           >
             <h3 style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--success)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <FileText size={16} /> In Simple Words — Read Aloud Version
+              <FileText size={16} /> {t("report.simple")}
             </h3>
             <pre style={{
               fontSize: "0.88rem",
@@ -415,7 +417,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
             style={{ background: "var(--bg-surface)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)" }}
           >
             <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--accent)", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Target size={16} /> Business Summary
+              <Target size={16} /> {t("report.summary")}
             </h3>
             <p style={{ fontSize: "0.95rem", color: "var(--text-primary)", lineHeight: 1.6 }}>{data.business_summary}</p>
           </motion.div>
@@ -425,7 +427,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
         {data.cash_flow_snapshot && Object.keys(data.cash_flow_snapshot).length > 0 && (
           <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
             <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--accent)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <IndianRupee size={16} /> Cash-Flow Snapshot
+              <IndianRupee size={16} /> {t("report.cashflow")}
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
               {Object.entries(data.cash_flow_snapshot).map(([k, v]) => (
@@ -446,7 +448,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
         {data.matched_schemes && data.matched_schemes.length > 0 && (
           <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
             <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--accent)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Sparkles size={16} /> Matched Government Schemes
+              <Sparkles size={16} /> {t("report.schemes")}
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {data.matched_schemes.map((line, idx) => {
@@ -494,7 +496,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
         {data.documents_needed && data.documents_needed.length > 0 && (
           <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }}>
             <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--accent)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <FileCheck size={16} /> Checklist of Documents Needed
+              <FileCheck size={16} /> {t("report.docs")}
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {data.documents_needed.map((doc, idx) => (
@@ -515,7 +517,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
         {data.sources && data.sources.length > 0 && (
           <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.28 }}>
             <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--accent)", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <Link2 size={16} /> Sources Used During Research
+              <Link2 size={16} /> {t("report.sources")}
             </h3>
             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "10px" }}>
               Pages this advisory actually read — always double-check with your bank or the official portal before acting.
@@ -544,7 +546,7 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
             style={{ background: "linear-gradient(135deg, rgba(79,142,247,0.1), rgba(139,92,246,0.1))", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "16px" }}
           >
             <h3 style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--accent2)", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <ArrowRight size={16} /> Next Step
+              <ArrowRight size={16} /> {t("report.next")}
             </h3>
             <p style={{ fontSize: "0.95rem", color: "var(--text-primary)", fontWeight: 500 }}>{data.next_step}</p>
           </motion.div>

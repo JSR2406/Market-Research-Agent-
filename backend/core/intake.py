@@ -242,8 +242,18 @@ def followup_instruction(intake: Optional[Dict], lang: str = "en") -> str:
     )
 
 
+def question_pack(lang: str = "en") -> Dict[str, str]:
+    """
+    Every field's question wording, in the site's language.
+
+    The check-up stepper renders these so the questions a user reads are the
+    same ones the gap detection reasons about — one source, no drift.
+    """
+    index = 2 if lang == "hi" else 1
+    return {fid: entry[index] for fid, entry in _FIELD_BY_ID.items()}
+
+
 def describe_missing(intake: Optional[Dict], lang: str = "en") -> str:
-    """Short human line for the UI: "Still missing: business, earnings"."""
     gaps = missing_fields(intake)
     if not gaps:
         return ""

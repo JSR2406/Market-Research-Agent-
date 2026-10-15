@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Check, ListChecks, Lock, Loader2 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 export type LedgerAction = {
   id: string;
@@ -38,6 +39,7 @@ export default function ActionLedger({
   sessionId: string;
   initial: LedgerScore;
 }) {
+  const { t } = useI18n();
   const [ledger, setLedger] = useState<LedgerScore>(initial);
   const [ticking, setTicking] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -63,12 +65,12 @@ export default function ActionLedger({
         const body = (await res.json()) as LedgerScore;
         setLedger(body);
       } catch {
-        setError("We couldn't save that just now. Please try again.");
+        setError(t("ledger.saveError"));
       } finally {
         setTicking(null);
       }
     },
-    [ledger.actions, sessionId, ticking]
+    [ledger.actions, sessionId, ticking, t]
   );
 
   const actions = ledger.actions ?? [];
@@ -76,6 +78,14 @@ export default function ActionLedger({
 
   const done = actions.filter((a) => a.status === "done").length;
   const blockers = ledger.blockers ?? [];
+
+  // The score band, translated from the backend's English level label.
+  const levelKey =
+    ledger.score >= 85 ? "ledger.levelReady"
+    : ledger.score >= 60 ? "ledger.levelAlmost"
+    : ledger.score >= 35 ? "ledger.levelGetting"
+    : "ledger.levelEarly";
+  const levelSuffix = () => t(levelKey);
 
   return (
     <motion.section
@@ -95,17 +105,16 @@ export default function ActionLedger({
       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
         <ListChecks size={15} color="var(--success)" />
         <h3 style={{ margin: 0, fontSize: "0.92rem", fontWeight: 700, color: "var(--text-primary)" }}>
-          Your action checklist
+          {t("ledger.title")}
         </h3>
         <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>
-          {done} of {actions.length} done
+          {t("ledger.doneOf", { done, total: actions.length })}
         </span>
       </div>
 
       <p style={{ margin: 0, fontSize: "0.74rem", color: "var(--text-secondary)" }}>
-        Your score is <strong style={{ color: "var(--text-primary)" }}>{ledger.score}/100</strong>
-        {ledger.level ? ` — ${ledger.level}` : ""}. Tick what you have actually done and the score updates
-        straight away. Nothing here is shared anywhere.
+        {t("ledger.scoreLine", { score: ledger.score, level: levelSuffix() })}{" "}
+        {t("ledger.local")}
       </p>
 
       {/* The one next thing — always the highest-value action */}
@@ -123,7 +132,7 @@ export default function ActionLedger({
         >
           <ArrowRight size={14} color="var(--accent)" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            Do this next: {ledger.next_action.title}
+            {t("ledger.doNext", { title: ledger.next_action.title })}
           </span>
           <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700, flexShrink: 0 }}>
             +{ledger.next_action.points}
@@ -187,13 +196,17 @@ export default function ActionLedger({
                 onClick={() => toggle(action)}
                 disabled={!tickable || !!ticking}
                 aria-pressed={isDone}
-                aria-label={`${isDone ? "Completed" : "Mark complete"}: ${action.title}`}
+                aria-label={
+                  isDone
+                    ? t("ledger.markCompleted", { title: action.title })
+                    : t("ledger.markComplete", { title: action.title })
+                }
                 title={
                   tickable
                     ? isDone
-                      ? "Tap to undo"
-                      : "Tap when you have done this"
-                    : "We already know this from your answers"
+                      ? t("ledger.undo")
+                      : t("ledger.saveNext")
+                    : t("quiz.knownBefore")
                 }
                 style={{
                   width: "20px",
@@ -237,7 +250,7 @@ export default function ActionLedger({
                 ) : null}
                 {action.unlocks?.length > 0 && !isDone ? (
                   <p style={{ margin: "3px 0 0", fontSize: "0.66rem", color: "var(--accent)", fontWeight: 600 }}>
-                    Opens up: {action.unlocks.join(", ")}
+                    {t("ledger.opensUp", { list: action.unlocks.join(", ") })}
                   </p>
                 ) : null}
               </div>

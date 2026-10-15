@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 export type TraceNode = {
   id: number;
@@ -73,6 +74,7 @@ function ToolIcon({ tool }: { tool: string }) {
 }
 
 function NodeCard({ n, i }: { n: TraceNode; i: number }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const cfg = nodeColor(n.node);
   const busy = n.status === "running";
@@ -156,7 +158,7 @@ function NodeCard({ n, i }: { n: TraceNode; i: number }) {
             {n.label}
             {n.iteration > 0 && (
               <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginLeft: "6px" }}>
-                pass {n.iteration}
+                {t("timeline.pass", { n: n.iteration })}
               </span>
             )}
           </p>
@@ -279,6 +281,7 @@ function NodeCard({ n, i }: { n: TraceNode; i: number }) {
 }
 
 export default function AgentTimeline({ nodes, planSteps, statusMessage, isRunning, engine }: Props) {
+  const { t } = useI18n();
   const hasContent = nodes.length + (planSteps?.length ?? 0) > 0 || Boolean(statusMessage && isRunning);
   if (!hasContent) return null;
 
@@ -297,7 +300,10 @@ export default function AgentTimeline({ nodes, planSteps, statusMessage, isRunni
         <div style={{ marginBottom: "16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 500 }}>
-              {statusMessage || (active > 0 ? "Working…" : `${doneCount} of ${nodes.length} agents done`)}
+              {statusMessage ||
+                (active > 0
+                  ? t("timeline.working")
+                  : t("timeline.agentsDone", { done: doneCount, total: nodes.length }))}
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {engine && (

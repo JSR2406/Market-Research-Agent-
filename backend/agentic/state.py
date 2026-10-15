@@ -33,6 +33,8 @@ class AgenticState(TypedDict, total=False):
     # Deterministic verdicts computed in code before any LLM runs — the writer
     # is told these so the prose can never contradict the rule engine.
     eligibility_note: str
+    # Language the whole advisory must be written in, set from the UI language.
+    output_lang: str
 
     # ── planning ────────────────────────────────────────────────────────────
     plan: Annotated[List[str], operator.add]

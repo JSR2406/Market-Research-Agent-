@@ -10,6 +10,7 @@ import {
   Gavel,
   Layers,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export type EligibilityReason = {
   label: string;
@@ -54,6 +55,13 @@ const TONES: Record<string, Tone> = {
   not_eligible: { color: "var(--text-muted)", bg: "rgba(255,255,255,0.06)", Icon: CircleSlash },
 };
 
+/** Status labels are translated; the backend's English label is the fallback. */
+function statusLabel(t: (k: string) => string, status: string, fallback: string): string {
+  const key = `elig.status.${status}`;
+  const label = t(key);
+  return label === key ? fallback || label : label;
+}
+
 function money(value: number | null | undefined): string {
   if (value == null) return "";
   if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(value % 10_000_000 === 0 ? 0 : 2)} crore`;
@@ -78,6 +86,7 @@ export default function EligibilityPanel({
   amount?: number | null;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const { t } = useI18n();
 
   if (!families?.length) return null;
 
@@ -114,18 +123,18 @@ export default function EligibilityPanel({
               borderRadius: "8px",
             }}
           >
-            Your business: {businessLabel}
+            {t("elig.yourBusiness", { label: businessLabel })}
           </span>
         )}
         {amount ? (
           <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>
-            asking {money(amount)}
+            {t("elig.asking", { amount: money(amount) })}
           </span>
         ) : null}
       </div>
 
       <p style={{ margin: 0, fontSize: "0.72rem", color: "var(--text-muted)" }}>
-        Checked against the official scheme rules in code — not guessed. Tap a card to see the rule and the source.
+        {t("elig.subtitle")}
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -180,7 +189,7 @@ export default function EligibilityPanel({
                   }}
                 >
                   <Icon size={11} />
-                  {card.status_label}
+                  {statusLabel(t, card.status, card.status_label)}
                 </span>
                 <span
                   style={{
@@ -236,7 +245,7 @@ export default function EligibilityPanel({
                     fontWeight: 600,
                   }}
                 >
-                  Use: {card.recommended_name.split("(")[0].trim()}
+                  {t("elig.use", { name: card.recommended_name.split("(")[0].trim() })}
                 </p>
               ) : null}
 
@@ -263,7 +272,7 @@ export default function EligibilityPanel({
                           </p>
                           {reason.basis ? (
                             <p style={{ margin: "3px 0 0", fontSize: "0.66rem", color: "var(--text-muted)" }}>
-                              Rule: {reason.basis}
+                              {t("elig.tapRule", { rule: reason.basis })}
                             </p>
                           ) : null}
                         </div>
@@ -274,7 +283,7 @@ export default function EligibilityPanel({
                   {card.tiers?.length > 1 ? (
                     <div>
                       <p style={{ margin: "0 0 5px", fontSize: "0.68rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        Loan tiers
+                        {t("elig.tiers")}
                       </p>
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         {card.tiers.map((tier) => {
@@ -309,7 +318,7 @@ export default function EligibilityPanel({
                   {card.documents?.length > 0 ? (
                     <div>
                       <p style={{ margin: "0 0 5px", fontSize: "0.68rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        Documents
+                        {t("elig.documents")}
                       </p>
                       <ul style={{ margin: 0, paddingLeft: "16px", display: "flex", flexDirection: "column", gap: "3px" }}>
                         {card.documents.map((doc, i) => (
@@ -323,7 +332,7 @@ export default function EligibilityPanel({
 
                   {card.collateral_requirement ? (
                     <p style={{ margin: 0, fontSize: "0.72rem", color: "var(--text-secondary)" }}>
-                      <span style={{ color: "var(--text-muted)" }}>Collateral: </span>
+                      <span style={{ color: "var(--text-muted)" }}>{t("elig.collateral")} </span>
                       {card.collateral_requirement}
                     </p>
                   ) : null}
@@ -335,7 +344,10 @@ export default function EligibilityPanel({
                       rel="noopener noreferrer"
                       style={{ fontSize: "0.68rem", color: "var(--accent)", textDecoration: "underline" }}
                     >
-                      Official source{card.last_verified_at ? ` · verified ${card.last_verified_at}` : ""}
+                      {t("elig.source")}
+                      {card.last_verified_at
+                        ? ` · ${t("elig.verified", { date: card.last_verified_at })}`
+                        : ""}
                     </a>
                   ) : null}
                 </motion.div>

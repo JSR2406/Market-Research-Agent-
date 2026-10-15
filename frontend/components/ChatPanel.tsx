@@ -20,6 +20,7 @@ import {
   describeMissingIntake,
   type IntakeAnswers,
 } from "@/lib/intake";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -31,33 +32,43 @@ const LANGS = [
 ];
 
 const QUICK_PROMPTS = [
-  { icon: Banknote, label: "Which loans can I get?", lang: "en" },
-  { icon: FileText, label: "Documents I need", lang: "en" },
-  { icon: Languages, label: "क्या मुद्रा लोन मिलेगा?", lang: "hi" },
-  { icon: TrendingUp, label: "Start with ₹1 lakh?", lang: "en" },
+  { icon: Banknote, key: "chat.quick1", label: "Which loans can I get?", lang: "en" },
+  { icon: FileText, key: "chat.quick2", label: "Documents I need", lang: "en" },
+  { icon: Languages, key: "chat.quick3", label: "क्या मुद्रा लोन मिलेगा?", lang: "hi" },
+  { icon: TrendingUp, key: "chat.quick4", label: "Start with ₹1 lakh?", lang: "en" },
 ];
 
-function welcome(topic: string, intake: IntakeAnswers) {
+function welcome(topic: string, intake: IntakeAnswers, t: (k: string, v?: Record<string, string | number>) => string) {
   const known = buildIntakeSummary(intake);
   const missing = describeMissingIntake(intake);
   if (topic.trim()) {
-    return `I've read your “${topic}” business report — I'm your personal advisor now.${known ? ` I also have your Business Check-up answers (${known}).` : ""} Ask me about your loan eligibility, the documents to carry, or your next steps. आप हिंदी में भी पूछ सकते हैं।`;
+    const extra = known ? t("chat.subIntake", { intake: known }) : "";
+    return t("chat.welcomeReport", { topic, intake: extra });
   }
   if (known) {
-    return `Hi, I'm your personal business advisor. I have your Business Check-up answers: ${known}.${missing ? ` ${missing} — tell me and I'll get more specific.` : " That's everything I need — ask me anything about your business or loan."}`;
+    return t("chat.welcomeIntake", {
+      intake: known,
+      missing: missing
+        ? ` ${t("chat.missingAsk")}`
+        : ` ${t("chat.noMemoryAsk")}`,
+    });
   }
-  return "Hi, I'm your personal business advisor. Fill in the Business Check-up above or just tell me about your business — then ask me about loans, schemes, documents, or how to get loan-ready.";
+  return t("chat.welcomeEmpty");
 }
 
 export default function ChatPanel({
   sessionId,
   topic,
   intake,
+  locale,
 }: {
   sessionId: string;
   topic: string;
   intake: IntakeAnswers;
+  /** Site language. The advisor replies in it unless the user writes otherwise. */
+  locale: Locale;
 }) {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -84,6 +95,23 @@ export default function ChatPanel({
       /* noop */
     }
   };
+
+  // Seed the reply language from the site language the first time, so a user
+  // browsing in Hindi gets Hindi answers without touching this toggle.
+  const seededLocale = useRef(false);
+  useEffect(() => {
+    if (seededLocale.current) return;
+    try {
+      const saved = window.localStorage.getItem(LANG_KEY);
+      if (!saved) {
+        setLang(locale);
+        window.localStorage.setItem(LANG_KEY, locale);
+      }
+    } catch {
+      /* noop */
+    }
+    seededLocale.current = true;
+  }, [locale]);
 
   // Restore remembered chat for this session (chat memory).
   useEffect(() => {
@@ -129,22 +157,21 @@ export default function ChatPanel({
         const reply =
           typeof body?.reply === "string" && body.reply.trim()
             ? body.reply
-            : "I couldn't answer that right now. Please rephrase and try again.";
+            : t("chat.failed");
         setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
       } catch {
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
-            content:
-              "I'm having trouble connecting right now. Please check your internet connection and try again.",
+            content: t("chat.offline"),
           },
         ]);
       } finally {
         setIsLoading(false);
       }
     },
-    [input, isLoading, sessionId, topic, lang, intake]
+    [input, isLoading, sessionId, topic, lang, intake, t]
   );
 
   const clearChat = useCallback(async () => {
@@ -164,7 +191,7 @@ export default function ChatPanel({
 
   const displayMessages: ChatMessage[] =
     messages.length === 0 && !isLoading
-      ? [{ role: "assistant", content: welcome(topic, intake) }]
+      ? [{ role: "assistant", content: welcome(topic, intake, t) }]
       : messages;
 
   return (
@@ -201,16 +228,18 @@ export default function ChatPanel({
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            Your Personal Business Advisor
+            {t("chat.title")}
           </div>
           <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
             {topic.trim()
-              ? `Knows your “${topic}” business${intakeSummary ? " and your Business Check-up answers" : ""} — follow-ups come straight from your report.`
+              ? intakeSummary
+                ? t("chat.subReportIntake", { topic, intake: intakeSummary })
+                : t("chat.subReport", { topic, extra: "" })
               : intakeSummary
-                ? `Knows your Business Check-up answers (${intakeSummary}) — ask follow-ups about your plan anytime.`
+                ? t("chat.subIntake", { intake: intakeSummary })
                 : sessionId
-                  ? "Remembers this conversation — run a research above and I'll learn your business."
-                  : "Chatting without saved memory."}
+                  ? t("chat.subMemory")
+                  : t("chat.subNoMemory")}
           </div>
         </div>
         {/* Language toggle */}
@@ -249,7 +278,7 @@ export default function ChatPanel({
           <button
             type="button"
             onClick={clearChat}
-            title="Clear chat memory"
+            title={t("chat.clear")}
             style={{
               border: "1px solid rgba(255,255,255,0.15)",
               background: "rgba(255,255,255,0.06)",
@@ -286,8 +315,8 @@ export default function ChatPanel({
           <Sparkles size={12} color="var(--accent)" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: "0.72rem", color: "var(--text-secondary)" }}>
             {topic.trim()
-              ? `Personalised for your “${topic}” business — answers are grounded in your report, not generic advice.`
-              : "Personalised from your Business Check-up answers — advice and follow-up questions are shaped by them."}
+              ? t("chat.badgeReport", { topic })
+              : t("chat.badgeIntake")}
           </span>
         </div>
       )}
@@ -310,7 +339,7 @@ export default function ChatPanel({
         >
           <CircleHelp size={12} color="var(--warn)" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: "0.72rem", color: "var(--warn)" }}>
-            {intakeMissing} — ask me now, or fill the Business Check-up above.
+            {t("chat.missing", { list: intakeMissing })}
           </span>
         </div>
       )}
@@ -427,7 +456,7 @@ export default function ChatPanel({
                 key={q.label}
                 type="button"
                 whileTap={{ scale: 0.96 }}
-                onClick={() => send(q.label)}
+                onClick={() => send(t(q.key))}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -443,7 +472,7 @@ export default function ChatPanel({
                 }}
               >
                 <Icon size={13} color="var(--accent)" />
-                {q.label}
+                {t(q.key)}
               </motion.button>
             );
           })}
@@ -459,8 +488,8 @@ export default function ChatPanel({
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
-          placeholder={lang === "hi" ? "बिज़नेस या कर्ज़ के बारे में हिंदी में पूछें…" : "Ask anything about your business or loan…"}
-          aria-label="Chat message"
+          placeholder={t("chat.placeholder")}
+          aria-label={t("chat.title")}
           style={{
             flex: 1,
             background: "rgba(255,255,255,0.06)",
@@ -476,7 +505,7 @@ export default function ChatPanel({
           type="button"
           onClick={() => send()}
           disabled={isLoading || !input.trim()}
-          title="Send"
+          title={t("chat.send")}
           style={{
             border: "none",
             background: "linear-gradient(135deg,#2dd4bf,#0d9488)",
@@ -497,7 +526,7 @@ export default function ChatPanel({
         <div style={{ marginTop: "10px", display: "flex", gap: "6px", alignItems: "center" }}>
           <User size={12} color="var(--text-muted)" />
           <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-            Tip: run a research above first — the advisor then remembers your actual business. हिंदी में भी लिख सकते हैं।
+            {t("chat.tip")}
           </span>
         </div>
       )}

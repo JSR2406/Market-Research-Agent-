@@ -1,5 +1,5 @@
 """
-business.py — deterministic classification of what kind of business this is.
+business.py â€” deterministic classification of what kind of business this is.
 
 The eligibility engine needs a *stable business class*, not keywords. A user's
 own words ("I make and sell goat milk soap from my home") have to land on a
@@ -11,7 +11,7 @@ who sells goat-milk soap is not mistaken for a dairy farmer. Single animal
 words are only an allied-agriculture signal when no crop signal is present.
 
 Every class is deterministic: same words in, same class out. No LLM is involved
-— the model's job is to explain the verdict, never to decide it.
+â€” the model's job is to explain the verdict, never to decide it.
 """
 from __future__ import annotations
 
@@ -51,6 +51,18 @@ CLASS_LABELS: Dict[str, str] = {
     OTHER: "unspecified business",
 }
 
+# Plain Hindi, because this label is shown to the user on the verdict card.
+CLASS_LABELS_HI: Dict[str, str] = {
+    AGRICULTURE_CROP: "फसल उगाना",
+    AGRICULTURE_ALLIED: "डेयरी / मुर्गी पालन / मधुमक्खी पालन",
+    MANUFACTURING: "उत्पादन (बनाना)",
+    HOME_BASED: "घर पर बनाना",
+    STREET_VENDING: "रेहड़ी-पटरी / ठेला",
+    TRADING: "दुकान / रिटेल",
+    SERVICES: "सेवा काम",
+    OTHER: "अभी साफ़ नहीं",
+}
+
 # Hindi + English + common transliterations. Signals are matched against the
 # intake answers and the free-text topic.
 _STREET_RE = re.compile(
@@ -75,18 +87,18 @@ _CROP_RE = re.compile(
     r"cultivat|\bcrop\b|\bcrops\b|\bfarming\b|\bwheat\b|\brice\b|paddy|maize|"
     r"\bcotton\b|sugarcane|mustard|soybean|\bvegetable|\borchard|fruit\s*farm|"
     r"grow\w*\s+(vegetable|fruit|rice|wheat|crop|flower|plant|seed)|"
-    r"फसल|खेती|बोई|गेहूँ|गेहूं|धान|कृषि| खेत",
+    r"फसल|खेती|बोई|गेहूँ|गेहूं|धान|कृषि|खेत",
     re.IGNORECASE,
 )
 _ALLIED_RE = re.compile(
     r"\bdairy\b|\bmilk\b|\bcow\b|\bcows\b|cattle|buffalo|\bgoat\b|\bpoultry\b|"
     r"\bchicken\b|\begg?s?\b|honey|beekeep|apiary|\bfish\b|prawn|sericulture|"
-    r"poultry|दुग्ध|दुग्ध\s*व्यवसाय|पशु|गाय|बकरी|मुर्गी|अंडा|मधुमक्खी|मछली",
+    r"दुग्ध|पशु|गाय|बकरी|मुर्गी|अंडा|मधुमक्खी|मछली",
     re.IGNORECASE,
 )
 _SERVICE_RE = re.compile(
     r"\bservice\b|repair|technician|plumb|electrician|\btuition\b|coaching|"
-    r"salon|barber|beauty|\btransport\b|driver|deliver(y|ies)?\bservice|"
+    r"salon|barber|beauty|\btransport\b|driver|deliver(y|ies)\bservice|"
     r"photograph|event\s*manage|tailor|सेवा|मरम्मत|ट्यूशन|स्कूल|व्यापार|"
     r"मैकेनिक|ब्यूटी",
     re.IGNORECASE,
@@ -115,12 +127,14 @@ def _matches(pattern: re.Pattern, *texts: str) -> bool:
 def classify_business(
     intake: Optional[Dict[str, str]] = None,
     topic: str = "",
+    lang: str = "en",
 ) -> Dict[str, object]:
     """
     Return ``{"primary", "secondary", "signals", "label"}`` for one business.
 
     ``signals`` lists the literal matched words so a verdict can explain *why*
-    it classified that way — an unexplained verdict is not trustworthy advice.
+    it classified that way â€” an unexplained verdict is not trustworthy advice.
+    ``lang`` selects the user-facing label only; the class itself never changes.
     """
     answers = intake or {}
     business = str(answers.get("business") or "").strip()
@@ -133,16 +147,16 @@ def classify_business(
     # 1. An exact chip the user picked is the strongest evidence available.
     chip = _CHIP_CLASS.get(business.lower())
     if chip:
-        signals.append(f"picked “{business}”")
+        signals.append(f"picked â€œ{business}â€")
 
-    # 2. Street vending is unambiguous — a cart is a cart.
+    # 2. Street vending is unambiguous â€” a cart is a cart.
     if _matches(_STREET_RE, *texts) or chip == STREET_VENDING:
         if chip and chip != STREET_VENDING:
             secondary.append(chip)
         signals.append("street vending")
-        return _result(STREET_VENDING, secondary, signals)
+        return _result(STREET_VENDING, secondary, signals, lang)
 
-    # 3. Making things at home — tested BEFORE agriculture so "goat milk soap
+    # 3. Making things at home â€” tested BEFORE agriculture so "goat milk soap
     #    from my home" is production, not dairy farming.
     makes = _matches(_MAKE_RE, *texts)
     at_home = _matches(_HOME_RE, *texts) or chip == HOME_BASED
@@ -151,10 +165,10 @@ def classify_business(
         if makes:
             signals.append("makes its own goods")
         extra = [MANUFACTURING] if makes else []
-        return _result(HOME_BASED, secondary + extra, signals)
+        return _result(HOME_BASED, secondary + extra, signals, lang)
     if makes:
         signals.append("manufactures its own goods")
-        return _result(MANUFACTURING, secondary, signals)
+        return _result(MANUFACTURING, secondary, signals, lang)
 
     # 4. Agriculture: crops beat allied-animal signals when both are present.
     has_crop = _matches(_CROP_RE, *texts)
@@ -164,31 +178,34 @@ def classify_business(
         if has_allied:
             signals.append("also mentions livestock")
         extra = [AGRICULTURE_ALLIED] if has_allied else []
-        return _result(AGRICULTURE_CROP, secondary + extra, signals)
+        return _result(AGRICULTURE_CROP, secondary + extra, signals, lang)
     if has_allied or chip == AGRICULTURE_ALLIED:
         signals.append("allied agriculture")
-        return _result(AGRICULTURE_ALLIED, secondary, signals)
+        return _result(AGRICULTURE_ALLIED, secondary, signals, lang)
 
     # 5. Everything else.
     if _matches(_SERVICE_RE, *texts) or chip == SERVICES:
         signals.append("service business")
-        return _result(SERVICES, secondary, signals)
+        return _result(SERVICES, secondary, signals, lang)
     if _matches(_TRADE_RE, *texts) or chip == TRADING:
         signals.append("shop / retail trade")
-        return _result(TRADING, secondary, signals)
+        return _result(TRADING, secondary, signals, lang)
 
-    return _result(OTHER, secondary, signals)
+    return _result(OTHER, secondary, signals, lang)
 
 
-def _result(primary: str, secondary: List[str], signals: List[str]) -> Dict[str, object]:
+def _result(
+    primary: str, secondary: List[str], signals: List[str], lang: str = "en"
+) -> Dict[str, object]:
+    labels = CLASS_LABELS_HI if lang == "hi" else CLASS_LABELS
     return {
         "primary": primary,
         "secondary": [c for c in dict.fromkeys(secondary) if c and c != primary],
         "signals": [s for s in dict.fromkeys(signals) if s],
-        "label": CLASS_LABELS.get(primary, primary),
+        "label": labels.get(primary) or CLASS_LABELS.get(primary, primary),
     }
 
 
 def is_known(primary: str) -> bool:
-    """False for the `other` bucket — callers must not treat it as a verdict."""
+    """False for the `other` bucket â€” callers must not treat it as a verdict."""
     return primary in BUSINESS_CLASSES and primary != OTHER

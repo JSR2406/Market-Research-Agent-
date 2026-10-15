@@ -116,6 +116,8 @@ market-research-agent/
     ├── package.json
     ├── lib/
     │   └── api.ts              # SINGLE source of API_BASE + WS_URL (never derive URLs elsewhere)
+    │   ├── i18n.tsx            # site-wide language layer: dictionaries, LocaleProvider, useI18n()
+    │   ├── intake.ts           # Business Check-up question registry, branching, label translation
     ├── app/
     │   ├── globals.css         # design tokens (:root vars), keyframes, prose
     │   ├── layout.tsx
@@ -123,6 +125,7 @@ market-research-agent/
     │   └── research/page.tsx   # WS client, run/cancel, report state
     └── components/
         ├── TopicInput.tsx      # text + voice input, step selector
+        ├── LanguageSwitcher.tsx # site-wide language control (English / हिंदी)
         ├── AgentTimeline.tsx   # live agentic trace (nodes, thoughts, tool calls, reflections) + engine badge
         ├── AdvisoryCard.tsx    # advisory render, simplified doc, download/copy, listen
         ├── ChatPanel.tsx       # business advisory chatbot with saved chat memory
@@ -197,6 +200,15 @@ Terminal/legacy events: done (with simplified_report + trace + engine), cancelle
 - **Cash-Flow Simulator** (`CashflowSimulator.tsx`) — pure client-side cash-flow projection (capital/weekly sales/weekly expenses, 4–24 weeks), SVG line chart, break-even week, monthly surplus. No backend calls.
 - **Business Check-up** (`StartupQuiz.tsx` + `frontend/lib/intake.ts` + `backend/core/intake.py`) — the single intake layer. Every question keeps its quick chips **and** accepts a free-text answer ("I sell fruit near the bus stand in Nagpur" beats "Street vendor / cart"). Questions **branch** on earlier answers via `showIf`/`prompt`, so a farmer is asked what they grow and how much land they have. Persisted in `localStorage["grameenai_profile"]` (old chip-code format auto-migrated by `migrateIntake()`) and sent to the backend as structured `intake` (`{field_id: text}`) on both the WS `start` message and `POST /api/chat`. **The field ids in `frontend/lib/intake.ts` and `backend/core/intake.py` must match** — `tests/test_intake.py` fails if they drift. The backend builds the one canonical snippet from them (`build_intake_snippet`) and uses it for the run topic, synthesis, persistence and chat, so every surface reads the same intake. Coverage is graded (`unaddressed`/`thin`/`answered`) and the chat re-probes the vaguest answer before asking about an untouched field.
 - **Resume last advisory** — page mount calls `GET /api/sessions/{session_id}` and restores the saved advisory (report + simplified + grey-out of run state) until the user runs again. Backend lives in `backend/api/sessions.py`.
+
+## Language (i18n) — non-negotiable rules
+- `frontend/lib/i18n.tsx` is the **only** place user-facing UI copy lives. No hardcoded strings in components — every one resolves through `t()`. A language switch must change the *whole* site, not just the chat.
+- Adding a language is one `DICT` entry plus one line in `LOCALES`; no component changes. A missing key falls back to English rather than rendering a raw key.
+- **Official terms are never translated**: Udyam, GST, MUDRA, PMEGP, CGTMSE, PM SVANidhi, ElevenLabs. Users must recognise them on a bank form; only the sentence around them is translated. `tests/test_i18n.py` enforces this.
+- Language also travels to the **backend**: the WS `start` message carries `lang` (validated against `VALID_LANGS`, anything unexpected falls back to English) so the writer, refiner and simplifier produce the advisory in the chosen language; `POST /api/eligibility` takes `lang` to return translated question wording, business-class labels and scheme rule labels (`label_hi` in `schemes.json`).
+- Hindi answers are stored as the **English canonical label** and translated at render time (`optionLabel()`). Storing the displayed text would break every classification regex on the backend. `migrateIntake()` maps a Hindi-stored answer back to canonical, so switching language never loses an answer.
+- **Encoding discipline:** Devanagari must survive every round-trip. Never rewrite a source file containing Hindi through PowerShell `Get-Content`/`Set-Content` (it re-encodes UTF-8 through the ANSI code page and produces mojibake such as `à¤¡à¥‡à¤¯à¤°`, which still parses, still passes tests, and ships broken). `tests/test_i18n.py::test_no_source_file_is_mojibake` scans the files that carry Devanagari; keep it green.
+- The language handler lives in a long-lived WebSocket closure — read it through `tRef`, never the raw `t`, or a language switch tears down live connections.
 
 ## Rules
 - Never hardcode API keys, always use os.getenv()

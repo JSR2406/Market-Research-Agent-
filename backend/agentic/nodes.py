@@ -285,6 +285,15 @@ async def writer_node(state: Dict, config: RunnableConfig) -> Dict:
         f"### {f.get('agent', '')}\n{f.get('output', '')}" for f in (state.get("findings") or [])
     )
     eligibility_note = state.get("eligibility_note", "")
+    output_lang = state.get("output_lang", "en")
+    lang_rule = (
+        "Write the ENTIRE advisory in simple, plain Hindi (Devanagari script). "
+        "Keep scheme names, loan amounts and official terms (Udyam, GST, MUDRA, "
+        "PM SVANidhi, CGTMSE, PMEGP) in English — the user must recognise them on a "
+        "bank form. The JSON keys stay in English."
+        if output_lang == "hi"
+        else "Write the ENTIRE advisory in simple, plain English."
+    )
     writer_task = (
         f"Topic: {topic}\n"
         + (
@@ -303,6 +312,7 @@ async def writer_node(state: Dict, config: RunnableConfig) -> Dict:
         )
         + (f"\nCritic notes to address:\n{state.get('reflection')}\n" if state.get("reflection") else "")
         + f"\nAccumulated Findings:\n{combined}\n\n"
+        f"{lang_rule} "
         "Write a comprehensive Loan Readiness Advisory report in the JSON schema "
         "described in your instructions."
     )
@@ -406,10 +416,17 @@ async def refine_node(state: Dict, config: RunnableConfig) -> Dict:
     it = int(state.get("iteration", 0))
     idx = await em.node_start("refine", meta["label"], iteration=it, icon=meta["icon"])
 
+    editor_lang = (
+        "Keep the report in simple Hindi (Devanagari script), with scheme names "
+        "and amounts in English."
+        if state.get("output_lang", "en") == "hi"
+        else "Keep the report in simple English."
+    )
     editor_task = (
         f"Research Topic: {state.get('topic', '')}\n\n"
         f"Critic notes to address:\n{state.get('reflection') or 'none'}\n\n"
         f"Draft Report (JSON):\n{state.get('draft', '')}\n\n"
+        f"{editor_lang} "
         "Polish this report from the JSON provided: fix gaps, improve clarity, "
         "ensure the JSON keys exactly match the schema described in your instructions."
     )
@@ -468,7 +485,11 @@ async def finalize_node(state: Dict, config: RunnableConfig) -> Dict:
 
     simplified = ""
     try:
-        simplified = await simplifier_agent(final_report, topic=state.get("topic", ""))
+        simplified = await simplifier_agent(
+            final_report,
+            topic=state.get("topic", ""),
+            lang=state.get("output_lang", "en"),
+        )
     except Exception as e:
         logger.warning("[Finalize node] simplifier failed: %s", e)
 

@@ -14,6 +14,7 @@
         "type": "collateral_note",
         "severity": "qualifying",
         "label": "Guarantee covers collateral-free MSME loans",
+        "label_hi": "बिना ज़मानत के MSME लोन के लिए गारंटी कवर होता है",
         "basis": "collateral_requirement: None — the guarantee covers 85% of the loan up to Rs 15 lakh"
       },
       {
@@ -21,6 +22,7 @@
         "type": "registration_preferred",
         "severity": "advisory",
         "label": "Udyam registration is recommended to prove MSE status",
+        "label_hi": "MSME होने का सबूत — Udyam रजिस्ट्रेशन कराना बेहतर है",
         "basis": "eligibility_rules: Udyam registration recommended (not strictly mandatory)"
       }
     ],
@@ -68,6 +70,7 @@
         ],
         "severity": "disqualifying",
         "label": "Crop cultivation is not covered by this scheme",
+        "label_hi": "फसल उगाने वाला काम इस स्कीम में शामिल नहीं है",
         "basis": "exclusions: Corporate/farm cultivation activities"
       },
       {
@@ -78,6 +81,7 @@
         ],
         "severity": "qualifying",
         "label": "Allied agriculture (dairy, poultry, beekeeping) is covered",
+        "label_hi": "डेयरी, मुर्गी पालन, मधुमक्खी पालन जैसे काम शामिल हैं",
         "basis": "eligibility_rules: activities allied to agriculture such as poultry, dairy, beekeeping"
       },
       {
@@ -85,6 +89,7 @@
         "type": "advisory",
         "severity": "advisory",
         "label": "For individuals, proprietorships and partnerships (not companies)",
+        "label_hi": "व्यक्ति, एकल व्यवसाय और साझेदारी के लिए (कंपनियों के लिए नहीं)",
         "basis": "eligibility_rules: Available to individuals, proprietorship concerns, partnership firms"
       }
     ],
@@ -132,6 +137,7 @@
         ],
         "severity": "disqualifying",
         "label": "Crop cultivation is not covered by this scheme",
+        "label_hi": "फसल उगाने वाला काम इस स्कीम में शामिल नहीं है",
         "basis": "exclusions: Corporate/farm cultivation activities"
       },
       {
@@ -142,6 +148,7 @@
         ],
         "severity": "qualifying",
         "label": "Allied agriculture (dairy, poultry, beekeeping) is covered",
+        "label_hi": "डेयरी, मुर्गी पालन, मधुमक्खी पालन जैसे काम शामिल हैं",
         "basis": "eligibility_rules: activities allied to agriculture such as poultry, dairy, beekeeping"
       }
     ],
@@ -189,6 +196,7 @@
         ],
         "severity": "disqualifying",
         "label": "Crop cultivation is not covered by this scheme",
+        "label_hi": "फसल उगाने वाला काम इस स्कीम में शामिल नहीं है",
         "basis": "exclusions: Corporate/farm cultivation activities"
       },
       {
@@ -199,6 +207,7 @@
         ],
         "severity": "qualifying",
         "label": "Allied agriculture (dairy, poultry, beekeeping) is covered",
+        "label_hi": "डेयरी, मुर्गी पालन, मधुमक्खी पालन जैसे काम शामिल हैं",
         "basis": "eligibility_rules: activities allied to agriculture such as poultry, dairy, beekeeping"
       }
     ],
@@ -246,6 +255,7 @@
         ],
         "severity": "disqualifying",
         "label": "Crop cultivation is not covered by this scheme",
+        "label_hi": "फसल उगाने वाला काम इस स्कीम में शामिल नहीं है",
         "basis": "exclusions: Corporate/farm cultivation activities"
       },
       {
@@ -256,6 +266,7 @@
         ],
         "severity": "qualifying",
         "label": "Allied agriculture (dairy, poultry, beekeeping) is covered",
+        "label_hi": "डेयरी, मुर्गी पालन, मधुमक्खी पालन जैसे काम शामिल हैं",
         "basis": "eligibility_rules: activities allied to agriculture such as poultry, dairy, beekeeping"
       }
     ],
@@ -302,6 +313,7 @@
         ],
         "severity": "disqualifying",
         "label": "Crop cultivation is outside PMEGP (non-farm sector only)",
+        "label_hi": "फसल उगाना PMEGP में नहीं आता (यह सिर्फ़ गैर-कृषि क्षेत्र के लिए है)",
         "basis": "exclusions: Activities in the negative list / eligibility_rules: non-farm"
       },
       {
@@ -310,12 +322,11 @@
         "values": [
           "manufacturing",
           "services",
-          "trading",
-          "home_based",
-          "street_vending"
+          "home_based"
         ],
         "severity": "qualifying",
         "label": "Manufacturing or service sector micro unit",
+        "label_hi": "उत्पादन या सेवा क्षेत्र की माइक्रो यूनिट",
         "basis": "eligibility_rules: New micro-enterprise in manufacturing or business/service sector (non-farm)"
       },
       {
@@ -328,6 +339,7 @@
         ],
         "severity": "blocking",
         "label": "One unit per family — a second unit needs the first loan repaid",
+        "label_hi": "एक परिवार के लिए एक ही यूनिट — दूसरी यूनिट के लिए पहला लोन चुकाना ज़रूरी है",
         "basis": "exclusions: Units already financed under PMEGP / REGP / MUDRA in the same family"
       },
       {
@@ -335,6 +347,7 @@
         "type": "advisory",
         "severity": "advisory",
         "label": "Margin money subsidy is higher (25-35%) for rural units than urban (15-25%)",
+        "label_hi": "गाँव की यूनिट पर मार्जिन सब्सिडी ज़्यादा (25-35%) है, शहर में कम (15-25%)",
         "basis": "eligibility_rules: Margin money subsidy 25-35% rural, 15-25% urban"
       }
     ],
@@ -383,6 +396,7 @@
         ],
         "severity": "disqualifying",
         "label": "Only for street vendors — other businesses are not covered",
+        "label_hi": "यह सिर्फ़ रेहड़ी-पटरी वालों के लिए है — दूसरे कामों के लिए नहीं",
         "basis": "exclusions: Non-vending businesses"
       },
       {
@@ -390,6 +404,7 @@
         "type": "requires_document",
         "severity": "blocking",
         "label": "Needs a vending certificate / ULB identification letter",
+        "label_hi": "वेंडिंग सर्टिफ़िकेट / UBL पहचान पत्र चाहिए",
         "basis": "eligibility_rules: Holds a valid vending certificate / ULB identification letter"
       },
       {
@@ -397,6 +412,7 @@
         "type": "advisory",
         "severity": "advisory",
         "label": "Vending in a covered city or town (scheme extended to 31.03.2030)",
+        "label_hi": "शामिल शहर या कस्बे में विक्रय (योजना 31.03.2030 तक बढ़ाई गई है)",
         "basis": "eligibility_rules: Street vendor vending in a covered city/town"
       }
     ],

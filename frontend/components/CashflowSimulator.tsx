@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { motion } from "framer-motion";
 import { AlertCircle, CalendarClock, PiggyBank, TrendingUp, Wallet } from "lucide-react";
 
@@ -39,6 +40,7 @@ function NumField({
 }
 
 export default function CashflowSimulator() {
+  const { t } = useI18n();
   const [capital, setCapital] = useState(50000);
   const [sales, setSales] = useState(15000);
   const [expenses, setExpenses] = useState(10000);
@@ -98,25 +100,25 @@ export default function CashflowSimulator() {
           <TrendingUp size={16} color="#fff" />
         </div>
         <div>
-          <p style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)" }}>Cash-Flow Simulator</p>
+          <p style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)" }}>{t("cash.title")}</p>
           <p style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-            Guess your numbers — see if the business survives and when it breaks even. No internet needed.
+            {t("cash.sub")}
           </p>
         </div>
       </div>
 
       {/* Inputs */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", margin: "14px 0 6px" }}>
-        <NumField label="Starting capital (₹)" value={capital} onChange={setCapital} />
-        <NumField label="Weekly sales (₹)" value={sales} onChange={setSales} />
-        <NumField label="Weekly expenses (₹)" value={expenses} onChange={setExpenses} />
+        <NumField label={t("cash.capital")} value={capital} onChange={setCapital} />
+        <NumField label={t("cash.sales")} value={sales} onChange={setSales} />
+        <NumField label={t("cash.expenses")} value={expenses} onChange={setExpenses} />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
         <CalendarClock size={13} color="var(--text-muted)" style={{ flexShrink: 0 }} />
         <input
           type="range" min={4} max={24} value={weeks}
           onChange={(e) => setWeeks(Number(e.target.value))}
-          aria-label="Weeks to project"
+          aria-label={t("cash.weeks")}
           style={{ flex: 1, accentColor: "var(--accent2)" }}
         />
         <span style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 700, minWidth: "34px", textAlign: "right" }}>
@@ -126,7 +128,7 @@ export default function CashflowSimulator() {
 
       {/* Chart */}
       <div style={{ marginTop: "12px", background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "10px 8px 4px" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="Projected cash balance over weeks">
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label={t("cash.chartAria")}>
           <defs>
             <linearGradient id="cfFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="rgba(139,92,246,0.35)" />
@@ -157,19 +159,23 @@ export default function CashflowSimulator() {
       {/* Stats */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "12px" }}>
         <div style={{ flex: 1, minWidth: "130px", background: "rgba(45,212,191,0.08)", border: "1px solid rgba(45,212,191,0.25)", borderRadius: "10px", padding: "10px 12px" }}>
-          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Monthly surplus</p>
+          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{t("cash.surplus")}</p>
           <p style={{ fontSize: "1rem", fontWeight: 700, color: monthlySurplus >= 0 ? "var(--success)" : "var(--error)" }}>
             {monthlySurplus >= 0 ? "+" : ""}{inr(monthlySurplus)}
           </p>
         </div>
         <div style={{ flex: 1, minWidth: "130px", background: "rgba(251,146,60,0.06)", border: "1px solid rgba(251,146,60,0.2)", borderRadius: "10px", padding: "10px 12px" }}>
-          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Break-even</p>
+          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{t("cash.breakeven")}</p>
           <p style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            {breakEven > 0 ? `Week ${breakEven}` : monthlySurplus < 0 ? "Not happening" : "Immediate"}
+            {breakEven > 0
+              ? t("cash.weekN", { n: breakEven })
+              : monthlySurplus < 0
+                ? t("cash.never")
+                : t("cash.immediate")}
           </p>
         </div>
         <div style={{ flex: 1, minWidth: "130px", background: "rgba(79,142,247,0.06)", border: "1px solid rgba(79,142,247,0.2)", borderRadius: "10px", padding: "10px 12px" }}>
-          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Balance after {weeks} weeks</p>
+          <p style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{t("cash.balance", { n: weeks })}</p>
           <p style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)" }}>{inr(balances[balances.length - 1])}</p>
         </div>
       </div>
@@ -178,7 +184,7 @@ export default function CashflowSimulator() {
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px", padding: "10px 12px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "10px" }}>
           <AlertCircle size={14} color="var(--error)" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: "0.76rem", color: "var(--error)" }}>
-            Expenses are above sales — cash is draining every week. Cut costs or grow sales before applying for a loan.
+            {t("cash.warnNegative")}
           </span>
         </div>
       )}
@@ -186,7 +192,7 @@ export default function CashflowSimulator() {
       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "10px" }}>
         <PiggyBank size={13} color="var(--text-muted)" />
         <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-          Bankers like a consistent positive surplus — it proves the loan can be repaid.
+          {t("cash.foot")}
         </span>
       </div>
     </motion.div>

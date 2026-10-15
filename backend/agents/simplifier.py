@@ -12,12 +12,23 @@ async def simplifier_agent(
     advisory_json: str,
     topic: str = "",
     agent_hint: Optional[str] = "simplifier",
+    lang: str = "en",
 ) -> str:
     """
     Convert a finalized advisory JSON into a low-literacy, print-friendly plain
     document. Short numbered lines, no jargon — readable aloud to a first-time
     borrower. Falls back to a deterministic summary when the LLM is unavailable.
+
+    `lang` follows the language the user is reading the site in, so the
+    read-aloud version matches the interface. Official scheme names stay in
+    English either way — the user must recognise them on a bank form.
     """
+    language_rule = (
+        "Write in very simple Hindi (Devanagari script). Keep official scheme "
+        "names and amounts (Udyam, GST, MUDRA, PM SVANidhi) in English."
+        if lang == "hi"
+        else "Write in very simple English."
+    )
     messages = [
         {
             "role": "system",
@@ -25,6 +36,7 @@ async def simplifier_agent(
                 "You write for a first-time borrower with basic literacy. Convert the "
                 "advisory JSON into a short plain-language document: 4-6 numbered lines, "
                 "very simple words, no jargon, no abbreviations like CGTMSE/marginal. "
+                f"{language_rule} "
                 "Return plain text only — no markdown, no JSON."
             ),
         },

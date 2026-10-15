@@ -3,6 +3,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Square, Zap, Sparkles, Mic, MicOff, Loader, Check, ShieldCheck } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   onStart: (topic: string, maxSteps: number) => void;
@@ -10,7 +11,8 @@ interface Props {
   isRunning: boolean;
 }
 
-const EXAMPLE_TOPICS = [
+const EXAMPLE_KEYS = ["input.example1", "input.example2", "input.example3"] as const;
+const EXAMPLE_FALLBACK = [
   "Vegetable seller in rural Maharashtra, earning ₹15k/month",
   "Tailor in tier-2 city, ₹25k/month, needs sewing machine loan",
   "Small dairy farmer in Gujarat, 3 cows, ₹20k/month",
@@ -40,6 +42,8 @@ const ENGINE_LABELS: Record<string, string> = {
 const engineLabel = (key: string): string => ENGINE_LABELS[key] ?? key;
 
 export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
+  const { t } = useI18n();
+  const examples = EXAMPLE_KEYS.map((key, i) => t(key) || EXAMPLE_FALLBACK[i]);
   const [topic, setTopic] = useState("");
   const [maxSteps, setMaxSteps] = useState(4);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
@@ -86,14 +90,14 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
           const json = await res.json();
           if (json.text) {
             setTopic(json.text);
-            setVoiceMsg("Transcribed — review it and submit");
+            setVoiceMsg(t("mic.done"));
             setVoiceOk(true);
           } else {
-            setVoiceMsg(json.warning ?? "Could not understand audio — please type instead.");
+            setVoiceMsg(json.warning ?? t("mic.unheard"));
             setVoiceOk(false);
           }
         } catch {
-          setVoiceMsg("Voice unavailable right now — please type instead.");
+          setVoiceMsg(t("mic.unavailable"));
           setVoiceOk(false);
         }
         setVoiceState("idle");
@@ -102,11 +106,11 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
       mediaRecorderRef.current = mr;
       setVoiceState("recording");
     } catch {
-      setVoiceMsg("Microphone access denied — please type instead.");
+      setVoiceMsg(t("mic.denied"));
       setVoiceState("error");
       setTimeout(() => setVoiceState("idle"), 3000);
     }
-  }, []);
+  }, [t]);
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop();
@@ -160,10 +164,10 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
           </div>
           <div>
             <h1 style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
-              Your AI Business Saathi
+              {t("brand.name")}
             </h1>
             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "1px" }}>
-              Market research, growth planning &amp; schemes for small businesses
+              {t("brand.tagline")}
             </p>
           </div>
         </div>
@@ -183,7 +187,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
                 onStart(topic.trim(), maxSteps);
               }
             }}
-            placeholder="Describe your business — what you sell, roughly how much you earn, and where you're located"
+            placeholder={t("input.placeholder")}
             disabled={isRunning}
             rows={3}
             style={{
@@ -214,8 +218,8 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
             id="voice-mic-btn"
             onClick={handleMicClick}
             disabled={isRunning || voiceState === "transcribing"}
-            title={voiceState === "recording" ? "Stop recording" : "Speak your business description"}
-            aria-label={voiceState === "recording" ? "Stop voice recording" : "Record voice description"}
+            title={voiceState === "recording" ? t("mic.stop") : t("mic.speak")}
+            aria-label={voiceState === "recording" ? t("mic.stopAria") : t("mic.record")}
             whileTap={{ scale: 0.9 }}
             animate={voiceState === "recording" ? { boxShadow: ["0 0 0 0px rgba(248,113,113,0.4)", "0 0 0 8px rgba(248,113,113,0)"] } : {}}
             transition={voiceState === "recording" ? { duration: 1, repeat: Infinity } : {}}
@@ -272,8 +276,8 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
               )}
               {voiceOk && <Check size={12} color="var(--success)" />}
               <span>
-                {voiceState === "recording" ? "Recording — click the mic again to stop"
-                  : voiceState === "transcribing" ? "Transcribing…"
+                {voiceState === "recording" ? t("mic.recording")
+                  : voiceState === "transcribing" ? t("mic.transcribing")
                   : voiceMsg}
               </span>
             </motion.div>
@@ -286,7 +290,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
             Quick examples
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {EXAMPLE_TOPICS.map((t) => (
+            {examples.map((t) => (
               <button
                 key={t}
                 onClick={() => !isRunning && setTopic(t)}
@@ -327,19 +331,17 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
             <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
               {voiceCap.private_by_default ? (
                 <>
-                  Voice runs <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>privately on the
-                  server</strong> — open-source engines, your recording never leaves it. STT:{" "}
-                  <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                  {t("voice.private")}{" "}
+                  {t("voice.stt")}: <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
                     {engineLabel(voiceCap.stt_default)}
                   </strong>{" "}
-                  · TTS: <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                  · {t("voice.tts")}: <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
                     {engineLabel(voiceCap.tts_default)}
                   </strong>
                 </>
               ) : (
                 <>
-                  Voice is powered by <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
-                    ElevenLabs cloud</strong> for the best quality.
+                  {t("voice.cloud")}
                 </>
               )}
             </span>
@@ -351,7 +353,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
           {/* Steps selector */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Zap size={13} color="var(--text-muted)" />
-            <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Research depth:</span>
+            <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{t("input.depth")}</span>
             <div style={{ display: "flex", gap: "4px" }}>
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <button
@@ -369,7 +371,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
                 </button>
               ))}
             </div>
-            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>steps</span>
+            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t("input.steps")}</span>
           </div>
 
           {/* Action button */}
@@ -387,7 +389,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
                   fontSize: "0.86rem", fontWeight: 600, cursor: "pointer",
                 }}
               >
-                <Square size={13} /> Stop Research
+                <Square size={13} /> {t("input.stop")}
               </motion.button>
             ) : (
               <motion.button
@@ -408,7 +410,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
                   transition: "all 0.2s",
                 }}
               >
-                <Search size={14} /> Start Research
+                <Search size={14} /> {t("input.start")}
               </motion.button>
             )}
           </AnimatePresence>

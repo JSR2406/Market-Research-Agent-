@@ -79,9 +79,11 @@ async def run_agentic_workflow(
     profile: str = "",
     session_id: str = "",
     eligibility_note: str = "",
+    output_lang: str = "en",
 ) -> Tuple[AgenticState, str]:
     """Run the advisory graph end-to-end. Never raises — returns (state, status)."""
     state = initial_state(topic, max_steps, profile, session_context, eligibility_note)
+    state["output_lang"] = output_lang
     config: Dict[str, Any] = {
         "configurable": {
             "emitter": emitter,

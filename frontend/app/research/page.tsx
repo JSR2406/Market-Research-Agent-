@@ -9,6 +9,8 @@ import Usps from "@/components/Usps";
 const LiveAdvisorPanel = dynamic(() => import("@/components/LiveAdvisorPanel"), { ssr: false });
 import StartupQuiz, { type ProfileInit } from "@/components/StartupQuiz";
 const CashflowSimulator = dynamic(() => import("@/components/CashflowSimulator"), { ssr: false });
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useI18n } from "@/lib/i18n";
 import { migrateIntake } from "@/lib/intake";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, MessageCircle, X } from "lucide-react";
@@ -20,11 +22,17 @@ const SESSION_KEY = "grameenai_session";
 const PROFILE_KEY = "grameenai_profile";
 
 export default function ResearchPage() {
+  const { t, locale, backendLang } = useI18n();
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   // Mirror of `isRunning` for use inside the WebSocket `onclose` closure —
   // the closure captures the value at connect time and would otherwise go stale.
   const isRunningRef = useRef(false);
+  // Always-current translator for code that lives in a long-lived closure.
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const pendingStartRef = useRef<{
     topic: string;
     maxSteps: number;
@@ -94,7 +102,9 @@ export default function ResearchPage() {
         setFinalReport(body.final_report as string);
         setSimplifiedReport(((body.simplified_report as string) ?? "").trim());
         setCurrentTopic((body.topic as string) ?? "");
-        setResumeNote("Reopened your last advisory — run research again to refresh it.");
+        // Read through the ref so a language switch does not re-fetch the
+        // session just to re-word this note.
+        setResumeNote(tRef.current("misc.resumeNote"));
       } catch {
         /* backend offline — nothing to resume */
       }
@@ -114,6 +124,10 @@ export default function ResearchPage() {
   }, []);
 
   const handleMessage = useCallback((data: Record<string, unknown>) => {
+    // The WS handler is registered once per connection, so it would otherwise
+    // keep translating through a stale `t` after a language switch. A ref
+    // always holds the current translator without forcing a reconnect.
+    const translate = tRef.current;
     setErrorMessage("");
     switch (data.type) {
       case "status":
@@ -141,7 +155,7 @@ export default function ResearchPage() {
             reflections: [],
           },
         ]);
-        setStatusMessage(`Running ${(data.label as string) ?? (data.node as string)}…`);
+        setStatusMessage(translate("timeline.running", { label: (data.label as string) ?? (data.node as string) }));
         break;
       case "node_end":
         setNodes((prev) =>
@@ -220,13 +234,13 @@ export default function ResearchPage() {
         setFinalReport(data.final_report as string);
         setSimplifiedReport(((data.simplified_report as string) ?? "").trim());
         setIsRunning(false);
-        setStatusMessage("Research complete.");
+        setStatusMessage(translate("timeline.complete"));
         retriesRef.current = 0;
         break;
       case "cancelled":
         setIsRunning(false);
         setNodes((prev) => prev.map((n) => (n.status === "running" ? { ...n, status: "done" } : n)));
-        setStatusMessage("Research cancelled.");
+        setStatusMessage(translate("timeline.cancelled"));
         retriesRef.current = 0;
         break;
       case "error":
@@ -237,6 +251,8 @@ export default function ResearchPage() {
         retriesRef.current = 0;
         break;
     }
+    // `t` is read via tRef inside — the WS handler must not change identity on
+    // a language switch, or every live connection would be torn down.
   }, []);
 
   // ── WebSocket with reconnect ───────────────────────────────────
@@ -279,7 +295,7 @@ export default function ResearchPage() {
         if (running && retriesRef.current < WS_MAX_RETRIES && !ev.wasClean) {
           retriesRef.current += 1;
           setStatusMessage(
-            `Connection lost. Retrying (${retriesRef.current}/${WS_MAX_RETRIES})…`
+            `t("timeline.retry", { n: retriesRef.current, max: WS_MAX_RETRIES })`
           );
           setTimeout(() => {
             connectWs();
@@ -319,6 +335,9 @@ export default function ResearchPage() {
       max_steps: maxSteps,
       session_id: sessionId,
       intake: profile,
+      // The advisory is written in the language the site is set to, so the
+      // report matches the interface instead of arriving in English only.
+      lang: backendLang,
     };
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -337,6 +356,7 @@ export default function ResearchPage() {
             max_steps: pending.maxSteps,
             session_id: pending.sessionId,
             intake: pending.intake,
+            lang: backendLang,
           })
         );
         pendingStartRef.current = null;
@@ -348,7 +368,7 @@ export default function ResearchPage() {
       if (wsRef.current?.readyState !== WebSocket.OPEN) {
         setStatusMessage("");
         setErrorMessage(
-          "We couldn't reach your Business Saathi just now. Please check your internet connection and try again."
+          t("timeline.offline")
         );
         setIsRunning(false);
       }
@@ -399,7 +419,7 @@ export default function ResearchPage() {
             paddingInline: "8px",
           }}
         >
-          Market research, growth planning &amp; government schemes for small businesses
+          {t("hero.kicker")}
         </h2>
         <p
           style={{
@@ -414,7 +434,7 @@ export default function ResearchPage() {
             WebkitTextFillColor: "transparent",
           }}
         >
-          Your AI Business Saathi
+          {t("brand.name")}
         </p>
         <p
           style={{
@@ -425,9 +445,12 @@ export default function ResearchPage() {
             margin: "8px auto 0",
           }}
         >
-          Describe your business in plain language — get live market research, a clear business road-map, matched government schemes, and a loan-readiness checklist in under 60 seconds.
+          {t("hero.sub")}
         </p>
       </motion.div>
+
+      {/* Language — switches the whole site, not just the chat */}
+      <LanguageSwitcher />
 
       {/* Business Check-up — optional quick questions that sharpen the first report */}
       <StartupQuiz value={profile} onChange={changeProfile} />
@@ -504,7 +527,7 @@ export default function ResearchPage() {
             <span style={{ fontSize: "0.82rem", color: "var(--warn)", flex: 1 }}>{resumeNote}</span>
             <button
               type="button"
-              aria-label="Dismiss resume notice"
+              aria-label={t("misc.dismissResume")}
               onClick={() => setResumeNote("")}
               style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", display: "flex" }}
             >
@@ -536,6 +559,7 @@ export default function ResearchPage() {
         sessionId={sessionId}
         topic={currentTopic}
         intake={profile}
+        locale={locale}
       />
 
       {/* Realtime voice advisor (LiveKit) */}
@@ -564,10 +588,10 @@ export default function ResearchPage() {
         </div>
         <div>
           <div style={{ display: "inline-block", background: "rgba(37,211,102,0.15)", color: "#25D366", padding: "2px 8px", borderRadius: "10px", fontSize: "0.68rem", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase" }}>
-            Coming Next (Roadmap)
+            {t("misc.whatsappBadge")}
           </div>
-          <p style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-primary)" }}>WhatsApp Advisory Bot</p>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Deliver the same advisory via WhatsApp in Hindi, Marathi &amp; Gujarati — no app install needed.</p>
+          <p style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("misc.whatsappTitle")}</p>
+          <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{t("misc.whatsappText")}</p>
         </div>
       </motion.div>
     </main>

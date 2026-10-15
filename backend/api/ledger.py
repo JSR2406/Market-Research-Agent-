@@ -27,7 +27,7 @@ from backend.core.eligibility import (
     evaluate_schemes,
     eligibility_summary,
 )
-from backend.core.intake import coverage_report, next_probe, normalize_intake
+from backend.core.intake import coverage_report, next_probe, normalize_intake, question_pack
 from backend.core.ledger import ledger_and_score, merge_completed
 from backend.core.memory import is_valid_session_id, load_last_session
 
@@ -49,7 +49,7 @@ def _session_state(session_id: str) -> dict:
 async def eligibility(body: EligibilityRequest):
     """Rule-engine verdicts — can say no, with a cited reason."""
     intake = normalize_intake(body.intake)
-    result = evaluate_schemes(intake, body.topic, body.amount)
+    result = evaluate_schemes(intake, body.topic, body.amount, body.lang)
     return {
         "business_class": result.get("business_class", ""),
         "business_label": result.get("business_label", ""),
@@ -57,8 +57,11 @@ async def eligibility(body: EligibilityRequest):
         "amount": result.get("amount"),
         "families": result.get("families") or [],
         "summary": eligibility_summary(result),
-        "coverage": coverage_report(intake),
-        "next_probe": next_probe(intake),
+        "coverage": coverage_report(intake, body.lang),
+        "next_probe": next_probe(intake, body.lang),
+        # Question wording in the site's language, so the stepper can render the
+        # same branching questions the backend reasons about.
+        "questions": question_pack(body.lang),
     }
 
 

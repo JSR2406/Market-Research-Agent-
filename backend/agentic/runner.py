@@ -78,9 +78,10 @@ async def run_agentic_workflow(
     session_context: str = "",
     profile: str = "",
     session_id: str = "",
+    eligibility_note: str = "",
 ) -> Tuple[AgenticState, str]:
     """Run the advisory graph end-to-end. Never raises — returns (state, status)."""
-    state = initial_state(topic, max_steps, profile, session_context)
+    state = initial_state(topic, max_steps, profile, session_context, eligibility_note)
     config: Dict[str, Any] = {
         "configurable": {
             "emitter": emitter,

@@ -521,6 +521,7 @@ export default function ResearchPage() {
             report={finalReport}
             topic={currentTopic}
             simplified={simplifiedReport}
+            sessionId={sessionId}
           />
         )}
       </AnimatePresence>

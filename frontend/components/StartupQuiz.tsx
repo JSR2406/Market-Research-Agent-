@@ -5,10 +5,12 @@ import {
   ChevronDown,
   ChevronLeft,
   CornerDownLeft,
+  Gavel,
   PencilLine,
   RotateCcw,
   Stethoscope,
 } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 import {
   activeQuestions,
   describeMissingIntake,
@@ -37,6 +39,13 @@ export default function StartupQuiz({
   // Free-text answer being typed for the current question, committed on
   // Next / Enter / blur so a half-typed word never lands in the profile.
   const [draft, setDraft] = useState("");
+  // Live verdicts from the deterministic rule engine — the user sees what they
+  // qualify for while they answer, not only after a full research run.
+  const [verdict, setVerdict] = useState<{
+    business_label?: string;
+    families?: { name: string; status: string; status_label: string }[];
+    coverage?: { score?: number };
+  } | null>(null);
 
   // The question list is dynamic — branching questions appear once the earlier
   // answers call for them, so it is derived from the answers, never hardcoded.
@@ -88,6 +97,41 @@ export default function StartupQuiz({
     onChange(next);
     setDraft("");
   };
+
+  // Ask the rule engine what the answers so far mean. Debounced so typing a
+  // free-text answer doesn't fire a request per keystroke, and skipped
+  // entirely until there is something to judge.
+  const answeredCount = Object.keys(value).length;
+  useEffect(() => {
+    if (answeredCount === 0) {
+      setVerdict(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      (async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/eligibility`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ intake: value }),
+            signal: controller.signal,
+          });
+          if (!res.ok) return;
+          setVerdict(await res.json());
+        } catch {
+          /* offline or aborted — the quiz still works without verdicts */
+        }
+      })();
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(value)]);
+
+  const openNow = (verdict?.families ?? []).filter((f) => f.status === "eligible" || f.status === "likely");
 
   const nextQuestion = describeMissingIntake(value);
 
@@ -330,6 +374,49 @@ export default function StartupQuiz({
               : "Your Saathi has everything it needs — it will use these answers everywhere."}{" "}
             Nothing is shared anywhere — it stays on your device.
           </p>
+
+          {/* Live rule-engine verdict — shown while they answer */}
+          {verdict && (openNow.length > 0 || verdict.business_label) && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                marginTop: "12px",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                background: "rgba(37,211,102,0.06)",
+                border: "1px solid rgba(37,211,102,0.22)",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  color: "var(--success)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <Gavel size={12} />
+                {verdict.business_label
+                  ? `Your business type: ${verdict.business_label}`
+                  : "Your eligibility so far"}
+              </p>
+              {openNow.length > 0 && (
+                <p style={{ margin: "4px 0 0", fontSize: "0.71rem", color: "var(--text-secondary)" }}>
+                  Open for you:{" "}
+                  {openNow.slice(0, 4).map((f) => f.name).join(", ")}
+                </p>
+              )}
+              {typeof verdict.coverage?.score === "number" && (
+                <p style={{ margin: "3px 0 0", fontSize: "0.68rem", color: "var(--text-muted)" }}>
+                  Details filled in: {verdict.coverage.score}%
+                </p>
+              )}
+            </motion.div>
+          )}
         </div>
       )}
     </motion.div>

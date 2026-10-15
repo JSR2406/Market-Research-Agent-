@@ -3,6 +3,8 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText, ExternalLink, Link2 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import EligibilityPanel, { type EligibilityFamily } from "@/components/EligibilityPanel";
+import ActionLedger, { type LedgerScore } from "@/components/ActionLedger";
 
 interface CashFlow {
   [key: string]: string | number;
@@ -16,12 +18,20 @@ interface AdvisoryData {
   next_step?: string;
   loan_ready_score?: { score?: number; level?: string; why?: string[] };
   sources?: string[];
+  eligibility?: {
+    business_class?: string;
+    business_label?: string;
+    amount?: number | null;
+    families?: EligibilityFamily[];
+  };
+  action_ledger?: LedgerScore;
 }
 
 interface Props {
   report: string;
   topic: string;
   simplified?: string;
+  sessionId?: string;
 }
 
 const BACKEND_URL = API_BASE;
@@ -90,7 +100,7 @@ function ScoreGauge({ score }: { score: number }) {
   );
 }
 
-export default function AdvisoryCard({ report, topic, simplified }: Props) {
+export default function AdvisoryCard({ report, topic, simplified, sessionId }: Props) {
   const [audioState, setAudioState] = useState<AudioState>("idle");
   const [audioMsg, setAudioMsg] = useState("");
   const [copied, setCopied] = useState(false);
@@ -317,8 +327,24 @@ export default function AdvisoryCard({ report, topic, simplified }: Props) {
       </div>
 
       <div style={{ padding: "clamp(16px, 5vw, 24px)", display: "flex", flexDirection: "column", gap: "24px" }}>
-        {/* Loan-Ready Score */}
-        {data.loan_ready_score && typeof data.loan_ready_score.score === "number" && (
+        {/* Deterministic eligibility verdicts — computed in code, can say no */}
+        {Array.isArray(data.eligibility?.families) && data.eligibility.families.length > 0 && (
+          <EligibilityPanel
+            families={data.eligibility.families}
+            businessLabel={data.eligibility.business_label}
+            amount={data.eligibility.amount}
+          />
+        )}
+
+        {/* Action ledger — the loan-ready score measured on the user's own
+            progress, plus the checklist that moves it */}
+        {sessionId && data.action_ledger && Array.isArray(data.action_ledger.actions) && (
+          <ActionLedger sessionId={sessionId} initial={data.action_ledger} />
+        )}
+
+        {/* Loan-Ready Score — suppressed when the Action Ledger is showing the
+            same score alongside the checklist that raises it. */}
+        {data.loan_ready_score && typeof data.loan_ready_score.score === "number" && !data.action_ledger && (
           <motion.div
             initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
             style={{

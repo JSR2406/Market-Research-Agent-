@@ -30,6 +30,9 @@ class AgenticState(TypedDict, total=False):
     profile: str
     session_context: str
     max_steps: int
+    # Deterministic verdicts computed in code before any LLM runs — the writer
+    # is told these so the prose can never contradict the rule engine.
+    eligibility_note: str
 
     # ── planning ────────────────────────────────────────────────────────────
     plan: Annotated[List[str], operator.add]
@@ -64,12 +67,14 @@ def initial_state(
     max_steps: int,
     profile: str = "",
     session_context: str = "",
+    eligibility_note: str = "",
 ) -> AgenticState:
     """Fresh state for one advisory run."""
     return AgenticState(
         topic=topic,
         profile=profile,
         session_context=session_context,
+        eligibility_note=eligibility_note,
         max_steps=max(1, min(int(max_steps or 5), 6)),
         plan=[],
         iteration=0,

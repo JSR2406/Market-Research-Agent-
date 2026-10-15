@@ -253,3 +253,165 @@ def describe_missing(intake: Optional[Dict], lang: str = "en") -> str:
     if lang == "hi":
         return f"अभी बाकी है: {joined}{more}"
     return f"Still to tell me: {joined}{more}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Graded coverage — "answered" is not the same as "answered well".
+#
+# Asking "what do you earn?" and getting "some days" is not an answer a banker
+# can use, and treating it as one is how a profile silently becomes useless.
+# Each field is graded UNADDRESSED / THIN / ANSWERED, and THIN drives a gentle
+# re-probe rather than being counted as done.
+# ─────────────────────────────────────────────────────────────────────────────
+
+UNADDRESSED = "unaddressed"
+THIN = "thin"
+ANSWERED = "answered"
+
+# Fields the advisory leans on. `scale` and `registered` sharpen it but do not
+# gate it, so they are excluded from the headline percentage.
+CORE_FIELDS: Tuple[str, ...] = (
+    "business",
+    "offering",
+    "earnings",
+    "location",
+    "age",
+    "loan",
+    "need",
+)
+
+_THIN_NOTES: Dict[str, Tuple[str, str]] = {
+    "earnings": (
+        "An honest rough figure works — lenders do not need an exact one.",
+        "एक अनुमान भी चलेगा — सटीक नहीं चाहिए।",
+    ),
+    "location": (
+        "Adding your city or district makes this far more useful.",
+        "अपना शहर या ज़िला भी बताइए।",
+    ),
+    "offering": (
+        "Naming what you sell helps us match the right scheme.",
+        "यह बताइए कि आप क्या बेचते हैं — स्कीम सही से मिलेगी।",
+    ),
+    "scale": (
+        "Even 'about 3000 a day' is enough to work with.",
+        "रोज़ के 3000 रुपये भी काफ़ी हैं।",
+    ),
+}
+
+
+def _tokens(value: str) -> List[str]:
+    return [t for t in re.split(r"[\s,]+", value.strip()) if t]
+
+
+def _grade(field_id: str, value: str) -> Tuple[str, str]:
+    """Grade one answer: (status, why-it-is-thin)."""
+    if not value:
+        return UNADDRESSED, ""
+
+    if field_id == "earnings":
+        if not re.search(r"\d", value) and not re.search(
+            r"under|above|below|less|more|around|approx|से|से कम|से ज्यादा|तक", value, re.IGNORECASE
+        ):
+            return THIN, _THIN_NOTES["earnings"][0]
+        return ANSWERED, ""
+
+    if field_id == "location":
+        parts = _tokens(value)
+        if len(parts) < 2 and not re.search(
+            r"maharashtra|gujarat|rajasthan|p Pradesh|bengal|tamil|karnataka|telangana|madhya",
+            value,
+            re.IGNORECASE,
+        ):
+            return THIN, _THIN_NOTES["location"][0]
+        return ANSWERED, ""
+
+    if field_id in {"offering", "scale"}:
+        if len(_tokens(value)) < 2 and len(value) < 8:
+            return THIN, _THIN_NOTES[field_id][0]
+        return ANSWERED, ""
+
+    if field_id in {"business", "age", "loan", "need", "registered"}:
+        # A picked chip is a complete answer; free text needs a little substance.
+        if len(value) <= 3 and len(_tokens(value)) < 2:
+            return THIN, "A few more words would help here."
+        return ANSWERED, ""
+
+    return ANSWERED, ""
+
+
+def coverage_report(intake: Optional[Dict], lang: str = "en") -> Dict:
+    """
+    0-100 intake coverage with per-field grading.
+
+    ``score`` counts a THIN answer as half — visible partial credit is what
+    prompts the user to finish the answer instead of abandoning the form.
+    """
+    answers = normalize_intake(intake)
+    fields: List[Dict] = []
+    earned = 0.0
+
+    for fid in GAP_PRIORITY:
+        if fid not in CORE_FIELDS:
+            continue
+        label, q_en, q_hi = _FIELD_BY_ID[fid]
+        value = answers.get(fid, "")
+        status, note = _grade(fid, value)
+        if status == ANSWERED:
+            earned += 1.0
+        elif status == THIN:
+            earned += 0.5
+        fields.append({
+            "id": fid,
+            "label": label,
+            "status": status,
+            "note": _THIN_NOTES[fid][1 if lang == "hi" else 0] if status == THIN else note,
+            "question": q_hi if lang == "hi" else q_en,
+        })
+
+    score = int(round((earned / len(CORE_FIELDS)) * 100)) if CORE_FIELDS else 0
+
+    optional = []
+    for fid in GAP_PRIORITY:
+        if fid in CORE_FIELDS:
+            continue
+        label, q_en, q_hi = _FIELD_BY_ID[fid]
+        value = answers.get(fid, "")
+        status, note = _grade(fid, value)
+        optional.append({
+            "id": fid,
+            "label": label,
+            "status": status,
+            "note": note,
+            "question": q_hi if lang == "hi" else q_en,
+        })
+
+    return {
+        "score": max(0, min(100, score)),
+        "fields": fields,
+        "optional_fields": optional,
+        "thin": [f["id"] for f in fields if f["status"] == THIN],
+        "unaddressed": [f["id"] for f in fields if f["status"] == UNADDRESSED],
+        "complete": not any(
+            f["status"] != ANSWERED for f in fields
+        ),
+    }
+
+
+def next_probe(intake: Optional[Dict], lang: str = "en") -> str:
+    """
+    The one question worth asking next.
+
+    THIN answers outrank UNADDRESSED ones: a half-answer is closer to useful
+    than an empty field, so we finish what the user already started before
+    moving on to something they have not touched at all.
+    """
+    report = coverage_report(intake, lang)
+    for wanted in (THIN, UNADDRESSED):
+        for field in report["fields"]:
+            if field["status"] == wanted:
+                if wanted == THIN and field["note"]:
+                    hint = f" ({field['note']})" if lang == "en" else f" ({field['note']})"
+                    return f"{field['question']}{hint}"
+                return field["question"]
+    return ""

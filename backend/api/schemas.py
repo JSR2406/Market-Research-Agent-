@@ -53,6 +53,47 @@ class SessionResponse(BaseModel):
     updated_at: Optional[float] = None
 
 
+# ── Eligibility + Action Ledger — deterministic, never LLM-generated ──────────
+
+
+class EligibilityRequest(BaseModel):
+    topic: str = Field("", max_length=2000)
+    # Optional explicit loan amount; when absent the engine reads it from the
+    # topic only if the message actually mentions borrowing.
+    amount: Optional[int] = None
+    intake: Dict[str, str] = Field(default_factory=dict)
+
+
+class EligibilityResponse(BaseModel):
+    business_class: str = ""
+    business_label: str = ""
+    signals: List[str] = []
+    amount: Optional[int] = None
+    families: List[Dict[str, Any]] = []
+    summary: str = ""
+    coverage: Dict[str, Any] = {}
+    next_probe: str = ""
+
+
+class LedgerTickRequest(BaseModel):
+    completed: List[str] = Field(default_factory=list, max_length=40)
+    persist: bool = True
+
+
+class LedgerResponse(BaseModel):
+    session_id: str = ""
+    score: int = 0
+    points_earned: int = 0
+    points_possible: int = 100
+    reasons: List[str] = []
+    next_action: Optional[Dict[str, Any]] = None
+    blockers: List[Dict[str, Any]] = []
+    actions: List[Dict[str, Any]] = []
+    done_count: int = 0
+    total_count: int = 0
+    completed: List[str] = []
+
+
 # ── voice ─────────────────────────────────────────────────────────────────────
 
 class SpeakRequest(BaseModel):

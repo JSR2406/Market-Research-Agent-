@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 from backend.core.heuristics import match_schemes, schemes_brief
 from backend.core.intake import (
     build_intake_snippet,
+    coverage_report,
     followup_instruction,
     missing_fields,
     next_question,
@@ -164,6 +165,7 @@ async def chat_agent(
     intake_answers = normalize_intake(intake)
     profile = build_intake_snippet(intake_answers) or (profile or "").strip()
     missing = missing_fields(intake_answers)
+    coverage = coverage_report(intake_answers, effective)
 
     history: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
@@ -212,6 +214,22 @@ async def chat_agent(
     gap_note = followup_instruction(intake_answers, effective)
     if gap_note:
         history.append({"role": "system", "content": gap_note})
+
+    # Graded coverage: a "thin" answer (earnings = "some days") is half an
+    # answer and is worth re-probing before asking about something untouched.
+    thin = coverage.get("thin") or []
+    if thin:
+        fields = ", ".join(
+            f"{f['label']} ({f['note']})" for f in coverage["fields"] if f["status"] == "thin"
+        )
+        history.append({
+            "role": "system",
+            "content": (
+                "These answers were given but are too vague to use: " + fields + ". "
+                "Ask ONE gentle follow-up on the vaguest of them, in the user's "
+                "language, before answering — do not ask about fields already filled."
+            ),
+        })
 
     # First turn of a session with a nearly-empty intake: open with the intake
     # question rather than answering blind.

@@ -14,23 +14,38 @@ terminal ``done`` event (with the full agentic trace) and persists the session.
 import logging
 
 import json
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from backend.agentic import EventEmitter, run_agentic_workflow
 from backend.agentic import engine_name
+from backend.core.eligibility import (
+    eligibility_note_for,
+    evaluate_schemes,
+)
 from backend.core.intake import build_intake_snippet, normalize_intake
+from backend.core.ledger import ledger_and_score
 from backend.core.llm_client import SESSION_TOKEN_USAGE, reset_session_state
 
 logger = logging.getLogger(__name__)
 
 
-def _finalize_report(report: str, sources: list | None = None) -> str:
+def _finalize_report(
+    report: str,
+    sources: list | None = None,
+    eligibility: dict | None = None,
+    ledger: dict | None = None,
+) -> str:
     """
     Single deterministic post-pass on the LLM-written advisory:
-    1. attach the deterministic loan_ready_score,
+    1. attach the loan-ready score — from the Action Ledger when we have one,
+       so the score measures the user's real progress rather than the quality
+       of the model's own prose (the older rubric handed out points for having
+       written a summary and listed five documents),
     2. annotate every matched-scheme line with its official source URL +
        last-verified date from schemes.json (never trusts the model), and
-    3. attach the run's genuinely-fetched source URLs under `sources`.
+    3. attach the run's genuinely-fetched source URLs under `sources`,
+    4. attach the deterministic eligibility verdicts and the action ledger, so
+       the UI renders computed facts rather than anything the model claimed.
 
     Runs exactly once so a re-parse cannot drop the injected score.
     """
@@ -45,12 +60,31 @@ def _finalize_report(report: str, sources: list | None = None) -> str:
     if data is None:
         return report
     if "loan_ready_score" not in data:
-        data["loan_ready_score"] = compute_loan_ready_score(data)
+        data["loan_ready_score"] = ledger if ledger else compute_loan_ready_score(data)
     schemes = data.get("matched_schemes") or []
     if schemes:
         data["matched_schemes"] = annotate_scheme_sources([str(s) for s in schemes])
     if sources:
         data["sources"] = sources
+    if eligibility:
+        data["eligibility"] = {
+            "business_class": eligibility.get("business_class", ""),
+            "business_label": eligibility.get("business_label", ""),
+            "amount": eligibility.get("amount"),
+            "families": eligibility.get("families") or [],
+        }
+    if ledger:
+        data["action_ledger"] = {
+            "score": ledger.get("score", 0),
+            "points_earned": ledger.get("points_earned", 0),
+            "points_possible": ledger.get("points_possible", 100),
+            "reasons": ledger.get("reasons") or [],
+            "next_action": ledger.get("next_action"),
+            "blockers": ledger.get("blockers") or [],
+            "actions": ledger.get("actions") or [],
+            "done_count": ledger.get("done_count", 0),
+            "total_count": ledger.get("total_count", 0),
+        }
     return json.dumps(data, ensure_ascii=False)
 
 
@@ -93,6 +127,28 @@ async def run_research_workflow(
     # Normalized once here so what we persist matches what the graph saw.
     intake_answers = normalize_intake(intake)
 
+    # ── Deterministic verdicts, computed BEFORE any LLM call ────────────────
+    # The rule engine decides what this business can and cannot do. The model
+    # only ever writes prose around these numbers, so it cannot invent an
+    # eligibility claim or soften a disqualification.
+    #
+    # Progress the user already ticked on previous visits is carried forward,
+    # so the loan-ready score climbs as they actually do things.
+    completed_actions: List[str] = []
+    if session_id:
+        try:
+            from backend.core.memory import load_last_session as _prior_session
+
+            prior_state = (_prior_session(session_id) or {}).get("state") or {}
+            completed_actions = list((prior_state.get("ledger") or {}).get("completed") or [])
+        except Exception:
+            logger.warning("Could not read prior ledger for %s", session_id, exc_info=True)
+            completed_actions = []
+
+    eligibility = evaluate_schemes(intake_answers, topic)
+    scored = ledger_and_score(intake_answers, topic, completed=completed_actions, eligibility=eligibility)
+    eligibility_note = eligibility_note_for(eligibility)
+
     emitter = EventEmitter(websocket, cancel_flag)
     emitter.set_token_usage_getter(lambda: SESSION_TOKEN_USAGE)
 
@@ -104,6 +160,7 @@ async def run_research_workflow(
             session_context=session_context,
             profile=profile,
             session_id=session_id,
+            eligibility_note=eligibility_note,
         )
     finally:
         set_run_source_sink(None)
@@ -112,7 +169,12 @@ async def run_research_workflow(
         # The engine already emitted the terminal event.
         return
 
-    final_report = state.get("report") or ""
+    final_report = _finalize_report(
+        state.get("report") or "",
+        sources=state.get("sources") or [],
+        eligibility=eligibility,
+        ledger=scored,
+    )
     simplified_report = state.get("simplified") or ""
     plan_steps = state.get("plan") or []
     findings = state.get("findings") or []
@@ -156,6 +218,12 @@ async def run_research_workflow(
                 "token_usage": SESSION_TOKEN_USAGE.copy(),
                 "profile": profile,
                 "intake": intake_answers,
+                "eligibility": {
+                    "business_class": eligibility.get("business_class", ""),
+                    "business_label": eligibility.get("business_label", ""),
+                    "amount": eligibility.get("amount"),
+                },
+                "ledger": {"completed": completed_actions, "score": scored.get("score", 0)},
                 "trace": emitter.trace,
                 "engine": engine_name(),
                 "visited": state.get("visited") or [],

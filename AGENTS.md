@@ -30,10 +30,13 @@ Order of authority for every output the product produces:
 
 - The LLM is NOT a source of truth. It may explain and recommend, never establish facts.
 - Never let the model invent scheme names, loan amounts, interest rates, eligibility claims, or approval guarantees. Scheme data comes only from `backend/data/schemes.json` (curated, each entry with `source_url` + `last_verified_at`); amounts/eligibility shown to users must be traceable to that data or a cited source.
+- **Eligibility is decided in code, never by the model.** `backend/core/eligibility.py` evaluates the `checks[]` predicates in `schemes.json` against the user's intake and returns `eligible | likely | blocked | not_eligible | wrong_tier`. The writer receives these verdicts as `eligibility_note` and is instructed not to contradict them. A verdict without a `basis` + `source_url` is a bug.
 - Every financial or government-scheme claim shown to a user must carry its source (URL or "curated dataset" provenance). Where a number is computed (e.g. loan-ready score, cash-flow projection), the calculation must be deterministic code, not an LLM output.
-- Scores and projections: deterministic functions in `backend/core/heuristics.py` / client-side calculators — never ask the LLM to compute them.
+- **Loan-ready score = f(user's real state), not f(report quality).** `backend/core/ledger.py` scores the Action Ledger — actions the user has actually completed, ticked via `POST /api/ledger/{session_id}`. The older `compute_loan_ready_score` rubric (which awarded points for the report containing a summary / five documents) is retained only as an offline fallback for sessions saved before the ledger existed. Never reintroduce report-quality scoring under the loan-ready label.
+- Scores and projections: deterministic functions in `backend/core/heuristics.py` / `backend/core/ledger.py` / client-side calculators — never ask the LLM to compute them.
+- **Intake answers are graded, not binary.** `coverage_report()` marks a field `unaddressed | thin | answered`; `next_probe()` re-asks the vaguest answer before moving to an untouched field. "some days" for earnings is half an answer, not an answer.
 - Research provenance: `web_research.web_context()` records only pages it genuinely fetched (run-scoped `contextvars` sink set by `executor.run_research_workflow`); the executor attaches the deduped list to the advisory JSON under `sources` and ships it on the `done` event. LLM-written URLs never count as sources. Scheme lines carry their own `(Source: <url>, verified <date>)` annotation added deterministically by `annotate_scheme_sources()`.
-- Offline guarantee: every agent must still produce usable output (heuristic tier) when all LLM providers are down.
+- Offline guarantee: every agent must still produce usable output (heuristic tier) when all LLM providers are down. `/api/eligibility` and `/api/ledger` are fully deterministic and must keep answering with every provider offline.
 
 ## Folder Structure
 market-research-agent/
@@ -46,7 +49,17 @@ market-research-agent/
 │   │   ├── __init__.py
 │   │   ├── config.py           # env-derived settings, fail-fast key guard
 │   │   ├── llm_client.py       # multi-provider LLM client + cache + token counter
-│   │   ├── heuristics.py       # zero-LLM advisory engine (offline guarantee tier) + loan-ready score
+│   │   ├── heuristics.py       # offline advisory tier + legacy report-quality score
+│   │   ├── intake.py           # THE intake layer: field registry, normalize, canonical
+│   │   │                       # snippet, graded coverage (unaddressed/thin/answered),
+│   │   │                       # next_probe(), deterministic follow-up questions
+│   │   ├── business.py         # deterministic business-class classification
+│   │   │                       # (agriculture_crop / agriculture_allied / manufacturing /
+│   │   │                       #  home_based / street_vending / trading / services / other)
+│   │   ├── eligibility.py      # scheme rule engine over schemes.json `checks[]`
+│   │   │                       # → eligible | likely | blocked | not_eligible | wrong_tier;
+│   │   │                       # group_by_family() collapses MUDRA tiers into one card
+│   │   ├── ledger.py           # Action Ledger + loan-ready score = f(actions completed)
 │   │   ├── web_research.py     # search + scrape (Google → DuckDuckGo), no keys
 │   │   ├── ws.py               # SafeWebSocket — serialized sends
 │   │   ├── memory.py           # JSON session store, 7-day retention, session_id allowlist guard
@@ -82,13 +95,15 @@ market-research-agent/
 │   │   ├── runner.py           # run_agentic_workflow; _run_langgraph + _run_native (identical events/state)
 │   │   └── tools.py            # deterministic tools: web_search, scheme_match, loan_ready_score, document_checklist, cashflow_projection (+langchain_tools())
 │   ├── data/
-│   │   └── schemes.json        # curated Indian MSME schemes (id, source_url, last_verified_at, eligibility_rules, documents)
+│   │   └── schemes.json        # curated Indian MSME schemes (id, source_url, last_verified_at,
+│   │                          #  eligibility_rules, documents, min/max_amount, checks[])
 │   ├── sessions/               # runtime JSON stores (gitignored)
 │   └── api/
 │       ├── __init__.py
-│       ├── schemas.py          # shared pydantic request/response models for the REST surface (response_model on every route)
+│       ├── schemas.py          # shared pydantic request/response models (response_model on every route)
 │       ├── ws_market.py        # WS endpoint (start/cancel/export/delete) + input validation
 │       ├── chat.py             # /api/chat (POST/GET history/DELETE) + chat memory, pydantic caps
+│       ├── ledger.py           # /api/eligibility (rule engine) + /api/ledger/{session_id} (GET/POST)
 │       ├── sessions.py         # GET /api/sessions/{session_id} — resume a saved advisory
 │       ├── langchain.py        # GET /api/langchain/status, POST /api/langchain/run (heuristic fallback, never 500)
 │       ├── whatsapp.py         # OPTIONAL WhatsApp Cloud API: GET verify, POST incoming → chat_agent → Graph reply (always 200)
@@ -177,9 +192,10 @@ Terminal/legacy events: done (with simplified_report + trace + engine), cancelle
 - Engine usage is always logged in `backend/core/voice.py` (e.g. `[Voice/TTS] piper voice '…' used`), so operators can audit which engine handled which request.
 
 ## Frontend Novelty Features
-- **Loan-Ready Score** — deterministic 0–100 score added to the advisory JSON by `executor._finalize_report()` (no LLM cost; rubric in `backend/core/heuristics.compute_loan_ready_score`). `AdvisoryCard.tsx` draws an SVG gauge + "why" reasons. Always present, even fully offline.
+- **Loan-Ready Score** — a 0–100 score derived from the **Action Ledger** (`backend/core/ledger.py`): the things the user has actually done (Udyam registration, 6 months of statements, declared income, business vintage, a matched scheme, a ready document pack), each worth points with a reason and a consequence. Attached to the advisory JSON as `action_ledger` by `executor._finalize_report()`; `ActionLedger.tsx` renders the checklist and ticks items via `POST /api/ledger/{session_id}`, which recomputes the score immediately and persists it for the next run. The legacy report-quality rubric (`heuristics.compute_loan_ready_score`) is now only an offline fallback — never reintroduce it as the loan-ready score.
+- **Eligibility Verdicts** (`backend/core/eligibility.py` + `EligibilityPanel.tsx`) — a deterministic rule engine over the `checks[]` predicates in `schemes.json`. Returns `eligible | likely | blocked | not_eligible | wrong_tier` per scheme family, each reason carrying the `basis` line it came from plus `source_url` + `last_verified_at`. Runs **before** any LLM call and is injected into the writer prompt as an override, so the prose cannot contradict it. MUDRA's four tiers collapse into one card with the recommended tier named. `POST /api/eligibility` exposes it standalone; the Business Check-up polls it (debounced) to show a live verdict while the user answers.
 - **Cash-Flow Simulator** (`CashflowSimulator.tsx`) — pure client-side cash-flow projection (capital/weekly sales/weekly expenses, 4–24 weeks), SVG line chart, break-even week, monthly surplus. No backend calls.
-- **Business Check-up quiz** (`StartupQuiz.tsx`) — 6 optional questions (business type, age, earnings, **location**, loan history, need) shown one at a time as a stepper, persisted in `localStorage["grameenai_profile"]`; answers are deterministically folded into the WS `start` topic via `buildProfileSnippet()` AND sent as a separate `profile` field on the `start` message (no extra LLM calls). The backend (`executor.run_research_workflow`) guarantees the profile is in the run topic, injects it into the writer's synthesis prompt (reflected in `business_summary`/`next_step`), persists it in session state (`state.profile`), and `POST /api/chat` uses it (request body, falling back to session state) so the advisor chat answers follow-up questions from the same answers — `chat_agent(profile=...)`.
+- **Business Check-up** (`StartupQuiz.tsx` + `frontend/lib/intake.ts` + `backend/core/intake.py`) — the single intake layer. Every question keeps its quick chips **and** accepts a free-text answer ("I sell fruit near the bus stand in Nagpur" beats "Street vendor / cart"). Questions **branch** on earlier answers via `showIf`/`prompt`, so a farmer is asked what they grow and how much land they have. Persisted in `localStorage["grameenai_profile"]` (old chip-code format auto-migrated by `migrateIntake()`) and sent to the backend as structured `intake` (`{field_id: text}`) on both the WS `start` message and `POST /api/chat`. **The field ids in `frontend/lib/intake.ts` and `backend/core/intake.py` must match** — `tests/test_intake.py` fails if they drift. The backend builds the one canonical snippet from them (`build_intake_snippet`) and uses it for the run topic, synthesis, persistence and chat, so every surface reads the same intake. Coverage is graded (`unaddressed`/`thin`/`answered`) and the chat re-probes the vaguest answer before asking about an untouched field.
 - **Resume last advisory** — page mount calls `GET /api/sessions/{session_id}` and restores the saved advisory (report + simplified + grey-out of run state) until the user runs again. Backend lives in `backend/api/sessions.py`.
 
 ## Rules

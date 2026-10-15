@@ -284,13 +284,21 @@ async def writer_node(state: Dict, config: RunnableConfig) -> Dict:
     combined = "\n\n---\n\n".join(
         f"### {f.get('agent', '')}\n{f.get('output', '')}" for f in (state.get("findings") or [])
     )
+    eligibility_note = state.get("eligibility_note", "")
     writer_task = (
         f"Topic: {topic}\n"
         + (
             f"\nClient intake answers (Business Check-up):\n{profile}\n"
-            "Reflect these answers inside business_summary and next_step — the "
+            "Reflect these answers inside business_summary and next_step - the "
             "advisory must be written for THIS client, not a generic one.\n"
             if profile
+            else ""
+        )
+        + (
+            f"\nDETERMINISTIC ELIGIBILITY VERDICTS (computed in code - these "
+            f"override anything you might infer, and you must not contradict them):\n"
+            f"{eligibility_note}\n"
+            if eligibility_note
             else ""
         )
         + (f"\nCritic notes to address:\n{state.get('reflection')}\n" if state.get("reflection") else "")

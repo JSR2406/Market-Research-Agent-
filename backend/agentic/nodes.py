@@ -21,15 +21,17 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from backend.agentic.events import EventEmitter, WorkflowCancelled
+from backend.agentic.compiler import compile_plan
+from backend.agentic.plan import parse_plan_json
 from backend.agentic.supervisor import ACTION_TO_NODE, decide
 from backend.agentic.tools import run_tool_async
 from backend.agents.analyst import analyst_agent
 from backend.agents.editor import editor_agent
 from backend.agents.opportunity import opportunity_agent
-from backend.agents.planner import planner_agent
+from backend.agents.planner import planner_agent, structured_plan_agent
 from backend.agents.research import research_agent
 from backend.agents.simplifier import simplifier_agent
 from backend.agents.writer import writer_agent
@@ -89,16 +91,55 @@ async def planner_node(state: Dict, config: RunnableConfig) -> Dict:
     meta = NODE_META["planner"]
     idx = await em.node_start("planner", meta["label"], icon=meta["icon"])
     topic = state.get("topic", "")
+
+    # The model *proposes* a structured plan; the compiler decides whether it is
+    # usable. Compilation failure is not an error — the default topology runs.
+    proposed = None
+    try:
+        proposed = await structured_plan_agent(
+            topic, previous_context=state.get("session_context", "")
+        )
+    except Exception as e:
+        logger.warning("[Planner] structured plan unavailable: %s", e)
+
+    compiled = None
+    if proposed:
+        try:
+            candidate = parse_plan_json(proposed)
+            compiled = compile_plan(candidate, state)
+        except Exception as e:  # pragma: no cover — compiler is defensive
+            logger.warning("[Planner] compilation raised: %s", e)
+
+    if compiled is None and proposed:
+        logger.info("[Planner] proposed plan rejected; using default topology")
+
+    # Prose plan for the UI and the trace, always available.
     try:
         plan = await planner_agent(topic, previous_context=state.get("session_context", ""))
     except Exception:
         plan = []
     plan = [str(s) for s in (plan or []) if str(s).strip()][: int(state.get("max_steps", 5))]
+
     await em.plan(topic, plan)
-    await em.node_end("planner", meta["label"], idx,
-                      summary=f"{len(plan)} research steps", output="\n".join(plan))
+    await em.node_end(
+        "planner",
+        meta["label"],
+        idx,
+        summary=(
+            f"{compiled.step_count} compiled steps from a proposed plan"
+            if compiled
+            else f"{len(plan)} research steps (default topology)"
+        ),
+        output="\n".join(plan),
+    )
     await em.token_usage()
-    return {"plan": plan, "visited": ["planner"]}
+
+    update: Dict[str, Any] = {"plan": plan, "visited": ["planner"]}
+    if compiled is not None:
+        # Store the serialised form only — the executor and the postcondition
+        # wrapper both read state["compiled_plan"] as a plain dict.
+        update["compiled_plan"] = compiled.as_dict()
+    return update
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,13 +152,52 @@ async def supervisor_node(state: Dict, config: RunnableConfig) -> Dict:
     _check_cancel(em)
     it = int(state.get("iteration", 0)) + 1
     idx = await em.node_start("supervisor", meta["label"], iteration=it, icon=meta["icon"])
-    action, reason = await decide(state)
+
+    # A compiled plan, when present, is the routing decision. The supervisor
+    # still checks preconditions and can skip a step, but it no longer invents
+    # the order — the compiler already validated it.
+    compiled = state.get("compiled_plan")
+    action, reason = await _decide_with_plan(state, compiled)
+
     node = ACTION_TO_NODE.get(action, "research")
     await em.thought("supervisor", f"{_summ(reason, 140)} → next: {node}")
     await em.node_end("supervisor", meta["label"], idx,
                       summary=f"Next: {node}", output=reason, iteration=it)
     await em.token_usage()
     return {"iteration": it, "next_action": action, "visited": ["supervisor"]}
+
+
+async def _decide_with_plan(
+    state: Dict, compiled: Optional[Dict]
+) -> Tuple[str, str]:
+    """
+    Pick the next action.
+
+    With a compiled plan: take the first step whose preconditions hold and which
+    has not already run. With no plan: the heuristic supervisor decides, exactly
+    as before — so a rejected plan costs the user nothing.
+    """
+    if not compiled:
+        return await decide(state)
+
+    steps = compiled.get("steps") or []
+    visited = {str(v) for v in (state.get("visited") or [])}
+
+    for step in steps:
+        node = str(step.get("node") or "")
+        if node in visited:
+            continue
+        pre = [str(k) for k in (step.get("pre") or [])]
+        missing = [k for k in pre if state.get(k) in (None, "", [], {}, 0)]
+        if missing:
+            # Preconditions unmet — skip this step and try the next one rather
+            # than running work that cannot succeed.
+            continue
+        return node, f"planned step {step.get('id')}: {step.get('reason') or node}"
+
+    # Every planned step has run (or been skipped). Fall back to the heuristic so
+    # the graph can still close out through writer/finalize.
+    return await decide(state)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

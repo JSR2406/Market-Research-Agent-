@@ -22,10 +22,19 @@ from typing import Any, Dict, Optional, Tuple
 
 from backend.agentic import runtime
 from backend.agentic.events import EventEmitter, WorkflowCancelled
+from backend.agentic.executor import with_postconditions
 from backend.agentic.graph import NODE_FUNCS, REDUCERS, START_NODE, graph_topology, successors
 from backend.agentic.state import AgenticState, initial_state
 
 logger = logging.getLogger(__name__)
+
+
+# The same registry, wrapped for postcondition checking. LangGraph mode and the
+# native runner both execute through this surface, so a step's declared
+# postconditions get checked whichever engine is available.
+POSTCONDITION_FUNCS: Dict[str, Any] = {
+    nid: with_postconditions(fn, nid) for nid, fn in NODE_FUNCS.items()
+}
 
 
 def _merge(state: Dict, update: Optional[Dict]) -> None:
@@ -56,7 +65,7 @@ async def _run_native(state: Dict, config: Dict) -> Tuple[Dict, str]:
         if fn is None:
             logger.error("[Agentic] unknown node %s", node)
             break
-        update = await fn(state, config)
+        update = await POSTCONDITION_FUNCS[node](state, config)
         _merge(state, update)
         node = successors(node, state)
     return state, "done"

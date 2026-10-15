@@ -10,6 +10,66 @@ from backend.core.llm_client import call_llm
 logger = logging.getLogger(__name__)
 
 
+# The step ids and graph nodes a plan may reference. The compiler validates
+# against these, so they are the single source of truth for what a plan can say.
+STRUCTURED_PLAN_PROMPT = """\
+You plan advisory work for a rural micro-business. Output a JSON plan.
+
+Return ONLY a JSON object of this exact shape, no prose, no markdown:
+{"goal": "one line", "steps": [{"id":"s1","node":"research","reason":"why","tool":"web_search","pre":["topic"],"post":["findings"],"fallback":"supervisor"}]}
+
+Allowed node values: research, analyst, schemes, writer, finalize.
+Allowed tool values: web_search, scheme_match, loan_ready_score, document_checklist, cashflow_projection.
+Rules:
+- 3 to 5 steps. Order matters.
+- "pre" = state keys that must already hold something. "post" = keys this step must produce.
+- Use "post" only for: findings, analysis, schemes_text, draft, report, simplified.
+- The last step must be "finalize" with post ["report","simplified"].
+- "fallback" is a node to run if the postcondition fails; use "supervisor" or "finalize".
+- Do not invent nodes or tools outside the allowed lists.
+"""
+
+
+async def structured_plan_agent(
+    topic: str,
+    previous_context: str = "",
+) -> Optional[str]:
+    """
+    Ask the model for a structured plan and return the raw JSON text.
+
+    Returns None when the model cannot produce one — the caller then falls back
+    to the default topology. This is deliberately a *proposal*: the compiler
+    decides whether it is usable, never the model.
+    """
+    context_note = ""
+    if previous_context:
+        context_note = (
+            f"\n\nPrevious research context (build on it, do not repeat):\n"
+            f"{previous_context[:600]}"
+        )
+
+    messages = [
+        {"role": "system", "content": STRUCTURED_PLAN_PROMPT},
+        {
+            "role": "user",
+            "content": f'Business: "{topic}".{context_note}',
+        },
+    ]
+    try:
+        content = await call_llm(
+            messages, temperature=0.2, max_tokens=700, agent_hint="planner"
+        )
+    except Exception as e:
+        logger.error(f"[Planner] structured plan failed: {e}")
+        return None
+
+    text = (content or "").strip()
+    # Strip fences — models love adding them even when told not to.
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"```\s*$", "", text, flags=re.MULTILINE).strip()
+    return text or None
+
+
 def _parse_plan(content: str) -> List[str]:
     """Robustly extract a list of strings from LLM output."""
     content = content.strip()
@@ -60,6 +120,11 @@ async def planner_agent(
     """
     Plan a 5-step research workflow for the given topic.
     previous_context: optional summary of a prior session.
+
+    The model is asked for a *structured* plan (see ``PLAN_SCHEMA``) and the
+    caller compiles it; this function returns the prose form for the UI and the
+    trace. A model that returns something unparseable is not an error — the
+    compiler rejects it and the default topology runs instead.
     """
     context_note = ""
     if previous_context:

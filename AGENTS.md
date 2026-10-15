@@ -89,6 +89,9 @@ market-research-agent/
 │   │   ├── state.py            # AgenticState TypedDict + Annotated reducers + initial_state
 │   │   ├── events.py           # EventEmitter (graph/plan/node_start/node_end/thought/tool_call/tool_result/reflection), WorkflowCancelled
 │   │   ├── runtime.py          # LANGGRAPH_AVAILABLE / LANGCHAIN_AVAILABLE / run_coro_sync / engine_name
+│   │   ├── plan.py             # typed Plan IR: Step(id/node/tool/pre/post/fallback) + parse_plan_json
+│   │   ├── compiler.py         # compile_plan() validates before any model call; default_plan() fallback; best_plan()
+│   │   ├── executor.py         # run_plan(): preconditions → run → postconditions → fallback; never raises
 │   │   ├── supervisor.py       # decide(): heuristic routing + guardrails (+LLM when up); ACTION_TO_NODE
 │   │   ├── nodes.py            # planner, supervisor, research, analyst, schemes, writer, critic, refine, finalize (+NODE_META)
 │   │   ├── graph.py            # topology + conditional routers + build_langgraph() + graph_topology()
@@ -200,6 +203,16 @@ Terminal/legacy events: done (with simplified_report + trace + engine), cancelle
 - **Cash-Flow Simulator** (`CashflowSimulator.tsx`) — pure client-side cash-flow projection (capital/weekly sales/weekly expenses, 4–24 weeks), SVG line chart, break-even week, monthly surplus. No backend calls.
 - **Business Check-up** (`StartupQuiz.tsx` + `frontend/lib/intake.ts` + `backend/core/intake.py`) — the single intake layer. Every question keeps its quick chips **and** accepts a free-text answer ("I sell fruit near the bus stand in Nagpur" beats "Street vendor / cart"). Questions **branch** on earlier answers via `showIf`/`prompt`, so a farmer is asked what they grow and how much land they have. Persisted in `localStorage["grameenai_profile"]` (old chip-code format auto-migrated by `migrateIntake()`) and sent to the backend as structured `intake` (`{field_id: text}`) on both the WS `start` message and `POST /api/chat`. **The field ids in `frontend/lib/intake.ts` and `backend/core/intake.py` must match** — `tests/test_intake.py` fails if they drift. The backend builds the one canonical snippet from them (`build_intake_snippet`) and uses it for the run topic, synthesis, persistence and chat, so every surface reads the same intake. Coverage is graded (`unaddressed`/`thin`/`answered`) and the chat re-probes the vaguest answer before asking about an untouched field.
 - **Resume last advisory** — page mount calls `GET /api/sessions/{session_id}` and restores the saved advisory (report + simplified + grey-out of run state) until the user runs again. Backend lives in `backend/api/sessions.py`.
+
+## Planner / Executor (Phase B) — code decides, the model proposes
+The advisory run is a **propose → dispose** loop, not a chatbot that talks its way through a task:
+
+- `agentic/plan.py` — typed Plan IR. A `Step` names the graph node, the deterministic tool (if any), `pre` state keys that must hold, `post` keys that must be produced, and a `fallback` node. `parse_plan_json()` turns model output into a `Plan`, returning `None` on anything unusable.
+- `agentic/compiler.py` — `compile_plan()` validates **before any model call is spent**: unique step ids, real graph nodes, real tools, real state keys, reachable pre/postconditions, valid fallbacks. `default_plan()` is the fallback topology; `best_plan()` prefers the candidate and falls back. Compilation never raises.
+- `agentic/executor.py` — `run_plan()` runs a compiled plan transactionally: check preconditions → run → check postconditions → run fallback or record failure. Never raises; returns a `PlanRun` written to `state["plan_run"]`.
+- `with_postconditions()` wraps every node so a step that claims success but produced nothing is recorded as **failed** in the trace. Applied to both runners.
+- The **supervisor follows the compiled plan** when one exists (`_decide_with_plan`); with no plan it uses the heuristic `decide()` exactly as before — so a rejected plan costs the user nothing.
+- LangGraph node wrappers must type `config` as `RunnableConfig`; a `Dict` hint makes LangGraph omit the config and the node then fails for lack of an emitter.
 
 ## Language (i18n) — non-negotiable rules
 - `frontend/lib/i18n.tsx` is the **only** place user-facing UI copy lives. No hardcoded strings in components — every one resolves through `t()`. A language switch must change the *whole* site, not just the chat.

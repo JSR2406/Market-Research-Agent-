@@ -21,6 +21,8 @@ import logging
 import operator
 from typing import Any, Callable, Dict, List, Optional
 
+from backend.agentic.events import EventEmitter, WorkflowCancelled
+from backend.agentic.executor import with_postconditions
 from backend.agentic.nodes import (
     NODE_META,
     analyst_node,
@@ -142,7 +144,10 @@ def build_langgraph() -> Optional[Any]:
 
         g = StateGraph(AgenticState)
         for nid, fn in NODE_FUNCS.items():
-            g.add_node(nid, fn)
+            # Postcondition checking is applied here so LangGraph mode and the
+            # native runner behave identically. The wrapper reads the live state
+            # at call time, so no state needs to be bound up front.
+            g.add_node(nid, with_postconditions(fn, nid))
 
         g.add_edge(START, "planner")
         g.add_edge("planner", "supervisor")

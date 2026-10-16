@@ -148,6 +148,7 @@ async def chat_agent(
     lang: str = "auto",
     profile: str = "",
     intake: Optional[Dict] = None,
+    facts_context: str = "",
 ) -> str:
     """
     Answer a single chat turn. `chat_history` is the recent remembered
@@ -155,8 +156,8 @@ async def chat_agent(
     session, used when the user asks about their own report. `lang` is one of
     "auto" | "hi" | "en". `intake` is the structured Business Check-up
     answers ({field_id: text}) — the single intake layer shared with the
-    research run. From it we derive the profile snippet and, deterministically,
-    which detail is still missing so Saathi asks for it instead of guessing.
+    research run. `facts_context` is cross-session memory (business type,
+    location, past eligibility, loan-ready scores) for richer personalization.
     """
     effective = _effective_lang(message, lang)
 
@@ -168,6 +169,13 @@ async def chat_agent(
     coverage = coverage_report(intake_answers, effective)
 
     history: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # Inject cross-session facts for personalization
+    if facts_context:
+        history.append({
+            "role": "system",
+            "content": f"[Cross-session memory]\n{facts_context}\nUse this to personalize your advice. Do not repeat it verbatim; let it inform your suggestions."
+        })
 
     if effective == "hi":
         history.append({

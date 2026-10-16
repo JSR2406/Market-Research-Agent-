@@ -40,6 +40,15 @@ const STORAGE_KEY = "grameenai_locale";
 
 /** Flat dotted keys → copy. English is the source of truth. */
 const EN: Record<string, string> = {
+  // ── nav ───────────────────────────────────────────────────────────────────
+  "nav.home": "Home",
+  "nav.research": "Research",
+  "nav.advisor": "Advisor",
+  "nav.schemes": "Schemes",
+  "nav.aria": "Main navigation",
+  "nav.openMenu": "Open menu",
+  "nav.closeMenu": "Close menu",
+
   // ── brand / hero ────────────────────────────────────────────────────────
   "brand.name": "Your AI Business Saathi",
   "brand.tagline": "Market research, growth planning & schemes for small businesses",
@@ -47,6 +56,52 @@ const EN: Record<string, string> = {
     "Market research, growth planning & government schemes for small businesses",
   "hero.sub":
     "Describe your business in plain language — get live market research, a clear business road-map, matched government schemes, and a loan-readiness checklist in under 60 seconds.",
+
+  // ── landing page ──────────────────────────────────────────────────────────
+  "landing.hero.badge": "New: Offline mode + Hindi support",
+  "landing.hero.title": "Your AI Business Saathi — Market research, growth planning & schemes for small businesses",
+  "landing.hero.subtitle": "Describe your business in plain language. Get live market research, a clear roadmap, matched government schemes, and a loan-readiness checklist — all in under 60 seconds.",
+  "landing.hero.cta": "Start Research",
+  "landing.hero.ctaSecondary": "Browse Schemes",
+  "landing.hero.trust": "No signup required · Works offline · Your data stays on your device",
+
+  "landing.stats.1": "Businesses helped",
+  "landing.stats.2": "Curated schemes",
+  "landing.stats.3": "Typical research time",
+  "landing.stats.4": "Free & open source",
+
+  "landing.features.title": "Built for small businesses",
+  "landing.features.subtitle": "Not a generic chatbot — Saathi is specialised for Indian micro-entrepreneurs",
+
+  "landing.features.1.title": "Business-first advice",
+  "landing.features.1.desc": "Saathi helps you build your business — pricing, costs, cash flow, customers, registration — not just answer questions.",
+
+  "landing.features.2.title": "Live market research",
+  "landing.features.2.desc": "Web-sourced facts, not memorised answers. Every claim is cited so you can verify it yourself.",
+
+  "landing.features.3.title": "Your Indian schemes",
+  "landing.features.3.desc": "MUDRA, PMEGP, CGTMSE, PM SVANidhi — matched to your business type, location, and stage automatically.",
+
+  "landing.features.4.title": "Loan-readiness checklist",
+  "landing.features.4.desc": "A clear action ledger shows exactly what to do before you walk into a bank branch.",
+
+  "landing.features.5.title": "Works offline",
+  "landing.features.5.desc": "Free local AI models mean Saathi works even without internet. No subscription, no API keys.",
+
+  "landing.features.6.title": "Your data, your device",
+  "landing.features.6.desc": "Session data stays in your browser. Export or delete anytime — GDPR-compliant by design.",
+
+  "landing.cta.title": "Ready to understand your business better?",
+  "landing.cta.subtitle": "Start your free research in seconds. No signup, no credit card.",
+  "landing.cta.button": "Start Research",
+
+  "landing.footer.desc": "Specialised business advisory for Indian micro-entrepreneurs. Market research, scheme matching, and loan-readiness — all in one place.",
+  "landing.footer.links": "Quick Links",
+  "landing.footer.legal": "Legal",
+  "landing.footer.privacy": "Privacy Policy",
+  "landing.footer.terms": "Terms of Service",
+  "landing.footer.contact": "Contact Us",
+  "landing.footer.copyright": "© 2024 Your AI Business Saathi. All rights reserved.",
 
   // ── business check-up ───────────────────────────────────────────────────
   "quiz.title": "Business Check-up",
@@ -260,6 +315,20 @@ const EN: Record<string, string> = {
   "chat.quick3": "क्या मुद्रा लोन मिलेगा?",
   "chat.quick4": "Start with ₹1 lakh?",
 
+  // ── advisor page ─────────────────────────────────────────────────────────
+  "advisor.title": "Business Advisor",
+  "advisor.subtitle": "Ask me anything about your business — loans, schemes, documents, cash flow, or how to grow. I remember your research context.",
+  "advisor.backToResearch": "← Back to Research",
+  "advisor.contextActive": "Research context active",
+  "advisor.contextDesc": "Your Business Check-up answers are loaded. The advisor will use them to give personalised advice.",
+  "advisor.welcome.title": "Welcome to your Business Advisor",
+  "advisor.welcome.desc": "I'm your personal business Saathi. I can help with loans, government schemes, documents, cash flow planning, and growing your business.",
+  "advisor.welcome.item1": "Loans & scheme eligibility (MUDRA, PMEGP, CGTMSE, PM SVANidhi)",
+  "advisor.welcome.item2": "Document checklists for bank applications",
+  "advisor.welcome.item3": "Cash flow, pricing, and business model questions",
+  "advisor.welcome.item4": "Registration (Udyam, GST) and compliance",
+  "advisor.welcome.gotIt": "Got it, let's start",
+
   // ── live voice ──────────────────────────────────────────────────────────
   "live.title": "Voice Advisor",
   "live.badge": "Live",
@@ -282,15 +351,109 @@ const EN: Record<string, string> = {
   "misc.whatsappTitle": "WhatsApp Advisory Bot",
   "misc.whatsappText":
     "Deliver the same advisory via WhatsApp in Hindi, Marathi & Gujarati — no app install needed.",
+
+  // ── schemes explorer ──────────────────────────────────────────────────────
+  "schemes.title": "Government Schemes for Small Businesses",
+  "schemes.subtitle": "Browse all curated schemes — MUDRA, PMEGP, CGTMSE, PM SVANidhi, and more. Filter by type, search by keyword, and see eligibility at a glance.",
+  "schemes.backToResearch": "← Back to Research",
+  "schemes.searchPlaceholder": "Search schemes by name or keyword…",
+  "schemes.searchAria": "Search schemes",
+  "schemes.filterAria": "Filter schemes by type",
+  "schemes.filter.all": "All",
+  "schemes.filter.loans": "Loans",
+  "schemes.filter.subsidies": "Subsidies",
+  "schemes.filter.guarantees": "Guarantees",
+  "schemes.type.loan": "Loan",
+  "schemes.type.subsidy": "Subsidy",
+  "schemes.type.guarantee": "Guarantee",
+  "schemes.type.other": "Other",
+  "schemes.maxAmount": "Max Amount",
+  "schemes.interestRate": "Interest Rate",
+  "schemes.seeDetails": "See details",
+  "schemes.showMore": "Show more",
+  "schemes.showLess": "Show less",
+  "schemes.purpose": "Purpose",
+  "schemes.eligibility": "Eligibility",
+  "schemes.eligibleFor": "Eligible for",
+  "schemes.requiresUdyam": "Requires Udyam registration",
+  "schemes.requiresGST": "Requires GST registration",
+  "schemes.locations": "Locations",
+  "schemes.excluded": "Excluded",
+  "schemes.documents": "Documents Required",
+  "schemes.verified": "Verified",
+  "schemes.source": "Source",
+  "schemes.errorTitle": "Could not load schemes",
+  "schemes.retry": "Try Again",
+  "schemes.noResults": "No schemes match your filters",
+  "schemes.noResultsDesc": "Try a different search term or filter.",
+  "schemes.cta.title": "Want a personalised match?",
+  "schemes.cta.desc": "Run a research with your business details — Saathi will match the right schemes for you automatically.",
+  "schemes.cta.button": "Start Research",
 };
 
 const HI: Record<string, string> = {
+  // ── nav ───────────────────────────────────────────────────────────────────
+  "nav.home": "होम",
+  "nav.research": "रिसर्च",
+  "nav.advisor": "सलाहकार",
+  "nav.schemes": "स्कीमें",
+  "nav.aria": "मुख्य नेविगेशन",
+  "nav.openMenu": "मेन्यू खोलें",
+  "nav.closeMenu": "मेन्यू बंद करें",
+
+  // ── brand / hero ────────────────────────────────────────────────────────
   "brand.name": "आपका AI बिज़नेस साथी",
   "brand.tagline": "छोटे बिज़नेस के लिए मार्केट रिसर्च, ग्रोथ प्लान और स्कीमें",
 
   "hero.kicker": "छोटे बिज़नेस के लिए मार्केट रिसर्च, ग्रोथ प्लान और सरकारी स्कीमें",
   "hero.sub":
     "अपने बिज़नेस को आसान भाषा में लिखिए — लाइव मार्केट रिसर्च, साफ़ बिज़नेस प्लान, आपकी स्कीमें और लोन की तैयारी की चेकलिस्ट 60 सेकंड में।",
+
+  // ── landing page ──────────────────────────────────────────────────────────
+  "landing.hero.badge": "नया: ऑफलाइन मोड + हिंदी सपोर्ट",
+  "landing.hero.title": "आपका AI बिज़नेस साथी — छोटे बिज़नेस के लिए मार्केट रिसर्च, ग्रोथ प्लान और स्कीमें",
+  "landing.hero.subtitle": "अपने बिज़नेस को आसान भाषा में बताइए। लाइव मार्केट रिसर्च, साफ़ रोडमैप, आपकी सरकारी स्कीमें और लोन की तैयारी की चेकलिस्ट — 60 सेकंड में।",
+  "landing.hero.cta": "रिसर्च शुरू करें",
+  "landing.hero.ctaSecondary": "स्कीमें देखें",
+  "landing.hero.trust": "साइनअप नहीं · ऑफलाइन चलता है · डेटा आपके फ़ोन पर",
+
+  "landing.stats.1": "बिज़नेस को मदद मिली",
+  "landing.stats.2": "क्यूरेटेड स्कीमें",
+  "landing.stats.3": "सामान्य रिसर्च समय",
+  "landing.stats.4": "मुफ़्त और खुला सोर्स",
+
+  "landing.features.title": "छोटे बिज़नेस के लिए बना",
+  "landing.features.subtitle": "कोई आम चैटबॉट नहीं — साथी भारतीय माइक्रो-उद्यमियों के लिए खास है",
+
+  "landing.features.1.title": "बिज़नेस-फर्स्ट सलाह",
+  "landing.features.1.desc": "साथी आपका बिज़नेस बनाने में मदद करता है — दाम, खर्च, कैश फ्लो, ग्राहक, रजिस्ट्रेशन — सिर्फ सवालों के जवाब नहीं देता।",
+
+  "landing.features.2.title": "लाइव मार्केट रिसर्च",
+  "landing.features.2.desc": "वेब से लिए तथ्य, याद किए जवाब नहीं। हर दावा स्रोत के साथ ताकि आप खुद जाँच सकें।",
+
+  "landing.features.3.title": "आपकी भारतीय स्कीमें",
+  "landing.features.3.desc": "मुद्रा, PMEGP, CGTMSE, PM SVANidhi — आपके बिज़नेस, जगह और अवस्था के हिसाब से अपने आप चुनी जाती हैं।",
+
+  "landing.features.4.title": "लोन की तैयारी की चेकलिस्ट",
+  "landing.features.4.desc": "साफ़ एक्शन लेजर बताता है कि बैंक जाने से पहले क्या-क्या करना है।",
+
+  "landing.features.5.title": "ऑफलाइन भी चलता है",
+  "landing.features.5.desc": "मुफ़्त लोकल AI मॉडल — इंटरनेट न हो तब भी साथी काम करता है। कोई सब्सक्रिप्शन नहीं।",
+
+  "landing.features.6.title": "आपका डेटा, आपका फ़ोन",
+  "landing.features.6.desc": "सेशन डेटा आपके ब्राउज़र में रहता है। कभी भी एक्सपोर्ट या डिलीट करें — GDPR के मुताबिक।",
+
+  "landing.cta.title": "अपने बिज़नेस को बेहतर समझने को तैयार?",
+  "landing.cta.subtitle": "मुफ़्त रिसर्च सेकंड में शुरू करें। साइनअप नहीं, क्रेडिट कार्ड नहीं।",
+  "landing.cta.button": "रिसर्च शुरू करें",
+
+  "landing.footer.desc": "भारतीय माइक्रो-उद्यमियों के लिए खास बिज़नेस सलाह। मार्केट रिसर्च, स्कीम मिलान और लोन की तैयारी — सब एक जगह।",
+  "landing.footer.links": "त्वरित लिंक",
+  "landing.footer.legal": "कानूनी",
+  "landing.footer.privacy": "गोपनीयता नीति",
+  "landing.footer.terms": "सेवा की शर्तें",
+  "landing.footer.contact": "संपर्क करें",
+  "landing.footer.copyright": "© 2024 आपका AI बिज़नेस साथी। सर्वाधिकार सुरक्षित।",
 
   "quiz.title": "बिज़नेस चेक-अप",
   "quiz.optional": "(ज़रूरी नहीं)",
@@ -489,7 +652,22 @@ const HI: Record<string, string> = {
   "chat.quick3": "क्या मुद्रा लोन मिलेगा?",
   "chat.quick4": "₹1 लाख से शुरुआत करूँ?",
 
-  "live.title": "आवाज़ वाला सलाहकार",
+  // ── advisor page ─────────────────────────────────────────────────────────
+  "advisor.title": "बिज़नेस सलाहकार",
+  "advisor.subtitle": "अपने बिज़नेस के बारे में कुछ भी पूछिए — लोन, स्कीम, काग़ज़, कैश फ्लो या ग्रोथ। मैं आपकी रिसर्च याद रखता हूँ।",
+  "advisor.backToResearch": "← रिसर्च पर वापस",
+  "advisor.contextActive": "रिसर्च का संदर्भ सक्रिय",
+  "advisor.contextDesc": "आपके बिज़नेस चेक-अप के जवाब लोड हो चुके हैं। सलाहकार इन्हीं से आपको निजी सलाह देगा।",
+  "advisor.welcome.title": "आपका बिज़नेस सलाहकार में स्वागत है",
+  "advisor.welcome.desc": "मैं आपका निजी बिज़नेस साथी हूँ। लोन, सरकारी स्कीम, काग़ज़, कैश फ्लो प्लानिंग और बिज़नेस बढ़ाने में मदद कर सकता हूँ।",
+  "advisor.welcome.item1": "लोन और स्कीम पात्रता (MUDRA, PMEGP, CGTMSE, PM SVANidhi)",
+  "advisor.welcome.item2": "बैंक एप्लिकेशन के लिए काग़ज़ की चेकलिस्ट",
+  "advisor.welcome.item3": "कैश फ्लो, दाम और बिज़नेस मॉडल के सवाल",
+  "advisor.welcome.item4": "रजिस्ट्रेशन (Udyam, GST) और अनुपालन",
+  "advisor.welcome.gotIt": "समझ गया, शुरू करते हैं",
+
+  // ── live voice ──────────────────────────────────────────────────────────
+  "live.title": "आवाज़ वाली सलाह",
   "live.badge": "लाइव",
   "live.sub": "अपने साथी से बोलकर पूछिए — वह सुनेगा और आपकी भाषा में जवाब देगा।",
   "live.subConn": "जुड़ गया। लोन, स्कीम और काग़ज़ पूछिए — सलाहकार बोलकर जवाब देगा।",
@@ -508,6 +686,44 @@ const HI: Record<string, string> = {
   "misc.whatsappTitle": "WhatsApp सलाहकार",
   "misc.whatsappText":
     "वही सलाह अब WhatsApp पर — हिंदी, मराठी और गुजराती में, बिना ऐप इंस्टॉल किए।",
+
+  // ── schemes explorer ──────────────────────────────────────────────────────
+  "schemes.title": "छोटे बिज़नेस के लिए सरकारी स्कीमें",
+  "schemes.subtitle": "सभी क्यूरेटेड स्कीमें देखें — मुद्रा, PMEGP, CGTMSE, PM SVANidhi, और भी। टाइप से फ़िल्टर करें, कीवर्ड से खोजें, और पात्रता एक नज़र में देखें।",
+  "schemes.backToResearch": "← रिसर्च पर वापस",
+  "schemes.searchPlaceholder": "नाम या कीवर्ड से स्कीम खोजें…",
+  "schemes.searchAria": "स्कीम खोजें",
+  "schemes.filterAria": "टाइप से स्कीम फ़िल्टर करें",
+  "schemes.filter.all": "सभी",
+  "schemes.filter.loans": "लोन",
+  "schemes.filter.subsidies": "सब्सिडी",
+  "schemes.filter.guarantees": "गारंटी",
+  "schemes.type.loan": "लोन",
+  "schemes.type.subsidy": "सब्सिडी",
+  "schemes.type.guarantee": "गारंटी",
+  "schemes.type.other": "अन्य",
+  "schemes.maxAmount": "अधिकतम राशि",
+  "schemes.interestRate": "ब्याज दर",
+  "schemes.seeDetails": "विवरण देखें",
+  "schemes.showMore": "और दिखाएँ",
+  "schemes.showLess": "कम दिखाएँ",
+  "schemes.purpose": "उद्देश्य",
+  "schemes.eligibility": "पात्रता",
+  "schemes.eligibleFor": "पात्र",
+  "schemes.requiresUdyam": "Udyam रजिस्ट्रेशन ज़रूरी",
+  "schemes.requiresGST": "GST रजिस्ट्रेशन ज़रूरी",
+  "schemes.locations": "स्थान",
+  "schemes.excluded": "अपात्र",
+  "schemes.documents": "ज़रूरी काग़ज़",
+  "schemes.verified": "सत्यापित",
+  "schemes.source": "स्रोत",
+  "schemes.errorTitle": "स्कीमें लोड नहीं हुईं",
+  "schemes.retry": "फिर कोशिश करें",
+  "schemes.noResults": "आपके फ़िल्टर से कोई स्कीम नहीं मिली",
+  "schemes.noResultsDesc": "अलग कीवर्ड या फ़िल्टर आज़माएँ।",
+  "schemes.cta.title": "निजी मिलान चाहते हैं?",
+  "schemes.cta.desc": "अपने बिज़नेस की डिटेल्स के साथ रिसर्च चलाएँ — साथी आपके लिए सही स्कीमें अपने आप मैच करेगा।",
+  "schemes.cta.button": "रिसर्च शुरू करें",
 };
 
 const DICTIONARIES: Record<Locale, Record<string, string>> = { en: EN, hi: HI };

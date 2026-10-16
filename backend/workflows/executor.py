@@ -249,4 +249,4 @@ async def run_research_workflow(
             }
             save_session(session_id, topic, state_out)
         except Exception as e:
-            logger.error("Failed to save session %s: %s", session_id, e)
+            logger.error("Failed to save session %s: %s", session_id, e, exc_info=True)

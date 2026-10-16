@@ -391,7 +391,8 @@ def test_workflow_injects_and_persists_profile(monkeypatch):
         assert "Business Check-up" in captured["writer_task"]
         # Profile persisted with the session for later chat questions.
         saved = load_last_session(sid)
-        assert saved["state"]["profile"] == profile
+        # New format: profile is in runs[0]["profile"]
+        assert saved["runs"][0]["profile"] == profile
         assert ws.events[-1]["type"] == "done"
         assert "loan_ready_score" in ws.events[-1]["final_report"]
     finally:

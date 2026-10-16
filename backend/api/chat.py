@@ -24,6 +24,8 @@ from backend.api.schemas import (
 from backend.core.intake import build_intake_snippet, normalize_intake
 from backend.core.memory import (
     clear_chat,
+    get_session_facts,
+    get_session_intake,
     is_valid_session_id,
     load_chat_history,
     load_last_session,
@@ -32,6 +34,20 @@ from backend.core.memory import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+
+def _format_facts_for_context(facts: dict) -> str:
+    """Format cross-session facts into a concise string for the LLM."""
+    if not facts:
+        return ""
+    parts = []
+    for key, value in facts.items():
+        if key == "updated_at":
+            continue
+        if value not in (None, "", [], {}):
+            label = key.replace("_", " ").title()
+            parts.append(f"{label}: {value}")
+    return "Cross-session memory: " + "; ".join(parts) if parts else ""
 
 
 @router.post("", response_model=ChatResponse)
@@ -46,21 +62,29 @@ async def chat(body: ChatRequest):
     if not message:
         return {"reply": "Please type a question first.", "session_id": session_id, "history_count": 0}
 
-    # Attach the latest written advisory (if any) for this session so the chat
-    # can answer "me" questions about the user's own report. The Business Check-up
-    # profile saved with the run is used when the client didn't send it.
+    # Attach the latest written advisory + cross-session facts for this session
+    # so the chat can answer "me" questions about the user's own report and
+    # remember their business across conversations.
     advisory_context = ""
+    facts_context = ""
     if session_id:
         try:
             prior = load_last_session(session_id)
             if prior:
                 topic = topic or prior.get("topic", "")
-                advisory_context = (prior.get("state", {}).get("final_report", "") or "")[:3000]
-                profile = profile or (prior.get("state", {}).get("profile", "") or "")
-                # The intake saved with the last run is the fallback when the
-                # client sends none — the same layer, still personalised.
+                runs = prior.get("runs") or []
+                latest = (runs[0].get("state") if runs else None) or prior.get("state") or {}
+                advisory_context = (latest.get("final_report", "") or "")[:3000]
+                profile = profile or (latest.get("profile", "") or "")
                 if not intake:
-                    intake = normalize_intake(prior.get("state", {}).get("intake", {}) or {})
+                    intake = normalize_intake(
+                        latest.get("intake", {}) or get_session_intake(session_id)
+                    )
+
+                # Cross-session memory: facts learned from earlier runs.
+                facts = get_session_facts(session_id)
+                if facts:
+                    facts_context = _format_facts_for_context(facts)
         except Exception as e:
             logger.error(f"[Chat] Failed to load advisory context for {session_id}: {e}")
 
@@ -75,6 +99,7 @@ async def chat(body: ChatRequest):
             lang=body.lang,
             profile=profile or build_intake_snippet(intake),
             intake=intake,
+            facts_context=facts_context,
         )
     except Exception as e:
         logger.error(f"[Chat] chat_agent raised unexpectedly: {e}")

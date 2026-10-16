@@ -13,6 +13,7 @@ from backend.core import config  # noqa: F401  (import for side-effect / fail-fa
 from backend.core.config import ALLOWED_ORIGINS
 from backend.api.schemas import HealthResponse
 from backend.api.ledger import router as ledger_router
+from backend.api.schemes import router as schemes_router
 from backend.api.voice import router as voice_router
 from backend.api.chat import router as chat_router
 from backend.api.sessions import router as sessions_router
@@ -113,6 +114,7 @@ app.include_router(sessions_router)
 app.include_router(langchain_router)
 app.include_router(whatsapp_router)
 app.include_router(ledger_router)
+app.include_router(schemes_router)
 
 
 @app.get("/health", response_model=HealthResponse)

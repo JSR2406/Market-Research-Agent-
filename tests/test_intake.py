@@ -341,8 +341,8 @@ def test_workflow_folds_intake_into_topic_and_persists_it(monkeypatch):
 
         # Persisted as structured intake so the chat can resume from it.
         saved = load_last_session(sid)
-        assert saved["state"]["intake"]["offering"] == "seasonal fruits and vegetables"
-        assert "junk_field" not in saved["state"]["intake"]
+        assert saved["runs"][0]["intake"]["offering"] == "seasonal fruits and vegetables"
+        assert "junk_field" not in saved["runs"][0]["intake"]
         assert ws.events[-1]["type"] == "done"
     finally:
         delete_session(sid)

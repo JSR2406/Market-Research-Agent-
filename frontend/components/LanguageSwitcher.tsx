@@ -6,7 +6,7 @@ import { LOCALES, useI18n } from "@/lib/i18n";
  * Site-wide language control. Sits at the top of the page so it switches the
  * entire site — check-up, verdicts, ledger, report, chat — not just the chat.
  */
-export default function LanguageSwitcher() {
+export default function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   const { locale, setLocale, t } = useI18n();
 
   return (
@@ -22,7 +22,7 @@ export default function LanguageSwitcher() {
         background: "rgba(255,255,255,0.05)",
         border: "1px solid rgba(255,255,255,0.12)",
         borderRadius: "999px",
-        marginBottom: "18px",
+        marginBottom: compact ? 0 : "18px",
       }}
     >
       <Languages size={13} color="var(--text-muted)" aria-hidden="true" />

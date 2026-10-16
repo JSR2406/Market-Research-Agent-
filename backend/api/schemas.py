@@ -43,7 +43,7 @@ class ChatDeleteResponse(BaseModel):
     session_id: str
 
 
-# ── sessions (resume) ─────────────────────────────────────────────────────────
+# ── sessions (resume + history) ───────────────────────────────────────────────
 
 class SessionResponse(BaseModel):
     session_id: str
@@ -51,6 +51,44 @@ class SessionResponse(BaseModel):
     final_report: str = ""
     simplified_report: str = ""
     updated_at: Optional[float] = None
+
+
+class RunSummary(BaseModel):
+    run_id: str
+    created_at: float
+    topic: str
+    has_report: bool
+    eligibility: Dict[str, Any] = {}
+    loan_ready_score: Optional[int] = None
+
+
+class RunsListResponse(BaseModel):
+    runs: List[RunSummary] = []
+
+
+class RunDetailResponse(BaseModel):
+    session_id: str
+    run_id: str
+    topic: str = ""
+    final_report: str = ""
+    simplified_report: str = ""
+    eligibility: Dict[str, Any] = {}
+    action_ledger: Dict[str, Any] = {}
+    # `plan` is the compiled step list (list[str]) in the run state, or a dict in
+    # the advisory JSON — accept either so neither shape 500s the endpoint.
+    plan: Any = {}
+    plan_run: Dict[str, Any] = {}
+    intake: Dict[str, str] = {}
+    profile: str = ""
+    sources: List[Dict[str, Any]] = []
+    token_usage: Dict[str, Any] = {}
+    engine: str = ""
+    created_at: Optional[float] = None
+
+
+class SessionFactsResponse(BaseModel):
+    facts: Dict[str, Any] = {}
+    intake: Dict[str, str] = {}
 
 
 # ── Eligibility + Action Ledger — deterministic, never LLM-generated ──────────

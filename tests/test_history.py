@@ -1,0 +1,214 @@
+"""
+tests/test_history.py — the session history layer and the schemes API.
+
+The history layer is the one place where a refactor can silently destroy user
+data: a session used to hold a single advisory, and the newest run must never
+erase the ones before it. These tests pin the additive contract — runs are kept
+newest-first and capped, the latest run is still readable in the legacy shape,
+facts are derived deterministically, and the read-only REST surface keeps the
+scheme dataset and the run history in sync.
+"""
+import pytest
+from fastapi.testclient import TestClient
+
+from backend.core.memory import (
+    MAX_RUNS_PER_SESSION,
+    delete_session,
+    get_runs_list,
+    get_session_facts,
+    load_last_session,
+    load_latest_run,
+    load_run,
+    save_session,
+    update_session_state,
+)
+
+
+def _state(topic: str, *, business: str = "tea stall", amount: int = 50000, score: int = 60):
+    return {
+        "plan": ["research demand", "match schemes"],
+        "final_report": '{"business_summary": "%s"}' % topic,
+        "simplified_report": "simple " + topic,
+        "eligibility": {"business_class": "retail", "business_label": "Retail", "amount": amount},
+        "ledger": {"completed": ["a"], "score": score},
+        "profile": "Business profile: " + topic,
+        "intake": {"business": business, "location": "Pune"},
+        "sources": [{"title": "ref", "url": "https://example.com"}],
+        "token_usage": {"input": 1, "output": 2},
+        "engine": "test",
+    }
+
+
+def test_runs_are_kept_newest_first_and_capped():
+    sid = "test-history-runs"
+    try:
+        for i in range(MAX_RUNS_PER_SESSION + 2):
+            save_session(sid, f"topic-{i}", _state(f"topic-{i}"))
+        session = load_last_session(sid)
+        assert len(session["runs"]) == MAX_RUNS_PER_SESSION
+        # Newest first.
+        assert session["runs"][0]["topic"] == f"topic-{MAX_RUNS_PER_SESSION + 1}"
+        # The legacy latest-state mirror is the newest run.
+        assert session["state"]["final_report"] == '{"business_summary": "topic-6"}'
+    finally:
+        delete_session(sid)
+
+
+def test_save_appends_runs_instead_of_overwriting():
+    sid = "test-history-append"
+    try:
+        save_session(sid, "first", _state("first"))
+        save_session(sid, "second", _state("second"))
+        session = load_last_session(sid)
+        assert [r["topic"] for r in session["runs"]] == ["second", "first"]
+        # Top-level topic mirrors the newest.
+        assert session["topic"] == "second"
+    finally:
+        delete_session(sid)
+
+
+def test_facts_are_derived_and_merged_forward():
+    sid = "test-history-facts"
+    try:
+        save_session(sid, "first", _state("first", business="tea stall", amount=50000, score=60))
+        facts = get_session_facts(sid)
+        assert facts["business_type"] == "tea stall"
+        assert facts["location"] == "Pune"
+        assert facts["last_eligible_amount"] == 50000
+        assert facts["last_loan_ready_score"] == 60
+
+        # A later run updates overlapping facts without losing older ones.
+        save_session(sid, "second", _state("second", business="dairy", amount=80000, score=75))
+        facts = get_session_facts(sid)
+        assert facts["business_type"] == "dairy"
+        assert facts["last_eligible_amount"] == 80000
+        assert facts["last_loan_ready_score"] == 75
+    finally:
+        delete_session(sid)
+
+
+def test_update_session_state_does_not_add_a_run():
+    sid = "test-history-update"
+    try:
+        save_session(sid, "only", _state("only", score=40))
+        update_session_state(sid, {"ledger": {"completed": ["a", "b"], "score": 55}})
+        session = load_last_session(sid)
+        assert len(session["runs"]) == 1, "ticking the ledger must not add a phantom run"
+        assert session["runs"][0]["ledger"]["score"] == 55
+        assert get_session_facts(sid)["last_loan_ready_score"] == 55
+    finally:
+        delete_session(sid)
+
+
+def test_load_run_and_get_runs_list():
+    sid = "test-history-load-run"
+    try:
+        save_session(sid, "one", _state("one"))
+        save_session(sid, "two", _state("two"))
+
+        runs = get_runs_list(sid)
+        assert len(runs) == 2
+        assert runs[0]["topic"] == "two"
+        assert runs[0]["has_report"] is True
+        assert runs[0]["eligibility"]["amount"] == 50000
+        assert runs[0]["loan_ready_score"] == 60
+
+        run_id = load_last_session(sid)["runs"][1]["run_id"]
+        one = load_run(sid, run_id)
+        assert one is not None
+        assert one["topic"] == "one"
+        assert one["state"]["final_report"] == '{"business_summary": "one"}'
+
+        # Unknown run id is simply absent.
+        assert load_run(sid, "nope") is None
+    finally:
+        delete_session(sid)
+
+
+def test_legacy_single_run_file_is_migrated():
+    """A pre-history file must open without losing its advisory."""
+    import json
+
+    from backend.core.memory import SESSIONS_DIR, _session_file
+
+    sid = "test-history-legacy"
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    legacy = {
+        "session_id": sid,
+        "topic": "old business",
+        "state": _state("old business"),
+        "updated_at": 1700000000.0,
+    }
+    _session_file(sid).write_text(json.dumps(legacy), encoding="utf-8")
+    try:
+        session = load_last_session(sid)
+        assert len(session["runs"]) == 1
+        assert session["runs"][0]["topic"] == "old business"
+        # Facts were back-filled from the migrated run.
+        assert get_session_facts(sid)["business_type"] == "tea stall"
+        assert load_latest_run(sid)["state"]["final_report"] == '{"business_summary": "old business"}'
+    finally:
+        delete_session(sid)
+
+
+# ── REST surface ──────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module")
+def client():
+    from backend.main import app
+
+    with TestClient(app) as c:
+        yield c
+
+
+def test_schemes_endpoint_serves_curated_data(client):
+    r = client.get("/api/schemes")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["count"] == len(body["schemes"]) >= 1
+    for scheme in body["schemes"]:
+        # Provenance is mandatory for every scheme the product shows.
+        assert scheme.get("source_url")
+        assert scheme.get("last_verified_at")
+
+    # `/list` is an alias for the same data.
+    r2 = client.get("/api/schemes/list")
+    assert r2.status_code == 200
+    assert r2.json()["count"] == body["count"]
+
+
+def test_session_history_endpoints(client):
+    sid = "test-history-rest"
+    try:
+        save_session(sid, "rest one", _state("rest one"))
+
+        runs = client.get(f"/api/sessions/{sid}/runs")
+        assert runs.status_code == 200
+        run_list = runs.json()["runs"]
+        assert len(run_list) == 1
+        run_id = run_list[-1]["run_id"]
+
+        detail = client.get(f"/api/sessions/{sid}/runs/{run_id}")
+        assert detail.status_code == 200
+        d = detail.json()
+        assert d["topic"] == "rest one"
+        assert d["final_report"] == '{"business_summary": "rest one"}'
+        # The state calls it `ledger`; the run detail exposes it as action_ledger.
+        assert d["action_ledger"]["score"] == 60
+
+        facts = client.get(f"/api/sessions/{sid}/facts")
+        assert facts.status_code == 200
+        assert facts.json()["facts"]["business_type"] == "tea stall"
+        assert facts.json()["intake"]["location"] == "Pune"
+    finally:
+        delete_session(sid)
+
+
+def test_session_history_rejects_bad_ids(client):
+    # A malformed id (fails the allowlist) is refused; a well-formed but unknown
+    # session simply has no history yet.
+    assert client.get("/api/sessions/bad id/facts").status_code == 404
+    assert client.get("/api/sessions/bad id/runs").status_code == 404
+    unknown = client.get("/api/sessions/unknown-session/runs")
+    assert unknown.status_code == 200
+    assert unknown.json()["runs"] == []

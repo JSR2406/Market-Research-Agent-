@@ -140,10 +140,18 @@ async def market_research_websocket(websocket: WebSocket):
                         prior = load_last_session(session_id)
                         if prior:
                             session_context = build_resume_context(prior)
+                            # New format: topic is in runs[0]["topic"]
+                            previous_topic = ""
+                            runs = prior.get("runs", [])
+                            if runs:
+                                previous_topic = runs[0].get("topic", "")
+                            elif prior.get("topic"):
+                                # Fallback: old format
+                                previous_topic = prior.get("topic", "")
                             await ws.send_json({
                                 "type": "resume_available",
                                 "session_id": session_id,
-                                "previous_topic": prior.get("topic", ""),
+                                "previous_topic": previous_topic,
                                 "summary": session_context[:300],
                             })
                     except Exception:

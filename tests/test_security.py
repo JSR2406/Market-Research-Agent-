@@ -76,7 +76,8 @@ def test_valid_session_roundtrip():
     save_session(sid, "tea stall", {"x": 1})
     try:
         loaded = load_last_session(sid)
-        assert loaded and loaded["topic"] == "tea stall"
+        # New format: topic is in runs[0]["topic"]
+        assert loaded and loaded["runs"][0]["topic"] == "tea stall"
     finally:
         delete_session(sid)
     assert load_last_session(sid) is None

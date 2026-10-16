@@ -29,7 +29,7 @@ from backend.core.eligibility import (
 )
 from backend.core.intake import coverage_report, next_probe, normalize_intake, question_pack
 from backend.core.ledger import ledger_and_score, merge_completed
-from backend.core.memory import is_valid_session_id, load_last_session
+from backend.core.memory import is_valid_session_id, load_session_state
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["ledger"])
@@ -39,7 +39,7 @@ def _session_state(session_id: str) -> dict:
     if not session_id:
         return {}
     try:
-        return (load_last_session(session_id) or {}).get("state") or {}
+        return load_session_state(session_id)
     except Exception as e:
         logger.error("[Ledger] failed to load session %s: %s", session_id, e)
         return {}
@@ -101,10 +101,14 @@ async def tick_ledger(session_id: str, body: LedgerTickRequest):
 
     if body.persist:
         try:
-            from backend.core.memory import save_session
+            from backend.core.memory import update_session_state
 
-            state["ledger"] = {"completed": completed, "score": scored.get("score", 0)}
-            save_session(session_id, state.get("topic", ""), state)
+            # Patch the newest run in place — ticking progress must not create a
+            # phantom entry in the run history.
+            update_session_state(
+                session_id,
+                {"ledger": {"completed": completed, "score": scored.get("score", 0)}},
+            )
         except Exception as e:
             logger.error("[Ledger] failed to persist progress for %s: %s", session_id, e)
 

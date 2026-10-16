@@ -77,6 +77,26 @@ body {
   padding: clamp(24px, 6vw, 48px) clamp(14px, 5vw, 20px);
 }
 
+/* ─── Site header responsiveness (mobile-first, works from 360 px) ─── */
+/* Inline styles win over plain rules, so the responsive overrides need
+   `!important` to flip display at the breakpoint. */
+.site-nav-toggle {
+  display: none;
+}
+@media (max-width: 760px) {
+  .site-nav-desktop {
+    display: none !important;
+  }
+  .site-nav-toggle {
+    display: inline-flex !important;
+  }
+}
+@media (min-width: 761px) {
+  .site-nav-mobile {
+    display: none !important;
+  }
+}
+
 /* Visible keyboard focus everywhere (a11y). */
 :focus-visible {
   outline: 2px solid var(--accent);

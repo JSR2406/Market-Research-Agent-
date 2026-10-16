@@ -4,16 +4,15 @@ import dynamic from "next/dynamic";
 import TopicInput from "@/components/TopicInput";
 import AgentTimeline, { type TraceNode } from "@/components/AgentTimeline";
 import AdvisoryCard from "@/components/AdvisoryCard";
-import ChatPanel from "@/components/ChatPanel";
 import Usps from "@/components/Usps";
-const LiveAdvisorPanel = dynamic(() => import("@/components/LiveAdvisorPanel"), { ssr: false });
 import StartupQuiz, { type ProfileInit } from "@/components/StartupQuiz";
+import { SiteHeader } from "@/components/SiteHeader";
 const CashflowSimulator = dynamic(() => import("@/components/CashflowSimulator"), { ssr: false });
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useI18n } from "@/lib/i18n";
 import { migrateIntake } from "@/lib/intake";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, MessageCircle, X } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, MessageSquare, X } from "lucide-react";
 import { API_BASE, WS_URL } from "@/lib/api";
 
 const WS_RECONNECT_DELAY_MS = 1500;
@@ -22,7 +21,7 @@ const SESSION_KEY = "grameenai_session";
 const PROFILE_KEY = "grameenai_profile";
 
 export default function ResearchPage() {
-  const { t, locale, backendLang } = useI18n();
+  const { t, backendLang } = useI18n();
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   // Mirror of `isRunning` for use inside the WebSocket `onclose` closure —
@@ -391,16 +390,18 @@ export default function ResearchPage() {
   }
 
   return (
-    <main
-      suppressHydrationWarning
-      className="page-shell"
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}
-    >
+    <>
+      <SiteHeader />
+      <main
+        suppressHydrationWarning
+        className="page-shell"
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
       {/* Hero heading */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
@@ -448,9 +449,6 @@ export default function ResearchPage() {
           {t("hero.sub")}
         </p>
       </motion.div>
-
-      {/* Language — switches the whole site, not just the chat */}
-      <LanguageSwitcher />
 
       {/* Business Check-up — optional quick questions that sharpen the first report */}
       <StartupQuiz value={profile} onChange={changeProfile} />
@@ -552,48 +550,63 @@ export default function ResearchPage() {
       {/* Cash-flow simulator — self-serve financial viz, runs locally */}
       <CashflowSimulator />
 
-      {/* Personal business advisor chat — one intake layer: it knows the same
-          Business Check-up answers the research run used, and asks for what is
-          still missing. */}
-      <ChatPanel
-        sessionId={sessionId}
-        topic={currentTopic}
-        intake={profile}
-        locale={locale}
-      />
-
-      {/* Realtime voice advisor (LiveKit) */}
-      <LiveAdvisorPanel />
-
-      {/* WhatsApp Roadmap — voice input/output is now live; WhatsApp channel is next */}
+      {/* The advisor chat and the live voice advisor now live on their own page,
+          so this page stays focused on producing the report. */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         style={{
-          marginTop: "48px",
-          marginBottom: "80px",
+          marginTop: "32px",
+          marginBottom: "64px",
           width: "100%",
           maxWidth: "760px",
           padding: "20px clamp(16px, 5vw, 24px)",
-          background: "rgba(37,211,102,0.04)",
-          border: "1px dashed rgba(37,211,102,0.3)",
+          background: "rgba(45,212,191,0.05)",
+          border: "1px solid rgba(45,212,191,0.22)",
           borderRadius: "var(--radius-xl)",
           display: "flex",
           alignItems: "center",
           gap: "16px",
         }}
       >
-        <div style={{ width: "44px", height: "44px", borderRadius: "22px", background: "linear-gradient(135deg, #25D366, #128C7E)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 12px rgba(37,211,102,0.2)" }}>
-          <MessageCircle size={22} color="#fff" />
+        <div
+          aria-hidden="true"
+          style={{
+            width: "44px",
+            height: "44px",
+            borderRadius: "22px",
+            background: "linear-gradient(135deg, var(--accent), #9b87f5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <MessageSquare size={22} color="#fff" />
         </div>
-        <div>
-          <div style={{ display: "inline-block", background: "rgba(37,211,102,0.15)", color: "#25D366", padding: "2px 8px", borderRadius: "10px", fontSize: "0.68rem", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase" }}>
-            {t("misc.whatsappBadge")}
-          </div>
-          <p style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-primary)" }}>{t("misc.whatsappTitle")}</p>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{t("misc.whatsappText")}</p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--text-primary)" }}>
+            {t("advisor.title")}
+          </p>
+          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{t("advisor.subtitle")}</p>
         </div>
+        <Link
+          href="/advisor"
+          style={{
+            padding: "10px 20px",
+            borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg, var(--accent), var(--accent-dim))",
+            color: "#fff",
+            textDecoration: "none",
+            fontWeight: 700,
+            fontSize: "0.84rem",
+            flexShrink: 0,
+          }}
+        >
+          {t("nav.advisor")}
+        </Link>
       </motion.div>
     </main>
+    </>
   );
 }

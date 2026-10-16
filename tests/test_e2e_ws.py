@@ -180,7 +180,8 @@ def test_persona_full_flow(llm_forced_down, client, topic, profile, expect_schem
         assert done["simplified_report"], "simplified report missing"
         # Session persists for resume + advisor follow-ups.
         saved = load_last_session(sid)
-        assert saved and saved["state"].get("final_report")
+        # New format: final_report is in runs[0]["final_report"]
+        assert saved and saved["runs"][0].get("final_report")
     finally:
         delete_session(sid)
 

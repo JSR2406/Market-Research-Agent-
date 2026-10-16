@@ -1,10 +1,22 @@
-"""sessions.py — REST endpoint to reopen a saved advisory for a session_id."""
+"""sessions.py — REST endpoints for session management and history."""
 import logging
 
 from fastapi import APIRouter, HTTPException
 
-from backend.api.schemas import SessionResponse
-from backend.core.memory import is_valid_session_id, load_last_session
+from backend.api.schemas import (
+    RunDetailResponse,
+    RunsListResponse,
+    SessionFactsResponse,
+    SessionResponse,
+)
+from backend.core.memory import (
+    get_runs_list,
+    get_session_facts,
+    get_session_intake,
+    is_valid_session_id,
+    load_last_session,
+    load_run,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -28,6 +40,19 @@ async def get_session(session_id: str):
     if not data:
         raise HTTPException(status_code=404, detail="No saved advisory for this session.")
 
+    # New format: get latest run from runs[]
+    runs = data.get("runs", [])
+    if runs:
+        run = runs[0]
+        return {
+            "session_id": session_id,
+            "topic": run.get("topic", ""),
+            "final_report": run.get("final_report", ""),
+            "simplified_report": run.get("simplified_report", ""),
+            "updated_at": run.get("created_at"),
+        }
+    
+    # Fallback: old format (should not happen after migration)
     state = data.get("state", {})
     return {
         "session_id": session_id,
@@ -36,3 +61,68 @@ async def get_session(session_id: str):
         "simplified_report": state.get("simplified_report", ""),
         "updated_at": data.get("updated_at"),
     }
+
+
+@router.get("/{session_id}/runs", response_model=RunsListResponse)
+async def get_session_runs(session_id: str):
+    """Return a lightweight list of all historical runs for a session."""
+    if not is_valid_session_id(session_id):
+        raise HTTPException(status_code=404, detail="No saved runs for this session.")
+    try:
+        runs = get_runs_list(session_id)
+    except Exception as e:
+        logger.error(f"Failed to list runs for {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not load run history.")
+    return {"runs": runs}
+
+
+@router.get("/{session_id}/runs/{run_id}", response_model=RunDetailResponse)
+async def get_session_run(session_id: str, run_id: str):
+    """Load a specific historical run by run_id."""
+    if not is_valid_session_id(session_id):
+        raise HTTPException(status_code=404, detail="No such session.")
+    if not run_id or not run_id.strip():
+        raise HTTPException(status_code=422, detail="run_id is required.")
+    try:
+        run = load_run(session_id, run_id)
+    except Exception as e:
+        logger.error(f"Failed to load run {run_id} for {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not load run.")
+    
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    
+    state = run.get("state", {})
+    return {
+        "session_id": session_id,
+        "run_id": run_id,
+        "topic": run.get("topic", ""),
+        "final_report": state.get("final_report", ""),
+        "simplified_report": state.get("simplified_report", ""),
+        "eligibility": state.get("eligibility", {}) or {},
+        # The run state calls it `ledger`; the advisory JSON calls it
+        # `action_ledger`. Accept both so the history view shows the score.
+        "action_ledger": state.get("action_ledger") or state.get("ledger") or {},
+        "plan": state.get("plan") or {},
+        "plan_run": state.get("plan_run") or {},
+        "intake": state.get("intake", {}) or {},
+        "profile": state.get("profile", ""),
+        "sources": state.get("sources", []) or [],
+        "token_usage": state.get("token_usage", {}) or {},
+        "engine": state.get("engine", ""),
+        "created_at": run.get("updated_at"),
+    }
+
+
+@router.get("/{session_id}/facts", response_model=SessionFactsResponse)
+async def get_session_facts_endpoint(session_id: str):
+    """Return cross-session facts and persisted intake for advisor context."""
+    if not is_valid_session_id(session_id):
+        raise HTTPException(status_code=404, detail="No such session.")
+    try:
+        facts = get_session_facts(session_id)
+        intake = get_session_intake(session_id)
+    except Exception as e:
+        logger.error(f"Failed to load facts for {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not load session facts.")
+    return {"facts": facts, "intake": intake}

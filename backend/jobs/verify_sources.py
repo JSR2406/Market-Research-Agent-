@@ -57,6 +57,13 @@ _HEALTH_PATH = os.path.join(_DATA_DIR, "source_health.json")
 # A short timeout on purpose: this is a health check, not a crawler.
 DEFAULT_TIMEOUT = 15.0
 _USER_AGENT = "SaathiProvenanceBot/1.0 (+https://market-research-agent-neon.vercel.app)"
+# Used only for the reachability probe (see fetch_source): WAF-protected
+# official portals 403 non-browser clients, which would mislabel live
+# sources as dead.
+_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
 
 
 # ── pure helpers (unit-tested, no network) ─────────────────────────────────
@@ -142,7 +149,16 @@ def fetch_source(url: str, timeout: float = DEFAULT_TIMEOUT) -> Dict[str, Any]:
     try:
         import httpx
 
-        headers = {"User-Agent": _USER_AGENT}
+        # Browser-like headers on purpose: several official portals
+        # (pib.gov.in, msme.gov.in and friends) sit behind WAFs that 403 any
+        # non-browser client. The health check must answer "would a human
+        # following this citation reach the page?" — a bot-UA 403 is a
+        # false "dead" for a perfectly live source.
+        headers = {
+            "User-Agent": _BROWSER_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+        }
         with httpx.Client(follow_redirects=True, timeout=timeout, headers=headers) as client:
             response = client.get(url)
             result["status_code"] = response.status_code

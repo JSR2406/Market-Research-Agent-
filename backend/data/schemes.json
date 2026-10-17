@@ -115,7 +115,7 @@
       "Passport-size photographs"
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
-    "source_url": "https://www.mudra.org.in/",
+    "source_url": "https://www.myscheme.gov.in/schemes/mudra-shishu",
     "last_verified_at": "2026-10-08",
     "apply_via": "Any bank branch, NBFC or MFI; online via mudra.org.in partners"
   },
@@ -174,7 +174,7 @@
       "Passport-size photographs"
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
-    "source_url": "https://www.mudra.org.in/",
+    "source_url": "https://www.myscheme.gov.in/schemes/mudra-kishore",
     "last_verified_at": "2026-10-08",
     "apply_via": "Any bank branch, NBFC or MFI"
   },
@@ -233,7 +233,7 @@
       "Business proof and photographs"
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
-    "source_url": "https://www.mudra.org.in/",
+    "source_url": "https://www.myscheme.gov.in/schemes/mudra-tarun",
     "last_verified_at": "2026-10-08",
     "apply_via": "Any bank branch, NBFC or MFI"
   },
@@ -291,7 +291,7 @@
       "Bank statements / income proof"
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
-    "source_url": "https://www.mudra.org.in/",
+    "source_url": "https://www.myscheme.gov.in/schemes/mudra-tarun-plus",
     "last_verified_at": "2026-10-08",
     "apply_via": "Any bank branch, NBFC or MFI"
   },
@@ -441,5 +441,954 @@
     "source_url": "https://pmsvanidhi.mohua.gov.in/",
     "last_verified_at": "2026-10-08",
     "apply_via": "pmsvanidhi.mohua.gov.in portal or through the local Urban Local Body / Common Service Centre"
+  },
+  {
+    "id": "pm-vishwakarma",
+    "scheme_name": "PM Vishwakarma",
+    "benefit_type": "Collateral-free enterprise loans + free skill training for traditional artisans",
+    "target_segment": "Self-employed artisans and craftspeople in 18 notified traditional trades",
+    "loan_ceiling": "Up to ₹3 lakh in two collateral-free tranches: ₹1 lakh (18-month repayment) + ₹2 lakh (30-month repayment), at 5% effective interest (government pays an 8% interest subvention)",
+    "checks": [
+      {
+        "id": "artisan_trades",
+        "type": "business_class_in",
+        "values": [
+          "manufacturing",
+          "home_based",
+          "services"
+        ],
+        "severity": "qualifying",
+        "label": "For self-employed artisans in the 18 notified trades",
+        "label_hi": "18 सूचीबद्ध पारंपरिक हुनरों के स्व-रोज़गार कारीगरों के लिए",
+        "basis": "eligibility_rules: Self-employed artisan in one of the 18 notified traditional trades"
+      },
+      {
+        "id": "prior_loans_repaid",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Loans under similar schemes must be fully repaid — a fully repaid MUDRA or PM SVANidhi loan does not disqualify you",
+        "label_hi": "समान योजनाओं के तहत लिए गए कर्ज़ पूरी तरह चुकाए होने चाहिए — पूरी तरह चुकाया गया MUDRA या PM SVANidhi कर्ज़ बाधा नहीं है",
+        "basis": "eligibility_rules: Loans under similar government credit schemes must be fully repaid"
+      }
+    ],
+    "collateral_requirement": "None — collateral-free loans with CGTMSE guarantee coverage",
+    "nodal_agency": "Ministry of MSME (implemented via District Industries Centres, banks and CSCs)",
+    "one_line_eligibility": "Self-employed artisans in 18 traditional trades, aged 18+, verified by the district-level committee.",
+    "eligibility_rules": [
+      "Self-employed artisan or craftsperson in one of the 18 notified traditional trades, working with hands and tools in the unorganised sector",
+      "Age 18 years or above; family-based self-employment",
+      "Free skill training (basic + advanced) with a ₹500/day attendance stipend",
+      "Collateral-free Enterprise Development Loans in two tranches: up to ₹1 lakh (18-month repayment), then up to ₹2 lakh (30-month repayment) — total up to ₹3 lakh",
+      "5% effective interest on prompt repayment (government provides an 8% interest subvention); loans carry CGTMSE guarantee coverage",
+      "₹15,000 tool-kit incentive (e-voucher) after basic training"
+    ],
+    "exclusions": [
+      "Salaried employees of government or other institutions",
+      "Artisans who availed loans under similar government credit schemes in the last 5 years and have not fully repaid"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "Udyam Registration (issued during enrolment)",
+      "Bank account details",
+      "Mobile number linked to Aadhaar"
+    ],
+    "interest_rate": "5% effective interest on prompt repayment (government pays an 8% interest subvention)",
+    "source_url": "https://pmvishwakarma.gov.in/",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "CSC (Common Service Centre) or pmvishwakarma.gov.in — enrolment, then basic skill training, then the bank loan application",
+    "category": "credit",
+    "level": "central"
+  },
+  {
+    "id": "kcc",
+    "scheme_name": "Kisan Credit Card (KCC)",
+    "benefit_type": "Working-capital crop and allied-activity loan at a subsidised interest rate",
+    "target_segment": "Farmers and borrowers into animal husbandry, dairy, poultry and fisheries",
+    "loan_ceiling": "₹3 lakh at 7% interest — 1.5% subvention to lenders + 3% prompt-repayment incentive means an effective 4% when repaid on time",
+    "checks": [
+      {
+        "id": "farm_only",
+        "type": "business_class_in",
+        "values": [
+          "agriculture_crop",
+          "agriculture_allied"
+        ],
+        "severity": "disqualifying",
+        "label": "Only for farm and allied-activity borrowers — non-farm businesses are not covered",
+        "label_hi": "सिर्फ़ खेती और पशुपालन/मत्स्य जैसे सहायक कामों के लिए — गैर-कृषि काम इसमें शामिल नहीं हैं",
+        "basis": "eligibility_rules: Farmers and allied-activity borrowers"
+      },
+      {
+        "id": "land_or_stock_proof",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Bank will ask for land records or proof of livestock/fishery activity",
+        "label_hi": "बैंक ज़मीन के कागज़ या पशुधन/मत्स्य पालन का प्रमाण माँगेगा",
+        "basis": "documents: Land records or lease documents; proof of livestock/fishery activity"
+      }
+    ],
+    "collateral_requirement": "As per bank norms; small crop loans are typically collateral-free",
+    "nodal_agency": "Department of Financial Services / RBI (Modified Interest Subvention Scheme); implemented by banks",
+    "one_line_eligibility": "Farmers and allied-activity borrowers for subsidised short-term crop loans.",
+    "eligibility_rules": [
+      "Farmers (owner cultivators and tenant farmers with a record) and borrowers into animal husbandry, dairy, poultry, fishery and other allied activities",
+      "Short-term crop loans and allied-activity loans up to ₹3 lakh under the Modified Interest Subvention Scheme (RBI, FY2025-26 continuation)",
+      "Interest of 7%; lenders get a 1.5% subvention and borrowers a 3% prompt-repayment incentive — effective rate 4% when repaid on time",
+      "The scheme is continued financial-year by financial-year by RBI notification — confirm the current year's terms with your bank"
+    ],
+    "exclusions": [
+      "Non-farm businesses (retail, services, manufacturing)",
+      "Borrowers outside the lending bank's KCC guidelines"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Land records or lease documents (farmers)",
+      "Proof of livestock/fishery activity (allied borrowers)",
+      "Passport-size photographs"
+    ],
+    "interest_rate": "7% with 1.5% subvention to lenders + 3% prompt-repayment incentive (effective 4% on time)",
+    "source_url": "https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=13270",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Any commercial bank, RRB or co-operative bank branch",
+    "category": "credit",
+    "level": "central"
+  },
+  {
+    "id": "pm-kisan",
+    "scheme_name": "PM-KISAN (Pradhan Mantri Kisan Samman Nidhi)",
+    "benefit_type": "Direct income support of ₹6,000 per year to landholding farmer families",
+    "target_segment": "Landholding farmer families (exclusions apply as per operational guidelines)",
+    "loan_ceiling": "₹6,000 per year in three instalments of ₹2,000 — direct benefit transfer, not a loan",
+    "checks": [
+      {
+        "id": "farmer_class",
+        "type": "business_class_in",
+        "values": [
+          "agriculture_crop"
+        ],
+        "severity": "qualifying",
+        "label": "For landholding farming households",
+        "label_hi": "ज़मीन रखने वाले किसान परिवारों के लिए",
+        "basis": "eligibility_rules: Landholding farmer families with cultivable land"
+      },
+      {
+        "id": "land_record_needed",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Needs ownership records of cultivable land in the family member's name",
+        "label_hi": "परिवार के सदस्य के नाम खेती योग्य ज़मीन के कागज़ चाहिए",
+        "basis": "documents: Land ownership records (khasra/khatauni)"
+      }
+    ],
+    "collateral_requirement": "Not a loan — direct income support",
+    "nodal_agency": "Department of Agriculture & Farmers Welfare, Ministry of Agriculture",
+    "one_line_eligibility": "Landholding farmer families with land records in their name.",
+    "eligibility_rules": [
+      "Landholding farmer families with cultivable land recorded in land records",
+      "₹6,000 per year in three equal instalments of ₹2,000, credited directly to the bank account (DBT); effective 01.12.2018",
+      "Institutional landholders, families of most serving/retired government employees (except Class IV / Group D) and income-tax payers are excluded as per the operational guidelines"
+    ],
+    "exclusions": [
+      "Institutional landholders",
+      "Income-tax payers and most serving/retired government employee families",
+      "Farmers whose land records are not in the family member's name"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "Land ownership records (khasra/khatauni)",
+      "Bank account details",
+      "Mobile number"
+    ],
+    "interest_rate": "Not a loan — direct income support",
+    "source_url": "https://www.agriwelfare.gov.in/en/FarmersWelDiv",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "pmkisan.gov.in, CSC, or the block agriculture office",
+    "category": "income-support",
+    "level": "central"
+  },
+  {
+    "id": "pm-kmy",
+    "scheme_name": "PM Kisan Maandhan Yojana (PM-KMY)",
+    "benefit_type": "Voluntary contributory pension of ₹3,000 per month after age 60",
+    "target_segment": "Small and marginal farmers, landless agricultural labourers and urban informal workers aged 18–40",
+    "loan_ceiling": "₹3,000/month pension at 60; monthly contribution ₹55–₹200 by entry age — not a loan",
+    "checks": [
+      {
+        "id": "age_band",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Entry age 18–40; the pension starts at 60",
+        "label_hi": "प्रवेश आयु 18–40; पेंशन 60 साल की उम्र से मिलेगी",
+        "basis": "eligibility_rules: Entry age 18 to 40 years"
+      },
+      {
+        "id": "contribution_note",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Monthly contribution of ₹55–₹200 (higher if you join later), matched by the Government; 50% family pension to the spouse",
+        "label_hi": "हर महीने ₹55–₹200 का योगदान (देर से जुड़ने पर अधिक), सरकार बराबर योगदान देती है; पति/पत्नी को 50% पारिवारिक पेंशन",
+        "basis": "eligibility_rules: Contribution of ₹55–₹200 per month depending on entry age"
+      }
+    ],
+    "collateral_requirement": "Not a loan — contributory pension",
+    "nodal_agency": "Ministry of Agriculture & Farmers Welfare; implemented via CSCs",
+    "one_line_eligibility": "Anyone aged 18–40 in farming or the informal economy, saving ₹55–₹200 a month for a ₹3,000 pension at 60.",
+    "eligibility_rules": [
+      "Entry age 18 to 40 years; voluntary and contributory pension scheme",
+      "Small and marginal farmers (up to 2 hectares), landless agricultural labourers, urban informal workers and self-employed people such as street vendors, tailors and shopkeepers",
+      "Pension of ₹3,000 per month after age 60; on the subscriber's death, 50% family pension continues to the spouse",
+      "Contribution of ₹55–₹200 per month depending on entry age, matched by the Government of India"
+    ],
+    "exclusions": [
+      "Persons above 40 years at entry",
+      "Income-tax payers, pensioners and government employees (and their spouses)",
+      "Persons receiving benefits from other statutory social-security pension schemes"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "Aadhaar-seeded bank account details",
+      "Mobile number",
+      "Nominee details"
+    ],
+    "interest_rate": "Not a loan — contributory pension",
+    "source_url": "https://maandhan.in/",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "CSC (Common Service Centre) or the Maandhan portal",
+    "category": "pension",
+    "level": "central"
+  },
+  {
+    "id": "pmfme",
+    "scheme_name": "PMFME — PM Formalisation of Micro Food Processing Enterprises",
+    "benefit_type": "35% credit-linked capital subsidy for micro food processing units",
+    "target_segment": "Individual micro food processing enterprises, FPOs, SHGs and cooperatives",
+    "loan_ceiling": "35% credit-linked capital subsidy capped at ₹10 lakh per individual unit (up to ₹3 crore for group applicants); beneficiary contributes at least 10% of the project cost",
+    "checks": [
+      {
+        "id": "food_processing",
+        "type": "business_class_in",
+        "values": [
+          "manufacturing",
+          "home_based"
+        ],
+        "severity": "qualifying",
+        "label": "For micro food processing units — manufacturing or home-based production",
+        "label_hi": "सूक्ष्म खाद्य प्रसंस्करण इकाइयों के लिए — विनिर्माण या घर-आधारित उत्पादन",
+        "basis": "eligibility_rules: Individual unincorporated micro food processing enterprises"
+      },
+      {
+        "id": "window_note",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Confirm the current intake window with MoFPI or your bank before applying",
+        "label_hi": "आवेदन से पहले MoFPI या अपने बैंक से वर्तमान आवेदन-खिड़की की पुष्टि कर लें",
+        "basis": "eligibility_rules: Scheme period originally 2020-21 to 2024-25; confirm the current window"
+      }
+    ],
+    "collateral_requirement": "Bank financing up to ₹2 crore is typically collateral-free under CGTMSE",
+    "nodal_agency": "Ministry of Food Processing Industries (MoFPI), implemented through state nodal agencies and banks",
+    "one_line_eligibility": "Micro food-processing units — proprietorship, FPO, SHG or cooperative — needing capital subsidy on a bank term loan.",
+    "eligibility_rules": [
+      "Individual unincorporated micro food processing enterprises (proprietary or partnership, fewer than 10 workers); one beneficiary per family member",
+      "35% credit-linked capital subsidy on the bank term loan, capped at ₹10 lakh per unit; beneficiary contribution at least 10% of the project cost",
+      "Group applicants — FPOs, SHGs and producer cooperatives — can receive up to ₹3 crore; common infrastructure and branding/marketing support are also available",
+      "One District One Product (ODOP) clusters are prioritised; training and capacity building are part of the scheme",
+      "Scheme period was originally 2020-21 to 2024-25 — confirm the current intake window with MoFPI or your bank"
+    ],
+    "exclusions": [
+      "Companies and industrial undertakings, and units with 10 or more workers",
+      "Existing recipients of similar capital subsidy for the same machinery"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Udyam / Udyog Aadhaar registration",
+      "Project report or business plan",
+      "Bank account details",
+      "Proof of address of the unit"
+    ],
+    "interest_rate": "Bank term-loan interest as applicable (the subsidy applies to the term loan)",
+    "source_url": "https://www.mofpi.gov.in/en/pmfme/shgs-fpos-co-operatives-individual-micro-food-enterprise",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "State nodal agency under MoFPI, then the bank branch",
+    "category": "subsidy",
+    "level": "central"
+  },
+  {
+    "id": "zed",
+    "scheme_name": "MSME Sustainable (ZED) Certification",
+    "benefit_type": "Subsidy on quality certification cost plus incentives for cleaner production",
+    "target_segment": "All Udyam-registered MSMEs",
+    "loan_ceiling": "Certification subsidy of 80% (micro), 60% (small), 50% (medium); +10% extra for women/SC/ST-owned units or units in NER, Himalayan, LWE, island and aspirational districts; +5% for SFURTI/MSE-CDP cluster members; 100% for women-owned MSMEs",
+    "checks": [
+      {
+        "id": "udyam_required",
+        "type": "requires_document",
+        "severity": "blocking",
+        "label": "Needs a valid Udyam Registration",
+        "label_hi": "मान्य Udyam रजिस्ट्रेशन चाहिए",
+        "basis": "eligibility_rules: Any MSME with a valid Udyam Registration"
+      },
+      {
+        "id": "women_bonus",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Women-owned MSMEs get a 100% subsidy on certification (effective 11.11.2023)",
+        "label_hi": "महिला-स्वामित्व वाले MSME को प्रमाणन पर 100% सब्सिडी मिलती है (11.11.2023 से)",
+        "basis": "eligibility_rules: Government states 100% subsidy for women-owned MSMEs"
+      }
+    ],
+    "collateral_requirement": "Not a loan — certification subsidy",
+    "nodal_agency": "Ministry of MSME (ZED drive, implemented with the Quality Council of India)",
+    "one_line_eligibility": "Any Udyam-registered MSME going for a quality or environment certification.",
+    "eligibility_rules": [
+      "Any MSME with a valid Udyam Registration; each unit under one Udyam Registration applies separately",
+      "Subsidy on certification cost: 80% for micro, 60% for small, 50% for medium enterprises; additional 10% for women/SC/ST-owned MSMEs or units in NER, Himalayan, LWE, island territories or aspirational districts; further 5% for units in SFURTI or MSE-CDP clusters",
+      "Government states a 100% subsidy for women-owned MSMEs (effective 11.11.2023)",
+      "Extra support: up to 75% of testing/certification cost (maximum ₹50,000), up to ₹2 lakh consultancy for ZED-certified MSMEs, and graded incentives for zero-effect technology solutions"
+    ],
+    "exclusions": [
+      "Units without a valid Udyam Registration"
+    ],
+    "documents": [
+      "Udyam Registration certificate",
+      "Aadhaar card of the proprietor/partners",
+      "GST registration (if applicable)",
+      "Unit and process details"
+    ],
+    "interest_rate": "Not a loan — certification subsidy",
+    "source_url": "https://www.myscheme.gov.in/schemes/zed",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "zed.msme.gov.in portal",
+    "category": "certification",
+    "level": "central"
+  },
+  {
+    "id": "sfurti",
+    "scheme_name": "SFURTI (Scheme of Fund for Regeneration of Traditional Industries)",
+    "benefit_type": "Cluster-level support for traditional industries — common facilities, training and market access",
+    "target_segment": "Artisan clusters in khadi, village industries, coir, handicrafts, handloom and other traditional trades",
+    "loan_ceiling": "Up to ₹2.5 crore per cluster (up to 500 artisans) and ₹5 crore for larger clusters — up to 90% of hard-intervention cost (95% in NER, J&K and hill areas) plus full soft-intervention funding",
+    "checks": [
+      {
+        "id": "traditional_trades",
+        "type": "business_class_in",
+        "values": [
+          "manufacturing",
+          "home_based"
+        ],
+        "severity": "qualifying",
+        "label": "Handloom, handicraft, coir, khadi and village-industry artisans qualify",
+        "label_hi": "हथकरघा, हस्तशिल्प, कोयर, खादी और ग्रामोद्योग के कारीगर पात्र हैं",
+        "basis": "eligibility_rules: Traditional-industry clusters — heritage crafts, handloom, khadi, village industries, coir"
+      },
+      {
+        "id": "cluster_level",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Applies at cluster level through an implementing agency — artisans benefit via their cluster",
+        "label_hi": "यह योजना क्लस्टर स्तर पर कार्यान्वयन एजेंसी के ज़रिए लागू होती है — कारीगरों को क्लस्टर के माध्यम से लाभ मिलता है",
+        "basis": "eligibility_rules: Organised as a cluster with an implementing agency"
+      }
+    ],
+    "collateral_requirement": "Not a loan — grant support at cluster level",
+    "nodal_agency": "Ministry of MSME (SFURTI) with implementing and technical agencies",
+    "one_line_eligibility": "Artisans in a recognised traditional-industry cluster, through the cluster's implementing agency.",
+    "eligibility_rules": [
+      "Traditional-industry clusters — heritage crafts, handloom, khadi, village industries, coir, handicrafts — organised as a cluster with an implementing agency (technical agency, SPV or federation)",
+      "Government support of up to 90% of hard-intervention cost (95% in North-East, J&K and hill areas) and full funding of soft interventions such as training, design and marketing",
+      "Cluster size up to 500 artisans: up to ₹2.5 crore support; larger clusters: up to ₹5 crore (per the 2025 Ministry scheme booklet)",
+      "Individual artisans benefit through the cluster's common facility centre, training and market linkages"
+    ],
+    "exclusions": [
+      "Individual units outside a recognised cluster",
+      "Non-traditional industries"
+    ],
+    "documents": [
+      "Cluster proposal through the implementing agency",
+      "Artisan list and trade details",
+      "Aadhaar details of member artisans",
+      "Registration of the cluster entity"
+    ],
+    "interest_rate": "Not a loan — grant support at cluster level",
+    "source_url": "https://www.myscheme.gov.in/schemes/sfurti",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Through the cluster's implementing agency / the Ministry's SFURTI portal",
+    "category": "cluster",
+    "level": "central"
+  },
+  {
+    "id": "mse-cdp",
+    "scheme_name": "MSE-CDP (Micro & Small Enterprises Cluster Development Programme)",
+    "benefit_type": "Grant support for common facility centres and cluster infrastructure",
+    "target_segment": "Micro and small enterprise clusters (manufacturing and service MSEs)",
+    "loan_ceiling": "Up to 70% of project cost as Government grant (90% for special-category states) for common facility centres, on a maximum eligible project cost of ₹15 crore",
+    "checks": [
+      {
+        "id": "mse_class",
+        "type": "business_class_in",
+        "values": [
+          "manufacturing",
+          "home_based"
+        ],
+        "severity": "qualifying",
+        "label": "For manufacturing and home-based MSE clusters",
+        "label_hi": "विनिर्माण और घर-आधारित MSE क्लस्टर के लिए",
+        "basis": "eligibility_rules: Clusters of MSEs producing similar products/services"
+      },
+      {
+        "id": "cluster_application",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Applied at cluster level via an SPV or industry association, not by a single unit",
+        "label_hi": "आवेदन एकल इकाई नहीं, SPV या उद्योग संघ के ज़रिए क्लस्टर स्तर पर होता है",
+        "basis": "eligibility_rules: Applying through an SPV, industry association or federation"
+      }
+    ],
+    "collateral_requirement": "Not a loan — grant support for cluster infrastructure",
+    "nodal_agency": "Ministry of MSME / DC(MSME), implemented through MSME-DIs and state governments",
+    "one_line_eligibility": "MSE clusters forming a common facility centre (testing, tool room, design, effluent treatment).",
+    "eligibility_rules": [
+      "Clusters of MSEs — ideally around 100 enterprises — producing similar products or services, applying through an SPV, industry association or federation",
+      "Common Facility Centres: up to 70% of eligible project cost as Government of India grant (90% for special-category states), on a maximum eligible project cost of ₹15 crore",
+      "Soft interventions such as training, testing and marketing support are funded within the cluster project"
+    ],
+    "exclusions": [
+      "Units outside a recognised cluster",
+      "Projects already funded under another central scheme for the same cost"
+    ],
+    "documents": [
+      "Cluster project proposal (SPV)",
+      "List of MSE units with Udyam details",
+      "Feasibility report / DPR",
+      "Land and infrastructure details"
+    ],
+    "interest_rate": "Not a loan — grant support for cluster infrastructure",
+    "source_url": "https://www.dcmsme.gov.in/SAMACHAR/MSMESchemebooklet2025-26.pdf",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "MSME Development Institute / state government cluster cell",
+    "category": "cluster",
+    "level": "central"
+  },
+  {
+    "id": "stand-up-india",
+    "scheme_name": "Stand-Up India",
+    "benefit_type": "Composite bank loan for greenfield enterprises by SC/ST and women entrepreneurs",
+    "target_segment": "First-generation SC/ST and women entrepreneurs setting up a greenfield enterprise",
+    "loan_ceiling": "₹10 lakh to ₹1 crore (successor announced in Budget 2025-26: up to ₹2 crore) — status caveat below",
+    "checks": [
+      {
+        "id": "greenfield_scst_women",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "SC/ST or woman entrepreneur, age 18+, setting up a new greenfield unit",
+        "label_hi": "SC/ST या महिला उद्यमी, आयु 18+, नई ग्रीनफ़ील्ड इकाई स्थापित कर रहे हैं",
+        "basis": "eligibility_rules: SC/ST and/or women entrepreneurs, aged 18 years or above, greenfield project"
+      },
+      {
+        "id": "status_check",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Status: original mandate ended 31.03.2025; the announced successor was awaiting formal launch — confirm with your bank before relying on it",
+        "label_hi": "स्थिति: मूल योजना 31.03.2025 को समाप्त हुई; घोषित उत्तराधिकारी योजना औपचारिक रूप से शुरू होना बाकी है — भरोसा करने से पहले बैंक से पुष्टि करें",
+        "basis": "eligibility_rules: Status: the original mandate under the 15th Finance Commission cycle ended 31.03.2025"
+      }
+    ],
+    "collateral_requirement": "Up to 85% of project cost financed by the bank; CGTMSE guarantee typically used in place of collateral",
+    "nodal_agency": "Department of Financial Services, Ministry of Finance; stand-up mitra portal (SIDBI)",
+    "one_line_eligibility": "First-generation SC/ST or woman entrepreneurs setting up a new greenfield unit.",
+    "eligibility_rules": [
+      "SC/ST and/or women entrepreneurs, aged 18 years or above, setting up a greenfield (new) enterprise in manufacturing, services, trading or allied agriculture",
+      "Composite bank loan of ₹10 lakh to ₹1 crore per branch of scheduled commercial banks; the borrower contributes at least 10% of the project cost; margin money of up to 15% is available through convergence on the stand-up mitra portal",
+      "Repayment up to 7 years including an 18-month moratorium",
+      "Status: the original mandate under the 15th Finance Commission cycle ended 31.03.2025; the Union Budget 2025-26 announced a successor for 5 lakh first-time women/SC/ST entrepreneurs with term loans up to ₹2 crore over five years — still awaiting formal launch at our last check (Q3 2026). Confirm the current framework with your bank or standupmitra.in"
+    ],
+    "exclusions": [
+      "Existing units / non-greenfield projects",
+      "Borrowers who have defaulted on bank loans"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Project report / DPR",
+      "Caste certificate (SC/ST) where applicable",
+      "Proof of business premises",
+      "Bank account details"
+    ],
+    "interest_rate": "As per bank norms for greenfield enterprise loans",
+    "source_url": "https://standupmitra.in/",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Scheduled commercial bank branch or standupmitra.in — confirm current status first",
+    "category": "credit",
+    "level": "central"
+  },
+  {
+    "id": "udyam",
+    "scheme_name": "Udyam Registration",
+    "benefit_type": "Free, lifetime-valid MSME registration — the gateway to every MSME scheme",
+    "target_segment": "All micro, small and medium enterprises",
+    "loan_ceiling": "Free of cost — no fee, no renewal; not a loan, but it unlocks credit, subsidies and procurement benefits",
+    "checks": [
+      {
+        "id": "register_now",
+        "type": "registration_preferred",
+        "severity": "advisory",
+        "label": "Register free on udyamregistration.gov.in — CGTMSE cover, ZED, NSIC and PMFME all need it",
+        "label_hi": "udyamregistration.gov.in पर मुफ़्त रजिस्ट्रेशन कराएँ — CGTMSE कवर, ZED, NSIC और PMFME सबके लिए यह ज़रूरी है",
+        "basis": "eligibility_rules: Any MSME can register free on udyamregistration.gov.in"
+      },
+      {
+        "id": "slabs_2025",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Slabs revised 01.04.2025: micro = investment up to ₹2.5 crore and turnover up to ₹10 crore; small = up to ₹25 crore / ₹100 crore",
+        "label_hi": "मापदंड 01.04.2025 से बदले: सूक्ष्म = निवेश ₹2.5 करोड़ तक और कारोबार ₹10 करोड़ तक; लघु = ₹25 करोड़ / ₹100 करोड़ तक",
+        "basis": "eligibility_rules: Slabs revised from 01.04.2025"
+      }
+    ],
+    "collateral_requirement": "Not a loan — registration",
+    "nodal_agency": "Ministry of MSME",
+    "one_line_eligibility": "Every MSME — a free, once-only registration that unlocks scheme benefits.",
+    "eligibility_rules": [
+      "Any MSME in manufacturing or services can register free on udyamregistration.gov.in; based on self-declaration of investment in plant & machinery/equipment and annual turnover",
+      "Aadhaar and PAN based, fully online and paperless; lifetime-valid with no renewal",
+      "Slabs revised from 01.04.2025: micro = up to ₹2.5 crore investment and ₹10 crore turnover; small = up to ₹25 crore investment and ₹100 crore turnover",
+      "Udyam Assist Portal (11.01.2023) covers units without PAN/GSTN; both registrations count for priority sector lending and Ministry schemes"
+    ],
+    "exclusions": [
+      "Traders and resellers are outside the Public Procurement Policy purchase preference for MSEs"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Bank account details",
+      "Business address details"
+    ],
+    "interest_rate": "Not a loan — registration",
+    "source_url": "https://udyamregistration.gov.in/",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "udyamregistration.gov.in (free)",
+    "category": "registration",
+    "level": "central"
+  },
+  {
+    "id": "lean",
+    "scheme_name": "MSME Competitive (LEAN) Scheme",
+    "benefit_type": "Government cost-share for lean-manufacturing consultants and certification",
+    "target_segment": "All Udyam-registered MSMEs; also common facility centres under SFURTI/MSE-CDP",
+    "loan_ceiling": "Government co-funds lean consultants and certification — ceilings are notified per batch through implementing bodies (confirm the current batch with your MSME-DI)",
+    "checks": [
+      {
+        "id": "udyam_required",
+        "type": "requires_document",
+        "severity": "blocking",
+        "label": "Needs a valid Udyam Registration",
+        "label_hi": "मान्य Udyam रजिस्ट्रेशन चाहिए",
+        "basis": "eligibility_rules: All MSMEs with a valid Udyam Registration"
+      },
+      {
+        "id": "mfg_focus",
+        "type": "business_class_in",
+        "values": [
+          "manufacturing"
+        ],
+        "severity": "qualifying",
+        "label": "Best fit for manufacturing units reducing waste, inventory and energy use",
+        "label_hi": "कचरा, इन्वेंटरी और ऊर्जा खपत घटाने वाली विनिर्माण इकाइयों के लिए सबसे उपयुक्त",
+        "basis": "eligibility_rules: Reduction of wastages in processes, inventory, space and energy consumption"
+      }
+    ],
+    "collateral_requirement": "Not a loan — implementation support",
+    "nodal_agency": "Ministry of MSME / DC(MSME), implemented through MSME-DIs and quality councils",
+    "one_line_eligibility": "Udyam-registered MSMEs wanting lean-manufacturing support and certification.",
+    "eligibility_rules": [
+      "All MSMEs with a valid Udyam Registration; common facility centres under SFURTI and MSE-CDP clusters are also eligible",
+      "Government co-funds lean-manufacturing consultants and the resulting certification — reducing waste in processes, inventory, space and energy use",
+      "Support ceilings are notified for each batch by the implementing bodies — confirm the current batch terms with your local MSME Development Institute or dcmsme.gov.in"
+    ],
+    "exclusions": [
+      "MSMEs without a valid Udyam Registration"
+    ],
+    "documents": [
+      "Udyam Registration certificate",
+      "Aadhaar / PAN of the proprietor",
+      "Unit details and process flow",
+      "Bank account details"
+    ],
+    "interest_rate": "Not a loan — implementation support",
+    "source_url": "https://www.dcmsme.gov.in/CLCS_TUS_Scheme/PMS/Scheme_Guidelines.aspx",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "MSME Development Institute / the Lean scheme guidelines on dcmsme.gov.in",
+    "category": "competitiveness",
+    "level": "central"
+  },
+  {
+    "id": "tread",
+    "scheme_name": "TREAD (Trade Related Entrepreneurship Assistance and Development) for Women",
+    "benefit_type": "Government grant of up to 30% of a women's bank loan, routed through NGOs",
+    "target_segment": "Women entrepreneurs in non-farm self-employment, via NGOs and SHG federations",
+    "loan_ceiling": "Government grant of up to 30% of the bank loan (maximum ₹30 lakh per proposal) through an NGO; the remaining 70% is the bank loan",
+    "checks": [
+      {
+        "id": "women_only",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Women-only scheme; applications go through a registered NGO or SHG federation",
+        "label_hi": "केवल महिलाओं के लिए; आवेदन पंजीकृत NGO या SHG संघ के ज़रिए होता है",
+        "basis": "eligibility_rules: Implemented through registered NGOs, women's associations and SHG federations"
+      },
+      {
+        "id": "group_proposal",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Prepare a composite bankable proposal with the NGO and submit it to the DC(MSME) office",
+        "label_hi": "NGO के साथ मिलकर एक संयुक्त बैंक-योग्य प्रस्तात तैयार करें और DC(MSME) कार्यालय में जमा करें",
+        "basis": "eligibility_rules: Apply via a composite proposal submitted to the Development Commissioner (MSME)"
+      }
+    ],
+    "collateral_requirement": "Bank's normal norms; group proposals through NGOs improve acceptance",
+    "nodal_agency": "Ministry of MSME — Development Commissioner (MSME) office",
+    "one_line_eligibility": "Women's groups and NGOs applying on behalf of women in non-farm self-employment.",
+    "eligibility_rules": [
+      "Women in non-farm self-employment activities; implemented through registered NGOs, women's associations and SHG federations",
+      "Government grant of up to 30% of the loan amount (capped at ₹30 lakh per proposal) is made available to the bank through the DC(MSME) office; the remaining 70% is disbursed as the bank loan",
+      "Additional grant of up to ₹1 lakh per training programme for NGOs training women entrepreneurs",
+      "Apply via a composite proposal submitted to the DC(MSME) office for onward bank appraisal"
+    ],
+    "exclusions": [
+      "Direct individual applications — must route through an NGO or SHG federation",
+      "Men applicants"
+    ],
+    "documents": [
+      "Proposal through a registered NGO",
+      "Aadhaar cards of beneficiary women",
+      "Bank account details",
+      "Activity / project details"
+    ],
+    "interest_rate": "Bank loan at applicable rates (30% of the loan comes as a government grant)",
+    "source_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=1485291",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Via a registered NGO or SHG federation to the DC(MSME) office, then the bank",
+    "category": "women",
+    "level": "central"
+  },
+  {
+    "id": "day-nrlm-shg",
+    "scheme_name": "DAY-NRLM Self-Help Group (SHG) Bank Linkage",
+    "benefit_type": "Revolving fund, community investment support and bank credit with interest subvention for women SHGs",
+    "target_segment": "Rural poor women organised into Self Help Groups under DAY-NRLM",
+    "loan_ceiling": "Revolving Fund of ₹20,000–₹30,000 per SHG + Community Investment Support Fund up to ₹2.5 lakh per SHG, plus bank loans with interest subvention",
+    "checks": [
+      {
+        "id": "shg_membership",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Benefits flow through a formal SHG of 10–20 women, federated under DAY-NRLM",
+        "label_hi": "लाभ 10–20 महिलाओं के औपचारिक SHG के ज़रिए मिलते हैं, जो DAY-NRLM से जुड़ा हो",
+        "basis": "eligibility_rules: Women from rural poor households organised into Self Help Groups"
+      },
+      {
+        "id": "subvention_note",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "SHG bank loans carry interest subvention under the RBI/NABARD master circular, with an extra concession for prompt repayment",
+        "label_hi": "SHG के बैंक कर्ज़ पर RBI/NABARD की मास्टर सर्कुलर के तहत ब्याज सब्सिडी मिलती है; समय पर चुकाने पर अतिरिक्त छूट",
+        "basis": "eligibility_rules: Interest subvention under the RBI/NABARD master circular for women SHGs"
+      }
+    ],
+    "collateral_requirement": "SHG loans are typically collateral-free up to the bank's SHG limits",
+    "nodal_agency": "Ministry of Rural Development (DAY-NRLM); RBI/NABARD circulars for bank linkage",
+    "one_line_eligibility": "Rural women already in, or forming, a DAY-NRLM Self Help Group.",
+    "eligibility_rules": [
+      "Women from rural poor households organised into Self Help Groups (SHGs) under DAY-NRLM",
+      "Revolving Fund of ₹20,000–₹30,000 per SHG and Community Investment Support Fund up to ₹2.5 lakh per SHG for livelihood activities",
+      "SHGs are linked to banks for credit with interest subvention under the RBI/NABARD master circular for women SHGs (additional concession on prompt repayment)",
+      "Farm and non-farm livelihood activities are both supported; capacity building and training included"
+    ],
+    "exclusions": [
+      "Individuals not part of a DAY-NRLM SHG",
+      "Households outside the mission's priority-group survey"
+    ],
+    "documents": [
+      "SHG membership register",
+      "Aadhaar details of members",
+      "SHG bank account details",
+      "Federation / village-level plan details"
+    ],
+    "interest_rate": "Bank rate with interest subvention for SHGs (as per the RBI/NABARD master circular)",
+    "source_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2086490",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Via the local DAY-NRLM community organiser / block mission team",
+    "category": "women",
+    "level": "central"
+  },
+  {
+    "id": "fpo-sfac",
+    "scheme_name": "10,000 FPO Scheme — SFAC Equity Grant & Credit Guarantee",
+    "benefit_type": "Matching equity grant and collateral-free credit guarantee for Farmer Producer Organisations",
+    "target_segment": "Farmer Producer Organisations / Farmer Producer Companies of member farmers",
+    "loan_ceiling": "Equity grant up to ₹2,000 per member capped at ₹15 lakh per FPO; credit guarantee on project loans up to ₹2 crore (85% cover up to ₹1 crore loan, 75% above it)",
+    "checks": [
+      {
+        "id": "farm_class",
+        "type": "business_class_in",
+        "values": [
+          "agriculture_crop",
+          "agriculture_allied"
+        ],
+        "severity": "qualifying",
+        "label": "For farmer-member organisations in crop or allied activities",
+        "label_hi": "फ़सल या पशुपालन जैसे सहायक कामों से जुड़े किसान-सदस्य संगठनों के लिए",
+        "basis": "eligibility_rules: Farmer Producer Organisations / Companies of member farmers"
+      },
+      {
+        "id": "fpo_level",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "For registered FPOs/FPCs — individual farmers benefit through their FPO",
+        "label_hi": "पंजीकृत FPO/FPC के लिए — व्यक्तिगत किसानों को अपने FPO के ज़रिए लाभ मिलता है",
+        "basis": "eligibility_rules: Farmer Producer Organisations / Companies registered under the Companies Act"
+      }
+    ],
+    "collateral_requirement": "None — covered by the SFAC Credit Guarantee Fund",
+    "nodal_agency": "Small Farmers' Agri-Business Consortium (SFAC), Ministry of Agriculture & Farmers Welfare",
+    "one_line_eligibility": "Registered Farmer Producer Organisations raising member equity and bank credit.",
+    "eligibility_rules": [
+      "Farmer Producer Organisations / Companies registered under the Companies Act (10,000 FPOs scheme, SFAC) — typically 300+ member farmers",
+      "Matching equity grant of up to ₹2,000 per farmer member, capped at ₹15 lakh per FPO, drawn in up to three tranches",
+      "Credit Guarantee Fund covers bank project loans up to ₹2 crore without collateral: 85% cover (ceiling ₹85 lakh) for loans up to ₹1 crore, 75% cover (ceiling ₹150 lakh) for loans from ₹1–2 crore",
+      "Management-cost support for the FPO for three years through the implementing agency (CBBO)"
+    ],
+    "exclusions": [
+      "FPOs not registered as legal entities",
+      "FPOs without member equity raised as per their bye-laws"
+    ],
+    "documents": [
+      "FPO/FPC registration certificate",
+      "Bye-laws / Articles of Association",
+      "Member equity records",
+      "Bank account of the FPO"
+    ],
+    "interest_rate": "Bank project-loan rate (the guarantee removes the collateral need)",
+    "source_url": "https://sfacindia.com/FPOS.aspx",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "SFAC portal / empanelled CBBO (for FPO formation and handholding)",
+    "category": "farmer",
+    "level": "central"
+  },
+  {
+    "id": "nsic-sprs",
+    "scheme_name": "NSIC Single Point Registration Scheme (SPRS)",
+    "benefit_type": "Access to government purchases — free tender sets, EMD exemption and purchase preference",
+    "target_segment": "Micro and small enterprises (manufacturing and service) with Udyam Registration",
+    "loan_ceiling": "Not a loan — government purchase access: 25% of central procurement earmarked for MSEs (4% SC/ST, 3% women-owned); 358 items reserved for the MSE sector",
+    "checks": [
+      {
+        "id": "udyam_required",
+        "type": "requires_document",
+        "severity": "blocking",
+        "label": "Needs a valid Udyam Registration",
+        "label_hi": "मान्य Udyam रजिस्ट्रेशन चाहिए",
+        "basis": "eligibility_rules: Micro and small enterprises with a valid Udyam Registration"
+      },
+      {
+        "id": "traders_out",
+        "type": "business_class_not_in",
+        "values": [
+          "trading"
+        ],
+        "severity": "disqualifying",
+        "label": "Traders and resellers are not eligible — only manufacturing and service MSEs",
+        "label_hi": "व्यापारी और रीसेलर पात्र नहीं हैं — सिर्फ़ विनिर्माण और सेवा MSE ही पात्र हैं",
+        "basis": "exclusions: Traders are not eligible for registration under this Scheme"
+      },
+      {
+        "id": "provisional_note",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Units under one year old can get a provisional certificate (₹5 lakh limit, one year)",
+        "label_hi": "एक साल से कम पुरानी इकाइयाँ अस्थायी प्रमाणपत्र ले सकती हैं (₹5 लाख सीमा, एक वर्ष)",
+        "basis": "eligibility_rules: Provisional registration with a ₹5 lakh limit for units under one year old"
+      }
+    ],
+    "collateral_requirement": "Not a loan — procurement access",
+    "nodal_agency": "National Small Industries Corporation (NSIC), Ministry of MSME",
+    "one_line_eligibility": "Manufacturing or service MSEs wanting to sell to government departments and PSUs.",
+    "eligibility_rules": [
+      "Micro and small enterprises (manufacturing or service) with a valid Udyam Registration; traders are not eligible",
+      "Benefits: free tender sets, exemption from Earnest Money Deposit, and supply of up to 25% of the requirement at L1 price (within the L1+15% band) where L1 is a non-MSE",
+      "Central ministries, departments and PSUs must procure at least 25% annually from MSEs (4% earmarked for SC/ST-owned, 3% for women-owned units); 358 items are reserved for exclusive MSE purchase",
+      "Certificate valid for 2 years, renewable; units under one year old get provisional registration with a ₹5 lakh limit"
+    ],
+    "exclusions": [
+      "Traders and resellers",
+      "Enterprises without Udyam Registration"
+    ],
+    "documents": [
+      "Udyam Registration certificate",
+      "Proof of commercial production (sales invoices)",
+      "Aadhaar and PAN of the proprietor",
+      "Factory / office address details"
+    ],
+    "interest_rate": "Not a loan — procurement access",
+    "source_url": "https://www.nsic.co.in/Schemes/SinglePointRegistration",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "nsicspronline.com (online enlistment)",
+    "category": "market-access",
+    "level": "central"
+  },
+  {
+    "id": "aif",
+    "scheme_name": "Agriculture Infrastructure Fund (AIF)",
+    "benefit_type": "Bank loan for post-harvest infrastructure with a 3% interest subvention",
+    "target_segment": "Farmers, FPOs, PACS, SHGs, cooperatives and entrepreneurs building post-harvest infrastructure",
+    "loan_ceiling": "3% interest subvention on loans up to ₹2 crore per project (the loan itself can be higher), lending-rate cap 9%, credit guarantee up to ₹2 crore; subvention for up to 7 years",
+    "checks": [
+      {
+        "id": "infra_class",
+        "type": "business_class_in",
+        "values": [
+          "agriculture_crop",
+          "agriculture_allied",
+          "manufacturing"
+        ],
+        "severity": "qualifying",
+        "label": "For cold chains, warehouses, processing and packaging units serving farm produce",
+        "label_hi": "खेती की उपज के लिए कोल्ड चेन, गोदाम, प्रसंस्करण और पैकेजिंग इकाइयों के लिए",
+        "basis": "eligibility_rules: Cold chains, warehouses, pack houses, processing units"
+      },
+      {
+        "id": "borrower_note",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Open to farmers, FPOs, PACS, SHGs, cooperatives and agri-entrepreneurs; scheme runs to 2032-33",
+        "label_hi": "किसानों, FPO, PACS, SHG, सहकारी समितियों और कृषि-उद्यमियों के लिए खुली; योजना 2032-33 तक जारी है",
+        "basis": "eligibility_rules: Borrowers: farmers, FPOs, PACS, SHGs, cooperatives, entrepreneurs"
+      }
+    ],
+    "collateral_requirement": "Credit guarantee cover up to ₹2 crore reduces collateral requirements",
+    "nodal_agency": "Department of Agriculture & Farmers Welfare (agriinfra.dac.gov.in)",
+    "one_line_eligibility": "Anyone building cold storage, warehouse or processing infrastructure for farm produce.",
+    "eligibility_rules": [
+      "Loans for post-harvest and farm-gate infrastructure: cold chains, warehouses, pack houses, processing units, grading/packaging, tillage equipment on hire and community farming assets",
+      "Interest subvention of 3% p.a., limited to ₹2 crore per project at one location (the loan itself can be higher); lending-rate cap of 9%",
+      "Credit guarantee cover up to ₹2 crore; subvention available for a maximum of 7 years including moratorium",
+      "Borrowers: farmers, FPOs, PACS, SHGs, cooperatives and agri-entrepreneurs; scheme operational from 2020-21 to 2032-33"
+    ],
+    "exclusions": [
+      "Projects outside post-harvest and farm infrastructure",
+      "Loans from non-eligible lending institutions"
+    ],
+    "documents": [
+      "Aadhaar / PAN",
+      "Project report for the infrastructure unit",
+      "Land / premises documents",
+      "Bank account details"
+    ],
+    "interest_rate": "Bank rate capped at 9%, with a 3% government interest subvention",
+    "source_url": "https://agriinfra.dac.gov.in/home/index",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Any eligible bank branch (public sector bank, RRB, co-operative bank or NBFC)",
+    "category": "credit",
+    "level": "central"
+  },
+  {
+    "id": "mahila-udyam-nidhi",
+    "scheme_name": "Mahila Udyam Nidhi (SIDBI)",
+    "benefit_type": "Term loan for women entrepreneurs setting up or expanding a small-scale unit",
+    "target_segment": "Women entrepreneurs (proprietorship or majority women ownership)",
+    "loan_ceiling": "Up to ₹10 lakh; repayment over up to 10 years (margin, moratorium and interest are set by the bank)",
+    "checks": [
+      {
+        "id": "women_led",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Women-led unit — proprietorship or majority women ownership",
+        "label_hi": "महिला-नेतृत्व वाली इकाई — प्रोप्राइटरशिप या बहुमत में महिला स्वामित्व",
+        "basis": "eligibility_rules: Women entrepreneurs setting up a new small-scale unit"
+      },
+      {
+        "id": "via_bank",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Routed through public sector banks under SIDBI refinancing — terms are set by the sanctioning bank",
+        "label_hi": "SIDBI रेफ़ाइनेंस के तहत सार्वजनिक क्षेत्र के बैंकों के ज़रिए मिलता है — शर्तें बैंक तय करता है",
+        "basis": "eligibility_rules: Disbursed through public sector banks under SIDBI refinancing"
+      }
+    ],
+    "collateral_requirement": "Bank norms apply; smaller loans are often covered under CGTMSE",
+    "nodal_agency": "SIDBI (refinance) — disbursed through public sector banks",
+    "one_line_eligibility": "Women entrepreneurs needing up to ₹10 lakh for a new or expanding small-scale unit.",
+    "eligibility_rules": [
+      "Women entrepreneurs setting up a new small-scale unit, or modernising or expanding an existing one",
+      "Financial assistance of up to ₹10 lakh, refinanced by SIDBI and disbursed through public sector banks",
+      "Repayment of up to 10 years; margin, moratorium and interest are set by the sanctioning bank"
+    ],
+    "exclusions": [
+      "Men applicants (scheme is women-only)",
+      "Wilful defaulters"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "PAN card",
+      "Project report / business plan",
+      "Proof of women ownership or shareholding",
+      "Bank account details"
+    ],
+    "interest_rate": "As set by the sanctioning bank (SIDBI-refinanced)",
+    "source_url": "https://startup.telangana.gov.in/women-entrepreneurship",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Nearest public sector bank branch (PNB, SBI, Bank of Baroda and others)",
+    "category": "women",
+    "level": "central"
+  },
+  {
+    "id": "mahila-coir-yojana",
+    "scheme_name": "Mahila Coir Yojana (MCY)",
+    "benefit_type": "Free skill training and subsidised coir processing equipment for rural women artisans",
+    "target_segment": "Rural women artisans in coir-producing regions",
+    "loan_ceiling": "Free 2-month training + coir processing equipment at 75% subsidy, up to ₹7,500 per artisan — not a loan",
+    "checks": [
+      {
+        "id": "women_artisan",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "100% women-oriented programme for rural women artisans in coir-producing regions",
+        "label_hi": "कोयर उत्पादक क्षेत्रों की ग्रामीण महिला कारीगरों के लिए 100% महिला-केंद्रित कार्यक्रम",
+        "basis": "eligibility_rules: An exclusive 100% women-oriented self-employment programme of the Coir Board"
+      },
+      {
+        "id": "equipment_subsidy",
+        "type": "advisory",
+        "severity": "advisory",
+        "label": "Free 2-month training, then coir processing equipment at 75% subsidy (motorised rats and other tools)",
+        "label_hi": "मुफ़्त 2 महीने का प्रशिक्षण, फिर 75% सब्सिडी पर कोयर प्रोसेसिंग उपकरण (मोटराइज़्ड रैट और अन्य औज़ार)",
+        "basis": "eligibility_rules: Free training of 2 months, after which equipment is provided at 75% subsidy"
+      }
+    ],
+    "collateral_requirement": "Not a loan — training and equipment subsidy",
+    "nodal_agency": "Coir Board (Ministry of MSME)",
+    "one_line_eligibility": "Rural women artisans in coir regions wanting free training plus subsidised equipment.",
+    "eligibility_rules": [
+      "Rural women artisans in coir-producing regions — an exclusive 100% women-oriented self-employment programme of the Coir Board",
+      "Free training of 2 months, after which coir processing equipment (motorised and traditional rats and other tools) is provided at 75% subsidy, up to ₹7,500",
+      "Continues under the Coir Vikas Yojana (Ministry of MSME)"
+    ],
+    "exclusions": [
+      "Men applicants",
+      "Artisans outside coir-producing regions"
+    ],
+    "documents": [
+      "Aadhaar card",
+      "Proof of residence in a coir-producing region",
+      "Training registration with the Coir Board centre"
+    ],
+    "interest_rate": "Not a loan — training and equipment subsidy",
+    "source_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=1485291",
+    "last_verified_at": "2026-10-17",
+    "apply_via": "Coir Board training centres / district coir offices",
+    "category": "skill",
+    "level": "central"
   }
 ]

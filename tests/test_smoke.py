@@ -50,7 +50,9 @@ def test_schemes_dataset_integrity():
     from backend.core.heuristics import load_schemes
 
     schemes = load_schemes()
-    assert len(schemes) >= 6
+    # WS-1 expanded the curated dataset from 7 to 25 central schemes; every
+    # record is source-cited and date-stamped (see also test_provenance.py).
+    assert len(schemes) >= 25
     for s in schemes:
         assert s.get("id") and s.get("scheme_name")
         assert s.get("benefit_type")
@@ -115,8 +117,10 @@ def test_annotate_scheme_sources():
     ])
     assert "pmsvanidhi.mohua.gov.in" in lines[0]
     assert "verified 2026-10-08" in lines[0]
-    assert "mudra-tarun-plus" not in lines[1]  # src is mudra.org.in for all MUDRA lines
-    assert "https://www.mudra.org.in/" in lines[1] and "https://www.mudra.org.in/" in lines[2]
+    # Each MUDRA tier has its own source; the longest matching token must win.
+    assert "mudra-tarun-plus" in lines[1]
+    assert "mudra-tarun-plus" not in lines[2]
+    assert "schemes/mudra-tarun," in lines[2]  # distinct per-tier source
     assert lines[3] == "Some unknown lender scheme line."
     assert lines[4].count("Source:") == 1  # idempotent — never double-annotate
 

@@ -60,6 +60,78 @@ _SCHEME_RULES: List[Dict] = [
         "scheme": "cgtmse",
         "keywords": ["sewing", "motor", "vehicle", "collateral", "loan without security", "udyam"],
     },
+    {
+        "scheme": "vishwakarma",
+        "keywords": ["artisan", "carpenter", "blacksmith", "goldsmith", "potter", "cobbler", "barber", "mason", "weaver", "tailor"],
+    },
+    {
+        "scheme": "stand-up",
+        "keywords": ["stand up", "stand-up", "greenfield"],
+    },
+    {
+        "scheme": "kisan credit",
+        "keywords": ["kcc", "kisan credit", "crop loan"],
+    },
+    {
+        "scheme": "pm-kisan",
+        "keywords": ["pm kisan", "kisan samman", "kisan nidhi"],
+    },
+    {
+        "scheme": "maandhan",
+        "keywords": ["maandhan", "kisan pension"],
+    },
+    {
+        "scheme": "pmfme",
+        "keywords": ["food processing", "pmfme"],
+    },
+    {
+        "scheme": "zed",
+        "keywords": ["zed", "zero defect", "quality certification"],
+    },
+    {
+        "scheme": "sfurti",
+        "keywords": ["sfurti", "handloom", "khadi", "coir", "traditional industr", "artisan cluster"],
+    },
+    {
+        "scheme": "mse-cdp",
+        "keywords": ["common facility", "cluster development", "cdp"],
+    },
+    {
+        "scheme": "udyam",
+        "keywords": ["udyam registration", "udyog aadhaar", "msme registration"],
+    },
+    {
+        "scheme": "lean",
+        "keywords": ["lean manufacturing", "lean scheme"],
+    },
+    {
+        "scheme": "tread",
+        "keywords": ["tread"],
+    },
+    {
+        "scheme": "self-help group",
+        "keywords": ["self help group", "self-help group", "shg", "nrlm"],
+    },
+    {
+        "scheme": "fpo",
+        "keywords": ["fpo", "farmer producer", "producer company"],
+    },
+    {
+        "scheme": "nsic",
+        "keywords": ["nsic", "government tender", "government purchase", "sell to government"],
+    },
+    {
+        "scheme": "agriculture infrastructure",
+        "keywords": ["agri infrastructure", "cold storage", "cold chain", "warehouse", "post harvest", "aif"],
+    },
+    {
+        "scheme": "mahila udyam",
+        "keywords": ["mahila udyam"],
+    },
+    {
+        "scheme": "mahila coir",
+        "keywords": ["coir board", "coir yojana", "coir artisans"],
+    },
 ]
 
 
@@ -107,6 +179,34 @@ _SCHEME_TOKENS: Dict[str, str] = {
     "tarun": "mudra-tarun",
     "pmegp": "pmegp",
     "cgtmse": "cgtmse",
+    "pm vishwakarma": "pm-vishwakarma",
+    "vishwakarma": "pm-vishwakarma",
+    "stand-up india": "stand-up-india",
+    "stand up india": "stand-up-india",
+    "kisan credit card": "kcc",
+    "kcc": "kcc",
+    "pm-kisan": "pm-kisan",
+    "pm kisan maandhan": "pm-kmy",
+    "kisan maandhan": "pm-kmy",
+    "maandhan": "pm-kmy",
+    "pm kisan": "pm-kisan",
+    "pmfme": "pmfme",
+    "msme sustainable": "zed",
+    "zed certification": "zed",
+    "sfurti": "sfurti",
+    "cluster development programme": "mse-cdp",
+    "udyam registration": "udyam",
+    "tread scheme": "tread",
+    "self help group": "day-nrlm-shg",
+    "day-nrlm": "day-nrlm-shg",
+    "farmer producer": "fpo-sfac",
+    "fpo scheme": "fpo-sfac",
+    "single point registration": "nsic-sprs",
+    "nsic": "nsic-sprs",
+    "agriculture infrastructure fund": "aif",
+    "mahila udyam nidhi": "mahila-udyam-nidhi",
+    "mahila coir": "mahila-coir-yojana",
+    "coir yojana": "mahila-coir-yojana",
 }
 
 

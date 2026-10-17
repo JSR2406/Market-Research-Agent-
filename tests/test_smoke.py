@@ -241,35 +241,6 @@ def test_langchain_status(client):
     node_ids = {n["id"] for n in agentic["nodes"]}
     assert {"planner", "supervisor", "finalize"} <= node_ids
 
-
-def test_whatsapp_verify_unconfigured(client):
-    # No WHATSAPP_VERIFY_TOKEN in this env → documented 503, never 500.
-    r = client.get("/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=x&hub.challenge=123")
-    assert r.status_code in (200, 403, 503)
-
-
-def test_whatsapp_post_always_200(client):
-    payload = {
-        "object": "whatsapp_business_account",
-        "entry": [{
-            "changes": [{
-                "value": {
-                    "messages": [{
-                        "from": "15550001111",
-                        "type": "text",
-                        "text": {"body": "MUDRA loan kaise milega?"},
-                    }]
-                }
-            }]
-        }],
-    }
-    r = client.post("/api/whatsapp/webhook", json=payload)
-    # 200 even with no creds/LLM: the brain falls back to heuristics, the
-    # send is skipped gracefully.
-    assert r.status_code == 200
-    assert r.json()["status"] == "processed"
-
-
 # ── Business Check-up profile → advisory + chat ────────────────────────────
 
 def test_chat_agent_injects_profile(monkeypatch):

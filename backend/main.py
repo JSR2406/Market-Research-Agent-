@@ -24,7 +24,6 @@ from backend.api.voice import router as voice_router
 from backend.api.chat import router as chat_router
 from backend.api.sessions import router as sessions_router
 from backend.api.langchain import router as langchain_router
-from backend.api.whatsapp import router as whatsapp_router
 from backend.api.ws_market import router as ws_router
 from backend.core.memory import cleanup_old_sessions
 from backend.core.analytics import cleanup_analytics
@@ -126,7 +125,6 @@ app.include_router(voice_router)
 app.include_router(chat_router)
 app.include_router(sessions_router)
 app.include_router(langchain_router)
-app.include_router(whatsapp_router)
 app.include_router(ledger_router)
 app.include_router(benefits_router)
 app.include_router(documents_router)

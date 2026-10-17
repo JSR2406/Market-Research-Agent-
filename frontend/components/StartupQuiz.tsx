@@ -11,6 +11,7 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import BenefitCalculator from "@/components/BenefitCalculator";
 import { track } from "@/lib/analytics";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -442,6 +443,9 @@ export default function StartupQuiz({
               )}
             </motion.div>
           )}
+
+          {/* "How much?" — the calculator only appears once a door is open */}
+          {openNow.length > 0 && <BenefitCalculator intake={value} />}
         </div>
       )}
     </motion.div>

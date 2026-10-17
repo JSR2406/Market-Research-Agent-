@@ -139,6 +139,32 @@ class EligibilityResponse(BaseModel):
     questions: Dict[str, str] = {}
 
 
+class BenefitRequest(BaseModel):
+    """Ask the deterministic calculator what a business could receive (WS-3)."""
+
+    topic: str = Field("", max_length=2000)
+    amount: Optional[int] = None
+    # The user's own project cost, when they enter one. A subsidy is a
+    # percentage of it; capped at ₹10 crore to reject nonsense input.
+    project_cost: Optional[int] = Field(default=None, ge=1000, le=100_000_000)
+    lang: str = Field("en", max_length=8)  # "en" | "hi"
+    intake: Dict[str, str] = Field(default_factory=dict)
+
+
+class BenefitResponse(BaseModel):
+    """Computed benefit rows + headline totals + the mandatory disclaimer."""
+
+    business_class: str = ""
+    business_label: str = ""
+    amount: Optional[int] = None
+    project_cost: Optional[int] = None
+    pmegp_sector: str = ""
+    rows: List[Dict[str, Any]] = []
+    headline: Dict[str, Any] = {}
+    assumptions: List[str] = []
+    disclaimer: str = ""
+
+
 class LedgerTickRequest(BaseModel):
     completed: List[str] = Field(default_factory=list, max_length=40)
     persist: bool = True

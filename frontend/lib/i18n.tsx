@@ -128,6 +128,19 @@ const EN: Record<string, string> = {
   "quiz.openForYou": "Open for you: {list}",
   "quiz.filledIn": "Details filled in: {pct}%",
 
+  // ── benefit calculator (WS-3) ───────────────────────────────────────────
+  "benefits.title": "What you could get (estimate)",
+  "benefits.costLabel": "Your project cost (₹)",
+  "benefits.costHint": "Enter your project cost to see the subsidy in rupees",
+  "benefits.subsidy": "You may not have to repay",
+  "benefits.credit": "Loans you match (ceiling)",
+  "benefits.none": "No grant or subsidy scheme matched yet",
+  "benefits.showAll": "Show all {count} matched schemes",
+  "benefits.showLess": "Show fewer",
+  "benefits.loading": "Calculating…",
+  "benefits.disclaimerLabel": "Please note",
+  "benefits.source": "Source",
+
   // ── topic input ─────────────────────────────────────────────────────────
   "input.placeholder":
     "Describe your business — what you sell, roughly how much you earn, and where you're located",
@@ -575,6 +588,19 @@ const HI: Record<string, string> = {
   "quiz.liveTitle": "आपका बिज़नेस: {label}",
   "quiz.openForYou": "आपके लिए खुली: {list}",
   "quiz.filledIn": "जानकारी भरी: {pct}%",
+
+  // ── benefit calculator (WS-3) ───────────────────────────────────────────
+  "benefits.title": "आपको क्या मिल सकता है (अनुमान)",
+  "benefits.costLabel": "आपकी परियोजना लागत (₹)",
+  "benefits.costHint": "लागत भरें तो सब्सिडी रुपये में दिखेगी",
+  "benefits.subsidy": "जो राशि चुकानी नहीं पड़ सकती",
+  "benefits.credit": "जिन कर्ज़ों से आप जुड़ते हैं (अधिकतम)",
+  "benefits.none": "अभी कोई अनुदान या सब्सिडी स्कीम नहीं मिली",
+  "benefits.showAll": "सभी {count} मिलती स्कीमें देखें",
+  "benefits.showLess": "कम देखें",
+  "benefits.loading": "गिनती हो रही है…",
+  "benefits.disclaimerLabel": "ध्यान दें",
+  "benefits.source": "स्रोत",
 
   "input.placeholder":
     "अपना बिज़नेस बताइए — क्या बेचते हैं, लगभग कितना कमाते हैं, और कहाँ हैं",

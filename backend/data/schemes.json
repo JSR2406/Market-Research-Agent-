@@ -59,8 +59,8 @@
     "target_segment": "First-time micro-entrepreneurs",
     "loan_ceiling": "Up to ₹50,000",
     "min_amount": null,
-    "max_amount": 150000,
-    "amount_band_note": "Up to Rs 150,000",
+    "max_amount": 50000,
+    "amount_band_note": "Up to Rs 50,000",
     "checks": [
       {
         "id": "no_crop_cultivation",
@@ -116,8 +116,14 @@
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
     "source_url": "https://www.myscheme.gov.in/schemes/mudra-shishu",
-    "last_verified_at": "2026-10-08",
-    "apply_via": "Any bank branch, NBFC or MFI; online via mudra.org.in partners"
+    "last_verified_at": "2026-10-18",
+    "apply_via": "Any bank branch, NBFC or MFI; online via mudra.org.in partners",
+    "benefit_rules": {
+      "kind": "tiered_loan",
+      "tier": "Shishu",
+      "no_subsidy": true,
+      "note": "MUDRA is a loan, not a subsidy; the interest rate is set by the lender."
+    }
   },
   {
     "id": "mudra-kishore",
@@ -125,9 +131,9 @@
     "benefit_type": "Collateral-free expansion loan for existing micro units",
     "target_segment": "Micro-entrepreneurs who have started and want to expand",
     "loan_ceiling": "₹50,001 – ₹5,00,000",
-    "min_amount": 150001,
-    "max_amount": 1500000,
-    "amount_band_note": "Up to Rs 1,500,000",
+    "min_amount": 50001,
+    "max_amount": 500000,
+    "amount_band_note": "Rs 50,001 to Rs 5,00,000",
     "checks": [
       {
         "id": "no_crop_cultivation",
@@ -175,8 +181,14 @@
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
     "source_url": "https://www.myscheme.gov.in/schemes/mudra-kishore",
-    "last_verified_at": "2026-10-08",
-    "apply_via": "Any bank branch, NBFC or MFI"
+    "last_verified_at": "2026-10-18",
+    "apply_via": "Any bank branch, NBFC or MFI",
+    "benefit_rules": {
+      "kind": "tiered_loan",
+      "tier": "Kishore",
+      "no_subsidy": true,
+      "note": "MUDRA is a loan, not a subsidy; the interest rate is set by the lender."
+    }
   },
   {
     "id": "mudra-tarun",
@@ -184,9 +196,9 @@
     "benefit_type": "Collateral-free growth loan for established micro units",
     "target_segment": "Micro-enterprises scaling up beyond ₹5 lakh",
     "loan_ceiling": "₹5,00,001 – ₹10,00,000",
-    "min_amount": 1500001,
-    "max_amount": 11000000,
-    "amount_band_note": "Up to Rs 11,000,000",
+    "min_amount": 500001,
+    "max_amount": 1000000,
+    "amount_band_note": "Rs 5,00,001 to Rs 10,00,000",
     "checks": [
       {
         "id": "no_crop_cultivation",
@@ -234,8 +246,14 @@
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
     "source_url": "https://www.myscheme.gov.in/schemes/mudra-tarun",
-    "last_verified_at": "2026-10-08",
-    "apply_via": "Any bank branch, NBFC or MFI"
+    "last_verified_at": "2026-10-18",
+    "apply_via": "Any bank branch, NBFC or MFI",
+    "benefit_rules": {
+      "kind": "tiered_loan",
+      "tier": "Tarun",
+      "no_subsidy": true,
+      "note": "MUDRA is a loan, not a subsidy; the interest rate is set by the lender."
+    }
   },
   {
     "id": "mudra-tarun-plus",
@@ -243,9 +261,9 @@
     "benefit_type": "Collateral-free larger loan for Tarun graduates",
     "target_segment": "Micro-enterprises that repaid a Tarun loan",
     "loan_ceiling": "₹10,00,001 – ₹20,00,000 (new tranche, w.e.f. 24.10.2024)",
-    "min_amount": 11000001,
-    "max_amount": 20000000,
-    "amount_band_note": "Up to Rs 20,000,000",
+    "min_amount": 1000001,
+    "max_amount": 2000000,
+    "amount_band_note": "Rs 10,00,001 to Rs 20,00,000",
     "checks": [
       {
         "id": "no_crop_cultivation",
@@ -292,8 +310,14 @@
     ],
     "interest_rate": "Decided by the lending institution (bank/NBFC/MFI)",
     "source_url": "https://www.myscheme.gov.in/schemes/mudra-tarun-plus",
-    "last_verified_at": "2026-10-08",
-    "apply_via": "Any bank branch, NBFC or MFI"
+    "last_verified_at": "2026-10-18",
+    "apply_via": "Any bank branch, NBFC or MFI",
+    "benefit_rules": {
+      "kind": "tiered_loan",
+      "tier": "Tarun Plus",
+      "no_subsidy": true,
+      "note": "MUDRA is a loan, not a subsidy; the interest rate is set by the lender."
+    }
   },
   {
     "id": "pmegp",
@@ -349,10 +373,23 @@
         "label": "Margin money subsidy is higher (25-35%) for rural units than urban (15-25%)",
         "label_hi": "गाँव की यूनिट पर मार्जिन सब्सिडी ज़्यादा (25-35%) है, शहर में कम (15-25%)",
         "basis": "eligibility_rules: Margin money subsidy 25-35% rural, 15-25% urban"
+      },
+      {
+        "id": "mfse_scope",
+        "type": "business_class_not_in",
+        "values": [
+          "trading",
+          "street_vending",
+          "other"
+        ],
+        "severity": "disqualifying",
+        "label": "PMEGP is for manufacturing and service units — a plain retail shop or street vending is not covered",
+        "label_hi": "PMEGP मैन्युफैक्चरिंग और सेवा इकाइयों के लिए है — सादी दुकान या रेहड़ी-पटरी इसके दायरे में नहीं आती",
+        "basis": "Trading permitted only for NER/LWE/A&N sales outlets, KVIC/village-industry products, or retail backed by manufacturing/service"
       }
     ],
     "tier_group": "pmegp",
-    "collateral_requirement": "None for loans up to ₹10 lakh (CGTMSE-backed); beyond that banks may ask for security",
+    "collateral_requirement": "None for loans up to ₹20 lakh (RBI collateral-free MSME limit, per the PMEGP FAQ); banks may ask for security beyond that",
     "nodal_agency": "KVIC (Khadi and Village Industries Commission) with banks",
     "one_line_eligibility": "Any individual above 18 years setting up a new project/micro enterprise; at least VIII standard pass for projects above ₹10 lakh (Mfg) / ₹5 lakh (Service).",
     "eligibility_rules": [
@@ -374,9 +411,32 @@
       "Bank account details and photographs"
     ],
     "interest_rate": "Bank rate on the loan portion — the government subsidy (margin money) reduces the effective cost",
-    "source_url": "https://www.msme.gov.in/",
-    "last_verified_at": "2026-10-08",
-    "apply_via": "Nearest KVIC / KVIB office or participating bank — application through pmegp.msme.gov.in"
+    "source_url": "https://pmegp.msme.gov.in/Documents/UserManual/Revisedguidelines07.12.2023.pdf",
+    "last_verified_at": "2026-10-18",
+    "apply_via": "Nearest KVIC / KVIB office or participating bank — application through pmegp.msme.gov.in",
+    "benefit_rules": {
+      "kind": "margin_money",
+      "project_cost_cap": {
+        "manufacturing": 5000000,
+        "service": 2000000
+      },
+      "subsidy_pct": {
+        "general": {
+          "urban": 15,
+          "rural": 25
+        },
+        "special": {
+          "urban": 25,
+          "rural": 35
+        }
+      },
+      "own_contribution_pct": {
+        "general": 10,
+        "special": 5
+      },
+      "special_note": "Special category: SC/ST/OBC/minority/women/transgender/ex-servicemen/differently-abled/NER/aspirational-district/hill & border areas",
+      "note": "Margin money subsidy is paid on the project cost up to the sector ceiling; the bank finances the balance (excluding the beneficiary's own contribution)."
+    }
   },
   {
     "id": "pm-svanidhi",
@@ -384,9 +444,9 @@
     "benefit_type": "Collateral-free working-capital loan for street vendors",
     "target_segment": "Street vendors (informal micro-entrepreneurs) in urban areas",
     "loan_ceiling": "₹15,000 (12 months) first tranche; up to ₹25,000 (18 months) and ₹50,000 (36 months) on timely repayment",
-    "min_amount": 10000,
+    "min_amount": 15000,
     "max_amount": 50000,
-    "amount_band_note": "Up to Rs 50,000",
+    "amount_band_note": "Rs 15,000 to Rs 50,000 (three tranches)",
     "checks": [
       {
         "id": "street_vendor_only",
@@ -440,7 +500,26 @@
     "interest_rate": "Bank rate under the scheme, with government interest subsidy for on-time repayment",
     "source_url": "https://pmsvanidhi.mohua.gov.in/",
     "last_verified_at": "2026-10-08",
-    "apply_via": "pmsvanidhi.mohua.gov.in portal or through the local Urban Local Body / Common Service Centre"
+    "apply_via": "pmsvanidhi.mohua.gov.in portal or through the local Urban Local Body / Common Service Centre",
+    "benefit_rules": {
+      "kind": "tranche_ladder",
+      "tranches": [
+        {
+          "amount": 15000,
+          "tenor_months": 12
+        },
+        {
+          "amount": 25000,
+          "tenor_months": 18
+        },
+        {
+          "amount": 50000,
+          "tenor_months": 36
+        }
+      ],
+      "cumulative_cap": 50000,
+      "note": "The next tranche is available after repaying the earlier one; interest subsidy applies for on-time repayment."
+    }
   },
   {
     "id": "pm-vishwakarma",

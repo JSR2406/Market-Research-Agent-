@@ -56,6 +56,7 @@ async def eligibility(body: EligibilityRequest):
         "signals": result.get("signals") or [],
         "amount": result.get("amount"),
         "families": result.get("families") or [],
+        "ranked": result.get("ranked") or [],
         "summary": eligibility_summary(result),
         "coverage": coverage_report(intake, body.lang),
         "next_probe": next_probe(intake, body.lang),

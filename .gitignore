@@ -22,6 +22,7 @@ Thumbs.db
 # Runtime data
 backend/sessions/
 backend/data/piper/
+backend/data/source_health.json
 *.log
 *.pid
 .pytest_cache/

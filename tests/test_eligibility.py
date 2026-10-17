@@ -171,6 +171,71 @@ def test_summary_names_each_programme_once():
     assert summary.count("MUDRA") == 1, summary
 
 
+# ── eligibility scoring (WS-2) ─────────────────────────────────────────────
+
+
+def test_every_verdict_carries_a_bounded_integer_score():
+    result = evaluate_schemes({"business": "I run a small dairy farm with 8 cows"})
+    assert result["verdicts"], "expected at least one verdict"
+    for verdict in result["verdicts"]:
+        assert isinstance(verdict["score"], int)
+        assert 0 <= verdict["score"] <= 100
+        assert verdict["score"] == int(verdict["score"])
+
+
+def test_a_disqualified_scheme_scores_zero():
+    """A closed door must read as zero, not as a partial match."""
+    crop = evaluate_schemes({"business": "I farm wheat and vegetables on 3 acres"})
+    for tier in ("mudra-shishu", "mudra-kishore", "mudra-tarun", "mudra-tarun-plus"):
+        verdict = _verdict(crop, tier)
+        assert verdict["status"] == NOT_ELIGIBLE
+        assert verdict["score"] == 0
+        assert verdict["failed"], "a disqualification must appear in failed rules"
+
+
+def test_a_missing_document_caps_the_score_below_a_clean_match():
+    """The scheme is reachable, one action away — but never ahead of an open one."""
+    unregistered = evaluate_schemes(
+        {"business": "Street vendor / cart", "offering": "vegetables", "registered": "No, not yet"}
+    )
+    blocked = _verdict(unregistered, "pm-svanidhi")
+    assert blocked["status"] == BLOCKED
+    assert blocked["score"] <= 55
+
+    registered = evaluate_schemes(
+        {"business": "Street vendor / cart", "offering": "vegetables", "registered": "Yes, registered"}
+    )
+    open_now = _verdict(registered, "pm-svanidhi")
+    assert open_now["score"] > blocked["score"]
+
+
+def test_ranked_matches_are_best_first_and_only_open_doors():
+    result = evaluate_schemes({"business": "I run a small dairy farm with 8 cows"})
+    ranked = result["ranked"]
+    assert ranked, "an eligible business must have ranked matches"
+    scores = [v["score"] for v in ranked]
+    assert scores == sorted(scores, reverse=True)
+    for verdict in ranked:
+        assert verdict["status"] in (ELIGIBLE, LIKELY)
+
+
+def test_matched_rules_are_reported_for_an_eligible_scheme():
+    registered = evaluate_schemes(
+        {"business": "Street vendor / cart", "offering": "vegetables", "registered": "Yes, registered"}
+    )
+    verdict = _verdict(registered, "pm-svanidhi")
+    assert verdict["matched"], "an eligible scheme must show which rules it met"
+    for rule in verdict["matched"]:
+        assert rule["basis"], "every matched rule must cite its basis"
+
+
+def test_family_card_exposes_the_best_tier_score():
+    result = evaluate_schemes({"business": "Street vendor / cart"}, "I need 2 lakh")
+    families = {c["family"]: c for c in group_by_family(result)}
+    assert "score" in families["mudra"]
+    assert 0 <= families["mudra"]["score"] <= 100
+
+
 # ── action ledger ──────────────────────────────────────────────────────────
 
 

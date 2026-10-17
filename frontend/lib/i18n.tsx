@@ -255,6 +255,7 @@ const EN: Record<string, string> = {
   "elig.subtitle":
     "Checked against the official scheme rules in code — not guessed. Tap a card to see the rule and the source.",
   "elig.tapRule": "Rule: {rule}",
+  "elig.matchScore": "Match {score}%",
   "elig.tiers": "Loan tiers",
   "elig.documents": "Documents",
   "elig.collateral": "Collateral:",
@@ -625,6 +626,7 @@ const HI: Record<string, string> = {
   "elig.subtitle":
     "यह सरकारी नियमों से कोड में जाँचा गया है — अंदाज़ा नहीं लगाया गया। कार्ड पर टैप करके नियम और स्रोत देखिए।",
   "elig.tapRule": "नियम: {rule}",
+  "elig.matchScore": "मेल {score}%",
   "elig.tiers": "लोन के स्तर",
   "elig.documents": "काग़ज़",
   "elig.collateral": "ज़मानत:",

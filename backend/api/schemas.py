@@ -129,6 +129,8 @@ class EligibilityResponse(BaseModel):
     signals: List[str] = []
     amount: Optional[int] = None
     families: List[Dict[str, Any]] = []
+    # Scored, best-first list of the schemes that are actually open (WS-2).
+    ranked: List[Dict[str, Any]] = []
     summary: str = ""
     coverage: Dict[str, Any] = {}
     next_probe: str = ""

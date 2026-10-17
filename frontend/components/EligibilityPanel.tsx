@@ -34,6 +34,7 @@ export type EligibilityFamily = {
   name: string;
   status: string;
   status_label: string;
+  score: number;
   reasons: EligibilityReason[];
   documents: string[];
   collateral_requirement: string;
@@ -202,6 +203,23 @@ export default function EligibilityPanel({
                 >
                   {card.name}
                 </span>
+                {typeof card.score === "number" && card.status !== "not_eligible" ? (
+                  <span
+                    title={t("elig.matchScore", { score: card.score })}
+                    style={{
+                      fontSize: "0.66rem",
+                      fontWeight: 800,
+                      color: tone.color,
+                      background: tone.bg,
+                      padding: "3px 8px",
+                      borderRadius: "999px",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {t("elig.matchScore", { score: card.score })}
+                  </span>
+                ) : null}
                 <motion.span
                   animate={{ rotate: isOpen ? 180 : 0 }}
                   style={{ display: "flex", color: "var(--text-muted)", flexShrink: 0 }}

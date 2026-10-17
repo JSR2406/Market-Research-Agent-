@@ -127,8 +127,14 @@ def _evaluate_check(
     classification: Dict,
     intake: Dict[str, str],
     lang: str = "en",
-) -> Optional[Dict]:
-    """One predicate → one reason, or None when the rule simply doesn't fire."""
+) -> Tuple[Optional[Dict], Optional[bool]]:
+    """One predicate → ``(reason-or-None, satisfied)``.
+
+    ``satisfied`` feeds the scoring pass (WS-2):
+      * ``True``  — the rule is met: a positive, qualifying fact.
+      * ``False`` — the rule fired negatively (blocking or disqualifying).
+      * ``None``  — the rule does not apply to this business (neutral).
+    """
     ctype = check.get("type")
     primary = classification["primary"]
     severity = check.get("severity", "advisory")
@@ -140,54 +146,111 @@ def _evaluate_check(
     if ctype == "business_class_not_in":
         blocked_classes = check.get("values") or []
         if primary in blocked_classes:
-            return {
-                "kind": "rule",
-                "severity": severity,
-                "label": label,
-                "basis": basis,
-            }
-        return None
+            return (
+                {"kind": "rule", "severity": severity, "label": label, "basis": basis},
+                False,
+            )
+        return None, None
 
     if ctype == "business_class_in":
         allowed = check.get("values") or []
         if primary in allowed:
-            return {"kind": "rule", "severity": "qualifying", "label": label, "basis": basis}
+            return (
+                {"kind": "rule", "severity": "qualifying", "label": label, "basis": basis},
+                True,
+            )
         # Only a *known* class can fail this. `other` means we did not
         # understand the business, which is not the same as failing the rule.
         if severity == "disqualifying" and is_known(primary):
-            return {"kind": "rule", "severity": severity, "label": label, "basis": basis}
-        return None
+            return (
+                {"kind": "rule", "severity": severity, "label": label, "basis": basis},
+                False,
+            )
+        return None, None
 
     if ctype == "requires_document":
         if _registered_yes(intake):
-            return {"kind": "rule", "severity": "qualifying", "label": label, "basis": basis}
-        return {
-            "kind": "rule",
-            "severity": "blocking",
-            "label": label,
-            "basis": basis,
-            "action": "Get this document — it is the only thing standing between you and this scheme.",
-        }
-
-    if ctype == "loan_history_not":
-        if _loan_history_value(intake) in (check.get("values") or []):
-            return {
+            return (
+                {"kind": "rule", "severity": "qualifying", "label": label, "basis": basis},
+                True,
+            )
+        return (
+            {
                 "kind": "rule",
                 "severity": "blocking",
                 "label": label,
                 "basis": basis,
-            }
-        return None
+                "action": "Get this document — it is the only thing standing between you and this scheme.",
+            },
+            False,
+        )
+
+    if ctype == "loan_history_not":
+        if _loan_history_value(intake) in (check.get("values") or []):
+            return (
+                {"kind": "rule", "severity": "blocking", "label": label, "basis": basis},
+                False,
+            )
+        return None, None
 
     if ctype in {"advisory", "collateral_note", "registration_preferred"}:
-        return {"kind": "note", "severity": "advisory", "label": label, "basis": basis}
+        return (
+            {"kind": "note", "severity": "advisory", "label": label, "basis": basis},
+            None,
+        )
 
     logger.debug("[eligibility] unknown check type %s", ctype)
-    return None
+    return None, None
+
+
+# Only these check types decide anything. Notes never move the score.
+_SCORED_TYPES = frozenset(
+    {"business_class_in", "business_class_not_in", "requires_document", "loan_history_not"}
+)
+
+
+def _score_from_outcomes(outcomes: List[Tuple[Dict, Optional[Dict], Optional[bool]]]) -> int:
+    """Deterministic 0–100 readiness score for one scheme.
+
+    The formula is written down so it can be argued with (and unit-tested):
+
+    * Any disqualifying rule → **0**. A closed door is a closed door.
+    * Otherwise ``score = round(100 * satisfied_weight / scored_weight)`` where
+      the denominator is every *deciding* check (notes excluded) and a check the
+      business clears contributes its ``weight`` (default 1). A rule that does
+      not block you counts in your favour, which is how hard filters read.
+    * A missing document caps the score at **55** — the scheme is reachable, one
+      action away, and must never out-rank a scheme the user can walk into today.
+    """
+    hard_fail = any(fired and fired.get("severity") == "disqualifying" for _, fired, _ in outcomes)
+    if hard_fail:
+        return 0
+
+    total = 0
+    satisfied = 0
+    blocked = False
+    for check, fired, satisfied_flag in outcomes:
+        if check.get("type") not in _SCORED_TYPES:
+            continue
+        weight = max(1, int(check.get("weight", 1) or 1))
+        total += weight
+        if satisfied_flag is False:
+            # The only way to fail a scored rule is to fire a blocking check —
+            # disqualifying checks have already returned 0 above.
+            if fired and fired.get("severity") == "blocking":
+                blocked = True
+        else:
+            # True (met) or None (rule does not apply) → the rule is not a barrier.
+            satisfied += weight
+
+    if total == 0:
+        return 60  # nothing decidable: a neutral, neither-open-nor-closed score
+    score = round(100 * satisfied / total)
+    return min(score, 55) if blocked else score
 
 
 def _verdict_for(scheme: Dict, reasons: List[Dict], amount: Optional[int],
-                 schemes: List[Dict], classification: Dict) -> Dict:
+                 schemes: List[Dict], classification: Dict, score: int = 0) -> Dict:
     severities = {r["severity"] for r in reasons}
 
     status = ELIGIBLE
@@ -207,11 +270,19 @@ def _verdict_for(scheme: Dict, reasons: List[Dict], amount: Optional[int],
         else:
             status = ELIGIBLE
 
+    matched = [r for r in reasons if r["severity"] == "qualifying"]
+    failed = [r for r in reasons if r["severity"] in ("disqualifying", "blocking")]
+
     return {
         "scheme_id": scheme.get("id", ""),
         "name": scheme.get("scheme_name", ""),
         "status": status,
         "status_label": _SEVERITY_LABEL[status],
+        # WS-2: a deterministic 0–100 score with the rule lists that produced it,
+        # so the UI can explain *why* one scheme outranks another.
+        "score": score,
+        "matched": matched,
+        "failed": failed,
         # Once the business type disqualifies a scheme, a missing document is
         # noise — the certificate would not help. Keep the disqualifier only.
         "reasons": [
@@ -254,13 +325,16 @@ def evaluate_schemes(
         if not scheme.get("checks"):
             # A scheme without predicates cannot be judged — never guess.
             continue
+        outcomes: List[Tuple[Dict, Optional[Dict], Optional[bool]]] = []
         reasons = []
         for check in scheme.get("checks") or []:
-            fired = _evaluate_check(check, classification, answers, lang)
+            fired, satisfied = _evaluate_check(check, classification, answers, lang)
+            outcomes.append((check, fired, satisfied))
             if fired:
                 reasons.append(fired)
 
-        verdict = _verdict_for(scheme, reasons, wanted, schemes, classification)
+        score = _score_from_outcomes(outcomes)
+        verdict = _verdict_for(scheme, reasons, wanted, schemes, classification, score)
 
         if verdict["status"] == WRONG_TIER:
             better = _tier_for(wanted, schemes, scheme.get("tier_group"))
@@ -275,12 +349,19 @@ def evaluate_schemes(
     for v in verdicts:
         by_status.setdefault(v["status"], []).append(v["scheme_id"])
 
+    # Best-first within the doors that are actually open (WS-2 ranking).
+    ranked = sorted(
+        [v for v in verdicts if v["status"] in (ELIGIBLE, LIKELY)],
+        key=lambda v: (-v.get("score", 0), v["name"]),
+    )
+
     return {
         "business_class": classification["primary"],
         "business_label": classification["label"],
         "signals": classification["signals"],
         "amount": wanted,
         "verdicts": verdicts,
+        "ranked": ranked,
         "families": group_by_family({"verdicts": verdicts}),
         "by_status": by_status,
         "actionable": [v for v in verdicts if v["status"] in (ELIGIBLE, LIKELY, BLOCKED, WRONG_TIER)],
@@ -312,7 +393,11 @@ def group_by_family(result: Dict) -> List[Dict]:
             members,
             key=lambda v: (v.get("min_amount") is not None, v.get("min_amount") or 0),
         )
-        best = min(members, key=lambda v: _SEVERITY_RANK.get(v["status"], 0))
+        best_rank = min(_SEVERITY_RANK.get(v["status"], 0) for v in members)
+        best = max(
+            [v for v in members if _SEVERITY_RANK.get(v["status"], 0) == best_rank],
+            key=lambda v: v.get("score", 0),
+        )
         recommended = None
         for v in tiers:
             if v["status"] in (ELIGIBLE, LIKELY):
@@ -323,6 +408,7 @@ def group_by_family(result: Dict) -> List[Dict]:
             "name": _short_name(tiers[0]["name"]),
             "status": best["status"],
             "status_label": best["status_label"],
+            "score": best.get("score", 0),
             "reasons": best["reasons"],
             "documents": best["documents"],
             "collateral_requirement": best["collateral_requirement"],

@@ -183,6 +183,30 @@ class DocumentPlanResponse(BaseModel):
     disclaimer: str = ""
 
 
+class DprRequest(BaseModel):
+    """Ask for a bank-ready Detailed Project Report (WS-5)."""
+
+    intake: Dict[str, str] = Field(default_factory=dict)
+    topic: str = Field("", max_length=2000)
+    scheme_id: str = Field("", max_length=64)
+    project_cost: Optional[int] = Field(None, ge=1000, le=100_000_000)
+    monthly_sales: Optional[int] = Field(None, ge=0, le=100_000_000)
+    monthly_expenses: Optional[int] = Field(None, ge=0, le=100_000_000)
+    session_id: str = Field("", max_length=64)
+    lang: str = Field("en", max_length=8)  # "en" | "hi"
+
+
+class DprJobResponse(BaseModel):
+    """A generated report plus where to fetch its PDF."""
+
+    job_id: str = ""
+    status: str = "done"  # done | error
+    progress: List[str] = []
+    report: Optional[Dict[str, Any]] = None
+    pdf_url: str = ""
+    error: str = ""
+
+
 class LedgerTickRequest(BaseModel):
     completed: List[str] = Field(default_factory=list, max_length=40)
     persist: bool = True

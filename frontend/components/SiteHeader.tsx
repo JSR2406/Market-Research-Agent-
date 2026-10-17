@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, MessageSquare, FileText, Home, Handshake, Menu, X, History } from "lucide-react";
+import { Search, MessageSquare, FileText, Home, Handshake, Menu, X, History, FileSpreadsheet } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useI18n } from "@/lib/i18n";
 
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/research", labelKey: "nav.research", icon: Search },
   { href: "/advisor", labelKey: "nav.advisor", icon: MessageSquare },
   { href: "/schemes", labelKey: "nav.schemes", icon: FileText },
+  { href: "/dpr", labelKey: "nav.dpr", icon: FileSpreadsheet },
   { href: "/history", labelKey: "nav.history", icon: History },
 ] as const;
 

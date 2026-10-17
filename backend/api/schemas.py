@@ -392,3 +392,57 @@ class DeadlineListResponse(BaseModel):
 
     deadlines: List[Dict[str, Any]] = []
     disclaimer: str = ""
+
+
+# ── market data (WS-8) ────────────────────────────────────────────────────────
+
+class MarketResponse(BaseModel):
+    """One live-data lookup with its freshness metadata.
+
+    ``as_of`` is the date the *data itself* refers to and ``lag_days`` is how far
+    behind today it is, so a lagging feed is visible instead of being passed off
+    as current. ``note`` is the localised one-line freshness statement.
+    """
+
+    dataset: str = ""
+    key: str = ""
+    available: bool = False
+    live: bool = False
+    stale: bool = False
+    cached: bool = False
+    as_of: Optional[str] = None
+    as_of_known: bool = False
+    fetched_at: Optional[str] = None
+    lag_days: Optional[int] = None
+    records: List[Dict[str, Any]] = []
+    count: int = 0
+    source_name: str = ""
+    source_url: str = ""
+    official_url: str = ""
+    reason: str = ""
+    note: str = ""
+    error: str = ""
+    disclaimer: str = ""
+
+
+class MarketDatasetInfo(BaseModel):
+    """Which feeds exist, whether each is configured, and what we hold for it."""
+
+    id: str = ""
+    configured: bool = False
+    key_env: str = ""
+    ttl_seconds: int = 0
+    dated: bool = False
+    source_name: str = ""
+    source_url: str = ""
+    official_url: str = ""
+    cached_queries: int = 0
+    last_fetched_at: str = ""
+
+
+class MarketStatusResponse(BaseModel):
+    """Diagnostics for the live-data feeds — cheap, no network, no secrets."""
+
+    datasets: List[MarketDatasetInfo] = []
+    disclaimer: str = ""
+    server_time: str = ""

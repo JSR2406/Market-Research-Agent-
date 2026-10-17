@@ -150,6 +150,35 @@ def _cashflow_projection(payload: str) -> str:
     }, ensure_ascii=False)
 
 
+def _market_price(tool_input: str) -> str:
+    """Deterministic live mandi-price lookup from the published data.gov.in feed.
+
+    Accepts either a JSON object (``{"commodity","market","state"}``) or a plain
+    business description; returns the fetched records with their true ``as_of``
+    date. Says ``available: false`` rather than guessing when the feed is off.
+    """
+    from backend.core.market import extract_query, lookup
+
+    payload = (tool_input or "").strip()
+    params: Dict[str, str] = {}
+    if payload.startswith("{"):
+        try:
+            raw = json.loads(payload)
+            if isinstance(raw, dict):
+                params = {k: str(raw.get(k, "") or "") for k in ("commodity", "market", "state")}
+        except Exception:
+            params = {}
+    if not params.get("commodity"):
+        params = extract_query(payload)
+
+    result = lookup("mandi_price", params)
+    keep = (
+        "available", "live", "stale", "as_of", "as_of_known", "lag_days",
+        "freshness_label", "source_name", "source_url", "count", "records", "reason",
+    )
+    return json.dumps({k: result.get(k) for k in keep}, ensure_ascii=False)
+
+
 TOOLS: Dict[str, AgenticTool] = {
     t.name: t
     for t in [
@@ -183,6 +212,12 @@ TOOLS: Dict[str, AgenticTool] = {
             "Deterministic weekly cash-flow projection from a JSON input.",
             _cashflow_projection,
             ["analyst"],
+        ),
+        AgenticTool(
+            "market_price",
+            "Deterministic live mandi (wholesale) price lookup; returns records with their as-of date.",
+            _market_price,
+            ["research"],
         ),
     ]
 }

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
@@ -5,12 +6,13 @@ from typing import Optional
 from backend.core.config import WEB_SEARCH_ENABLED, WEB_SEARCH_MAX_RESULTS
 from backend.core.heuristics import extract_topic, match_schemes, parse_amount, schemes_brief
 from backend.core.llm_client import call_llm
+from backend.core.market import live_context as market_live_context
 from backend.core.web_research import web_context
 
 logger = logging.getLogger(__name__)
 
 
-def heuristic_research(task: str) -> str:
+def heuristic_research(task: str, market_note: str = "") -> str:
     """
     Deterministic fallback for the research agent: keyword-match the local MSME
     scheme dataset. Guarantees a useful answer when all LLM providers are offline.
@@ -39,6 +41,9 @@ def heuristic_research(task: str) -> str:
     lines.append("")
     lines.append("Suggested next step: register your business on Udyam (free, online), "
                  "then visit your bank with the document checklist.")
+    if market_note:
+        lines.append("")
+        lines.append(market_note)
     return "\n".join(lines)
 
 
@@ -64,6 +69,23 @@ async def research_agent(task: str, agent_hint: Optional[str] = "research", live
             f"{live_context}"
         )
 
+    # Live published market data (WS-8). When the topic names a commodity we have
+    # a real fetched price for, it outranks a web-search estimate and is quoted
+    # with the date it refers to. Empty (and free of any network call) when no
+    # feed is configured or no commodity is recognised.
+    market_note = ""
+    try:
+        market_note = await asyncio.to_thread(market_live_context, task)
+    except Exception as e:  # a market feed must never break a research run
+        logger.info(f"[Research] Live market data unavailable: {e}")
+        market_note = ""
+
+    if market_note:
+        user_content += (
+            "\n\nPublished market data (deterministic fetch — prefer this over any "
+            f"web-search estimate):\n{market_note}"
+        )
+
     messages = [
         {
             "role": "system",
@@ -83,4 +105,4 @@ async def research_agent(task: str, agent_hint: Optional[str] = "research", live
         return await call_llm(messages, temperature=0.3, max_tokens=400, agent_hint=agent_hint)
     except Exception as e:
         logger.error(f"LLM call failed during research: {e}")
-        return heuristic_research(task)
+        return heuristic_research(task, market_note=market_note)

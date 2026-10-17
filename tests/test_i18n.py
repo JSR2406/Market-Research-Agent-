@@ -159,6 +159,8 @@ def test_no_source_file_is_mojibake():
         root / "backend" / "core" / "documents.py",
         root / "backend" / "core" / "dpr.py",
         root / "backend" / "core" / "tracker.py",
+        root / "backend" / "core" / "market.py",
+        root / "backend" / "api" / "market.py",
         root / "frontend" / "lib" / "i18n.tsx",
         root / "frontend" / "lib" / "intake.ts",
         root / "frontend" / "components" / "StartupQuiz.tsx",

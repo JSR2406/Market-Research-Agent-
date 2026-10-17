@@ -54,6 +54,9 @@ EVENT_ALLOWLIST = frozenset(
         "chat_message",
         "voice_use",
         "advisory_download",
+        "tracker_scheme_added",
+        "tracker_alerts_saved",
+        "market_view",
     }
 )
 
@@ -69,6 +72,9 @@ PROP_SCHEMA: Dict[str, type] = {
     "score": int,
     "step": str,
     "source": str,
+    "dataset": str,
+    "scheme": str,
+    "channel": str,
 }
 
 _MAX_PROPS = len(PROP_SCHEMA)

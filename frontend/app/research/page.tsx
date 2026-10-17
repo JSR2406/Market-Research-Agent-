@@ -9,6 +9,7 @@ import StartupQuiz, { type ProfileInit } from "@/components/StartupQuiz";
 import { SiteHeader } from "@/components/SiteHeader";
 import SessionHistory from "@/components/SessionHistory";
 const CashflowSimulator = dynamic(() => import("@/components/CashflowSimulator"), { ssr: false });
+const MarketCheck = dynamic(() => import("@/components/MarketCheck"), { ssr: false });
 import { useI18n } from "@/lib/i18n";
 import { migrateIntake } from "@/lib/intake";
 import { track } from "@/lib/analytics";
@@ -571,6 +572,9 @@ export default function ResearchPage() {
 
       {/* Cash-flow simulator — self-serve financial viz, runs locally */}
       <CashflowSimulator />
+
+      {/* Live market check — published prices with the date they belong to */}
+      <MarketCheck />
 
       {/* The advisor chat and the live voice advisor now live on their own page,
           so this page stays focused on producing the report. */}

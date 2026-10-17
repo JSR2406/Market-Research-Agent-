@@ -72,6 +72,16 @@ def test_boolean_is_not_stored_as_a_count():
     assert "count" not in clean["props"]
 
 
+def test_market_and_tracker_events_are_recordable():
+    """The new WS-6/WS-8 surface events must survive the allowlist, or the
+    funnel silently loses a step."""
+    for name in ("market_view", "tracker_scheme_added", "tracker_alerts_saved"):
+        clean = sanitize_event({"name": name, "props": {"dataset": "mandi_price", "scheme": "pmegp", "channel": "whatsapp"}})
+        assert clean is not None, f"{name} is not on the allowlist"
+        assert clean["name"] == name
+        assert clean["props"]["dataset"] == "mandi_price"
+
+
 # ── recording ───────────────────────────────────────────────────────────────
 
 

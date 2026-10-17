@@ -239,3 +239,27 @@ body::before {
   animation: pulse-border 2s infinite ease-in-out;
   pointer-events: none;
 }
+
+/* ── print / Save as PDF (WS-4 document checklist) ──────────────────────────
+   Only the checklist is printed, so the saved PDF carries the scheme name,
+   the date and the source link — not the whole app chrome. */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+    border: none !important;
+  }
+  .print-area button {
+    display: none !important;
+  }
+}

@@ -165,6 +165,24 @@ class BenefitResponse(BaseModel):
     disclaimer: str = ""
 
 
+class DocumentRequest(BaseModel):
+    """Ask for the per-scheme document checklist (WS-4)."""
+
+    intake: Dict[str, str] = Field(default_factory=dict)
+    topic: str = Field("", max_length=2000)
+    scheme_ids: List[str] = Field(default_factory=list, max_length=25)
+    lang: str = Field("en", max_length=8)  # "en" | "hi"
+
+
+class DocumentPlanResponse(BaseModel):
+    """Checklists grouped by issuer, plus the share/print text per scheme."""
+
+    generated_on: str = ""
+    checklists: List[Dict[str, Any]] = []
+    default_note: str = ""
+    disclaimer: str = ""
+
+
 class LedgerTickRequest(BaseModel):
     completed: List[str] = Field(default_factory=list, max_length=40)
     persist: bool = True

@@ -141,6 +141,14 @@ const EN: Record<string, string> = {
   "benefits.disclaimerLabel": "Please note",
   "benefits.source": "Source",
 
+  // ── document checklist (WS-4) ───────────────────────────────────────────
+  "docs.title": "Documents to keep ready",
+  "docs.print": "Print / Save as PDF",
+  "docs.copyWhatsapp": "Copy for WhatsApp",
+  "docs.copied": "Copied",
+  "docs.generatedOn": "Generated {date}",
+  "docs.loading": "Loading…",
+
   // ── topic input ─────────────────────────────────────────────────────────
   "input.placeholder":
     "Describe your business — what you sell, roughly how much you earn, and where you're located",
@@ -601,6 +609,14 @@ const HI: Record<string, string> = {
   "benefits.loading": "गिनती हो रही है…",
   "benefits.disclaimerLabel": "ध्यान दें",
   "benefits.source": "स्रोत",
+
+  // ── document checklist (WS-4) ───────────────────────────────────────────
+  "docs.title": "कौन-कौन से कागज़ तैयार रखें",
+  "docs.print": "प्रिंट / PDF सेव करें",
+  "docs.copyWhatsapp": "WhatsApp के लिए कॉपी करें",
+  "docs.copied": "कॉपी हो गया",
+  "docs.generatedOn": "बना: {date}",
+  "docs.loading": "लोड हो रहा है…",
 
   "input.placeholder":
     "अपना बिज़नेस बताइए — क्या बेचते हैं, लगभग कितना कमाते हैं, और कहाँ हैं",

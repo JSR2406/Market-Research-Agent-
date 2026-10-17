@@ -49,7 +49,7 @@ def test_runs_are_kept_newest_first_and_capped():
         # Newest first.
         assert session["runs"][0]["topic"] == f"topic-{MAX_RUNS_PER_SESSION + 1}"
         # The legacy latest-state mirror is the newest run.
-        assert session["state"]["final_report"] == '{"business_summary": "topic-6"}'
+        assert session["state"]["final_report"] == '{"business_summary": "topic-%d"}' % (MAX_RUNS_PER_SESSION + 1)
     finally:
         delete_session(sid)
 
@@ -212,3 +212,36 @@ def test_session_history_rejects_bad_ids(client):
     unknown = client.get("/api/sessions/unknown-session/runs")
     assert unknown.status_code == 200
     assert unknown.json()["runs"] == []
+
+
+def test_session_export_and_delete_endpoints(client):
+    """The UI's export/delete buttons ride on these two REST routes."""
+    sid = "test-history-export"
+    try:
+        save_session(sid, "export me", _state("export me"))
+
+        exp = client.get(f"/api/sessions/{sid}/export")
+        assert exp.status_code == 200
+        body = exp.json()
+        assert body["session_id"] == sid
+        assert body["run_count"] == 1
+        assert body["runs"][0]["topic"] == "export me"
+        assert body["facts"]["business_type"] == "tea stall"
+        assert body["intake"]["location"] == "Pune"
+
+        # An unknown (well-formed) session exports nothing.
+        assert client.get("/api/sessions/nope-session/export").status_code == 404
+
+        deleted = client.delete(f"/api/sessions/{sid}")
+        assert deleted.status_code == 200
+        assert deleted.json() == {"status": "deleted", "session_id": sid}
+
+        # Gone afterwards — both the resume read and the export 404.
+        assert client.get(f"/api/sessions/{sid}").status_code == 404
+        assert client.get(f"/api/sessions/{sid}/export").status_code == 404
+    finally:
+        delete_session(sid)
+
+
+def test_session_delete_rejects_bad_ids(client):
+    assert client.delete("/api/sessions/bad id").status_code == 404

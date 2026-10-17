@@ -91,6 +91,26 @@ class SessionFactsResponse(BaseModel):
     intake: Dict[str, str] = {}
 
 
+class SessionDeleteResponse(BaseModel):
+    """GDPR right-to-delete result."""
+
+    status: str
+    session_id: str
+
+
+class SessionExportResponse(BaseModel):
+    """A full, self-contained dump of one session the user owns."""
+
+    session_id: str
+    exported_at: float
+    topic: str = ""
+    run_count: int = 0
+    runs: List[Dict[str, Any]] = []
+    facts: Dict[str, Any] = {}
+    intake: Dict[str, str] = {}
+    chat: List[Dict[str, Any]] = []
+
+
 # ── Eligibility + Action Ledger — deterministic, never LLM-generated ──────────
 
 

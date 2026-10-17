@@ -45,6 +45,7 @@ const EN: Record<string, string> = {
   "nav.research": "Research",
   "nav.advisor": "Advisor",
   "nav.schemes": "Schemes",
+  "nav.history": "History",
   "nav.aria": "Main navigation",
   "nav.openMenu": "Open menu",
   "nav.closeMenu": "Close menu",
@@ -63,7 +64,7 @@ const EN: Record<string, string> = {
   "landing.hero.subtitle": "Describe your business in plain language. Get live market research, a clear roadmap, matched government schemes, and a loan-readiness checklist — all in under 60 seconds.",
   "landing.hero.cta": "Start Research",
   "landing.hero.ctaSecondary": "Browse Schemes",
-  "landing.hero.trust": "No signup required · Works offline · Your data stays on your device",
+  "landing.hero.trust": "No signup required · Works offline · Export or delete your session anytime",
 
   "landing.stats.1": "Businesses helped",
   "landing.stats.2": "Curated schemes",
@@ -77,19 +78,19 @@ const EN: Record<string, string> = {
   "landing.features.1.desc": "Saathi helps you build your business — pricing, costs, cash flow, customers, registration — not just answer questions.",
 
   "landing.features.2.title": "Live market research",
-  "landing.features.2.desc": "Web-sourced facts, not memorised answers. Every claim is cited so you can verify it yourself.",
+  "landing.features.2.desc": "Web-sourced facts, not memorised answers — the sources are listed so you can verify them yourself.",
 
   "landing.features.3.title": "Your Indian schemes",
-  "landing.features.3.desc": "MUDRA, PMEGP, CGTMSE, PM SVANidhi — matched to your business type, location, and stage automatically.",
+  "landing.features.3.desc": "MUDRA, PMEGP, CGTMSE, PM SVANidhi — matched to your business type, business stage and loan size automatically.",
 
   "landing.features.4.title": "Loan-readiness checklist",
   "landing.features.4.desc": "A clear action ledger shows exactly what to do before you walk into a bank branch.",
 
   "landing.features.5.title": "Works offline",
-  "landing.features.5.desc": "Free local AI models mean Saathi works even without internet. No subscription, no API keys.",
+  "landing.features.5.desc": "Free local AI models (Ollama) and an offline fallback keep Saathi answering even without internet. No subscription, no API keys.",
 
-  "landing.features.6.title": "Your data, your device",
-  "landing.features.6.desc": "Session data stays in your browser. Export or delete anytime — GDPR-compliant by design.",
+  "landing.features.6.title": "Your data, your control",
+  "landing.features.6.desc": "Your session lives behind an anonymous ID on our server — export it or delete everything anytime. Auto-deleted after 7 days.",
 
   "landing.cta.title": "Ready to understand your business better?",
   "landing.cta.subtitle": "Start your free research in seconds. No signup, no credit card.",
@@ -122,7 +123,7 @@ const EN: Record<string, string> = {
   "quiz.knownBefore": "We already know this from your answers",
   "quiz.askRest": "Your Saathi will ask you about the rest in chat: {list}.",
   "quiz.allSet": "Your Saathi has everything it needs — it will use these answers everywhere.",
-  "quiz.staysLocal": "Nothing is shared anywhere — it stays on your device.",
+  "quiz.staysLocal": "Your answers are used only for your own research — export or delete them anytime.",
   "quiz.liveTitle": "Your business type: {label}",
   "quiz.openForYou": "Open for you: {list}",
   "quiz.filledIn": "Details filled in: {pct}%",
@@ -166,7 +167,7 @@ const EN: Record<string, string> = {
     "Lives on the web. It searches fresh, current facts about your industry instead of guessing from memory.",
   "usps.3.title": "Matched Indian Schemes",
   "usps.3.text":
-    "MUDRA, PMEGP, CGTMSE and more — mapped to your business and stage, not a fixed list of a few schemes.",
+    "MUDRA, PMEGP, CGTMSE, PM SVANidhi — matched to your business and stage by a rules engine, each scheme with its own source and verification date.",
   "usps.4.title": "Works Offline & Free",
   "usps.4.text":
     "Runs on free + local AI models. No subscription, no paywall — and it still answers even when the internet drops.",
@@ -175,7 +176,31 @@ const EN: Record<string, string> = {
     "Switch the entire site to Hindi — check-up, verdicts, ledger, everything — and the advisor answers in the same language, even offline.",
   "usps.6.title": "Your Data Stays Yours",
   "usps.6.text":
-    "Stored locally on your device, with one-tap export and full delete (GDPR-aligned). Nothing is sold to anyone.",
+    "One-tap export and a full delete for your session, auto-removed after 7 days (GDPR-aligned). Nothing is ever sold.",
+
+  // ── session history ─────────────────────────────────────────────────────
+  "history.title": "Your research history",
+  "history.subtitle":
+    "Every research run in this session is saved here, in real time. Open one to revisit its report.",
+  "history.loading": "Loading your history…",
+  "history.error": "Could not load your history.",
+  "history.retry": "Retry",
+  "history.empty": "No research saved yet. Run your first research and it will appear here.",
+  "history.inProgress": "In progress…",
+  "history.savedOn": "Saved",
+  "history.topicFallback": "Untitled research",
+  "history.loanReady": "Loan-ready",
+  "history.viewReport": "View report",
+  "history.hideReport": "Hide report",
+  "history.export": "Export",
+  "history.noReport": "No report was saved for this run.",
+  "history.limited": "Showing your latest {n} runs.",
+  "history.viewAll": "Open full history",
+  "history.clearTitle": "Delete this session",
+  "history.clearDesc": "Permanently remove this session's history and chat (GDPR right to delete).",
+  "history.clear": "Delete session data",
+  "history.clearDone": "Session data deleted.",
+  "history.clearFailed": "Could not delete your session data. Please try again.",
 
   // ── timeline ────────────────────────────────────────────────────────────
   "timeline.title": "What Saathi is doing",
@@ -397,6 +422,7 @@ const HI: Record<string, string> = {
   "nav.research": "रिसर्च",
   "nav.advisor": "सलाहकार",
   "nav.schemes": "स्कीमें",
+  "nav.history": "इतिहास",
   "nav.aria": "मुख्य नेविगेशन",
   "nav.openMenu": "मेन्यू खोलें",
   "nav.closeMenu": "मेन्यू बंद करें",
@@ -415,7 +441,7 @@ const HI: Record<string, string> = {
   "landing.hero.subtitle": "अपने बिज़नेस को आसान भाषा में बताइए। लाइव मार्केट रिसर्च, साफ़ रोडमैप, आपकी सरकारी स्कीमें और लोन की तैयारी की चेकलिस्ट — 60 सेकंड में।",
   "landing.hero.cta": "रिसर्च शुरू करें",
   "landing.hero.ctaSecondary": "स्कीमें देखें",
-  "landing.hero.trust": "साइनअप नहीं · ऑफलाइन चलता है · डेटा आपके फ़ोन पर",
+  "landing.hero.trust": "साइनअप नहीं · ऑफलाइन चलता है · कभी भी एक्सपोर्ट या डिलीट करें",
 
   "landing.stats.1": "बिज़नेस को मदद मिली",
   "landing.stats.2": "क्यूरेटेड स्कीमें",
@@ -429,19 +455,19 @@ const HI: Record<string, string> = {
   "landing.features.1.desc": "साथी आपका बिज़नेस बनाने में मदद करता है — दाम, खर्च, कैश फ्लो, ग्राहक, रजिस्ट्रेशन — सिर्फ सवालों के जवाब नहीं देता।",
 
   "landing.features.2.title": "लाइव मार्केट रिसर्च",
-  "landing.features.2.desc": "वेब से लिए तथ्य, याद किए जवाब नहीं। हर दावा स्रोत के साथ ताकि आप खुद जाँच सकें।",
+  "landing.features.2.desc": "वेब से लिए तथ्य, याद किए जवाब नहीं। स्रोत साथ दिए जाते हैं ताकि आप खुद जाँच सकें।",
 
   "landing.features.3.title": "आपकी भारतीय स्कीमें",
-  "landing.features.3.desc": "मुद्रा, PMEGP, CGTMSE, PM SVANidhi — आपके बिज़नेस, जगह और अवस्था के हिसाब से अपने आप चुनी जाती हैं।",
+  "landing.features.3.desc": "MUDRA, PMEGP, CGTMSE, PM SVANidhi — आपके बिज़नेस, अवस्था और लोन राशि के हिसाब से अपने आप चुनी जाती हैं।",
 
   "landing.features.4.title": "लोन की तैयारी की चेकलिस्ट",
   "landing.features.4.desc": "साफ़ एक्शन लेजर बताता है कि बैंक जाने से पहले क्या-क्या करना है।",
 
   "landing.features.5.title": "ऑफलाइन भी चलता है",
-  "landing.features.5.desc": "मुफ़्त लोकल AI मॉडल — इंटरनेट न हो तब भी साथी काम करता है। कोई सब्सक्रिप्शन नहीं।",
+  "landing.features.5.desc": "मुफ़्त लोकल AI मॉडल (Ollama) और ऑफ़लाइन फ़ॉलबैक — इंटरनेट न हो तब भी साथी जवाब देता है। कोई सब्सक्रिप्शन नहीं।",
 
-  "landing.features.6.title": "आपका डेटा, आपका फ़ोन",
-  "landing.features.6.desc": "सेशन डेटा आपके ब्राउज़र में रहता है। कभी भी एक्सपोर्ट या डिलीट करें — GDPR के मुताबिक।",
+  "landing.features.6.title": "आपका डेटा, आपका नियंत्रण",
+  "landing.features.6.desc": "आपका सेशन सर्वर पर एक गुमनाम ID से जुड़ा रहता है — कभी भी एक्सपोर्ट या पूरा डिलीट करें। 7 दिन बाद अपने आप हट जाता है।",
 
   "landing.cta.title": "अपने बिज़नेस को बेहतर समझने को तैयार?",
   "landing.cta.subtitle": "मुफ़्त रिसर्च सेकंड में शुरू करें। साइनअप नहीं, क्रेडिट कार्ड नहीं।",
@@ -473,7 +499,7 @@ const HI: Record<string, string> = {
   "quiz.knownBefore": "यह हमें आपके जवाब से पता है",
   "quiz.askRest": "बाकी आपके साथी chat में पूछेगा: {list}।",
   "quiz.allSet": "आपके साथी के पास अब सब कुछ है — यही जवाब वह हर जगह इस्तेमाल करेगा।",
-  "quiz.staysLocal": "कुछ भी कहीं नहीं भेजा जाता — सब आपके फ़ोन पर ही रहता है।",
+  "quiz.staysLocal": "आपके जवाब सिर्फ़ आपकी रिसर्च के लिए इस्तेमाल होते हैं — कभी भी एक्सपोर्ट या डिलीट करें।",
   "quiz.liveTitle": "आपका बिज़नेस: {label}",
   "quiz.openForYou": "आपके लिए खुली: {list}",
   "quiz.filledIn": "जानकारी भरी: {pct}%",
@@ -515,7 +541,7 @@ const HI: Record<string, string> = {
     "यह वेब पर लाइव तथ्य खोजता है — याद से अंदाज़ा नहीं लगाता।",
   "usps.3.title": "आपकी भारतीय स्कीम",
   "usps.3.text":
-    "MUDRA, PMEGP, CGTMSE और दूसरी — आपके बिज़नेस और उसकी अवस्था के हिसाब से चुनी गईं।",
+    "MUDRA, PMEGP, CGTMSE, PM SVANidhi — नियम-आधारित इंजन से आपके बिज़नेस और उसकी अवस्था के हिसाब से चुनी जाती हैं, हर स्कीम का अपना स्रोत और जाँच की तारीख।",
   "usps.4.title": "बिना इंटरनेट भी चलता है",
   "usps.4.text":
     "मुफ़्त और लोकल AI मॉडल पर चलता है। कोई सब्सक्रिप्शन नहीं — और इंटरनेट चले जाए तब भी जवाब देता है।",
@@ -524,7 +550,31 @@ const HI: Record<string, string> = {
     "चेक-अप, स्कीम, लिस्ट — पूरी साइट हिंदी में बदलिए, और साथी उसी भाषा में जवाब देगा, बिना इंटरनेट के भी।",
   "usps.6.title": "आपका डेटा आपका ही",
   "usps.6.text":
-    "आपके फ़ोन पर सुरक्षित — एक टैप में एक्सपोर्ट और पूरा डिलीट। किसी को कुछ नहीं बेचा जाता।",
+    "एक टैप में एक्सपोर्ट और पूरा डिलीट — सेशन 7 दिन बाद अपने आप हट जाता है (GDPR के मुताबिक)। किसी को कुछ नहीं बेचा जाता।",
+
+  // ── session history ─────────────────────────────────────────────────────
+  "history.title": "आपकी रिसर्च का इतिहास",
+  "history.subtitle":
+    "इस सेशन में की गई हर रिसर्च यहाँ रियल टाइम में सेव होती है। रिपोर्ट दोबारा देखने के लिए किसी एक को खोलिए।",
+  "history.loading": "आपका इतिहास लोड हो रहा है…",
+  "history.error": "आपका इतिहास लोड नहीं हो सका।",
+  "history.retry": "दोबारा कोशिश करें",
+  "history.empty": "अभी कोई रिसर्च सेव नहीं है। पहली रिसर्च चलाइए — वो यहाँ दिखेगी।",
+  "history.inProgress": "चल रही है…",
+  "history.savedOn": "सेव हुआ",
+  "history.topicFallback": "बिना शीर्षक रिसर्च",
+  "history.loanReady": "लोन-रेडी",
+  "history.viewReport": "रिपोर्ट देखें",
+  "history.hideReport": "रिपोर्ट छिपाएँ",
+  "history.export": "एक्सपोर्ट",
+  "history.noReport": "इस रन की कोई रिपोर्ट सेव नहीं हुई।",
+  "history.limited": "आपके सबसे नए {n} रन दिखाए जा रहे हैं।",
+  "history.viewAll": "पूरा इतिहास खोलें",
+  "history.clearTitle": "यह सेशन डिलीट करें",
+  "history.clearDesc": "इस सेशन का इतिहास और चैट हमेशा के लिए हटा दें (GDPR डिलीट का अधिकार)।",
+  "history.clear": "सेशन डेटा डिलीट करें",
+  "history.clearDone": "सेशन डेटा डिलीट हो गया।",
+  "history.clearFailed": "सेशन डेटा डिलीट नहीं हो सका। दोबारा कोशिश करें।",
 
   "timeline.title": "साथी अभी क्या कर रहा है",
   "timeline.waiting": "आपके इंतज़ार में।",

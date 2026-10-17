@@ -6,14 +6,18 @@ from fastapi import APIRouter, HTTPException
 from backend.api.schemas import (
     RunDetailResponse,
     RunsListResponse,
+    SessionDeleteResponse,
+    SessionExportResponse,
     SessionFactsResponse,
     SessionResponse,
 )
 from backend.core.memory import (
+    delete_session,
     get_runs_list,
     get_session_facts,
     get_session_intake,
     is_valid_session_id,
+    load_chat_history,
     load_last_session,
     load_run,
 )
@@ -126,3 +130,56 @@ async def get_session_facts_endpoint(session_id: str):
         logger.error(f"Failed to load facts for {session_id}: {e}")
         raise HTTPException(status_code=500, detail="Could not load session facts.")
     return {"facts": facts, "intake": intake}
+
+
+@router.get("/{session_id}/export", response_model=SessionExportResponse)
+async def export_session(session_id: str):
+    """Export one session (runs + facts + intake + chat) as a JSON download.
+
+    This is the user-facing counterpart of the WS ``export_session`` command, so
+    the "export anytime" promise is reachable from the UI.
+    """
+    import time as _time
+
+    if not is_valid_session_id(session_id):
+        raise HTTPException(status_code=404, detail="No such session.")
+    try:
+        data = load_last_session(session_id)
+    except Exception as e:
+        logger.error(f"Failed to export session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not export session.")
+
+    if not data:
+        raise HTTPException(status_code=404, detail="No such session.")
+
+    try:
+        chat = load_chat_history(session_id, limit=1000)
+    except Exception:
+        chat = []
+
+    runs = data.get("runs", []) or []
+    return {
+        "session_id": session_id,
+        "exported_at": _time.time(),
+        "topic": data.get("topic", ""),
+        "run_count": len(runs),
+        "runs": runs,
+        "facts": data.get("facts", {}) or {},
+        "intake": data.get("intake", {}) or {},
+        "chat": chat,
+    }
+
+
+@router.delete("/{session_id}", response_model=SessionDeleteResponse)
+async def remove_session(session_id: str):
+    """GDPR right-to-delete: permanently remove this session and its chat."""
+    if not is_valid_session_id(session_id):
+        raise HTTPException(status_code=404, detail="No such session.")
+    try:
+        delete_session(session_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="No such session.")
+    except Exception as e:
+        logger.error(f"Failed to delete session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not delete session.")
+    return {"status": "deleted", "session_id": session_id}

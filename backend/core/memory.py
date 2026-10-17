@@ -47,8 +47,10 @@ SESSIONS_DIR = Path(os.path.join(os.path.dirname(os.path.dirname(__file__)), "se
 MAX_CHAT_MESSAGES = 40
 
 # How many past research runs a session keeps. Enough to compare "before and
-# after" without letting a single session grow without bound.
-MAX_RUNS_PER_SESSION = 5
+# after" without letting a single session grow without bound. The history UI
+# reads every one of these (newest first), so this is the size of the stored
+# session history.
+MAX_RUNS_PER_SESSION = 50
 
 # Session ids are client-controlled and are used to build file paths — they are
 # therefore restricted to a strict allowlist (frontend generates `s-<ts>-<rand>`,

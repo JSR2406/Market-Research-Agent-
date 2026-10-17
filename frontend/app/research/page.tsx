@@ -7,6 +7,7 @@ import AdvisoryCard from "@/components/AdvisoryCard";
 import Usps from "@/components/Usps";
 import StartupQuiz, { type ProfileInit } from "@/components/StartupQuiz";
 import { SiteHeader } from "@/components/SiteHeader";
+import SessionHistory from "@/components/SessionHistory";
 const CashflowSimulator = dynamic(() => import("@/components/CashflowSimulator"), { ssr: false });
 import { useI18n } from "@/lib/i18n";
 import { migrateIntake } from "@/lib/intake";
@@ -53,6 +54,9 @@ export default function ResearchPage() {
   const [sessionId, setSessionId] = useState("");
   const [profile, setProfile] = useState<ProfileInit>({});
   const [resumeNote, setResumeNote] = useState("");
+  // Bumped when a run finishes, so the Session History section refetches and
+  // the just-saved run appears in real time.
+  const [historyTick, setHistoryTick] = useState(0);
 
   useEffect(() => {
     isRunningRef.current = isRunning;
@@ -234,6 +238,7 @@ export default function ResearchPage() {
         setSimplifiedReport(((data.simplified_report as string) ?? "").trim());
         setIsRunning(false);
         setStatusMessage(translate("timeline.complete"));
+        setHistoryTick((v) => v + 1);
         retriesRef.current = 0;
         break;
       case "cancelled":
@@ -294,16 +299,14 @@ export default function ResearchPage() {
         if (running && retriesRef.current < WS_MAX_RETRIES && !ev.wasClean) {
           retriesRef.current += 1;
           setStatusMessage(
-            `t("timeline.retry", { n: retriesRef.current, max: WS_MAX_RETRIES })`
+            tRef.current("timeline.retry", { n: retriesRef.current, max: WS_MAX_RETRIES })
           );
           setTimeout(() => {
             connectWs();
           }, WS_RECONNECT_DELAY_MS * retriesRef.current);
         } else if (running) {
           setIsRunning(false);
-          setErrorMessage(
-            "The connection dropped while your research was running. Please try again."
-          );
+          setErrorMessage(tRef.current("timeline.lost"));
           setStatusMessage("");
         }
       };
@@ -320,7 +323,7 @@ export default function ResearchPage() {
     setSimplifiedReport("");
     setCurrentTopic(topic);
     setResumeNote("");
-    setStatusMessage("Connecting…");
+    setStatusMessage(t("timeline.connecting"));
     setErrorMessage("");
     retriesRef.current = 0;
 
@@ -546,6 +549,21 @@ export default function ResearchPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Session History — every run in this session, stored and shown live */}
+      {sessionId && (
+        <SessionHistory
+          sessionId={sessionId}
+          runningTopic={isRunning ? currentTopic : ""}
+          refreshKey={historyTick}
+          showViewAll
+          onDeleted={() => {
+            setFinalReport(null);
+            setSimplifiedReport("");
+            setResumeNote("");
+          }}
+        />
+      )}
 
       {/* Cash-flow simulator — self-serve financial viz, runs locally */}
       <CashflowSimulator />

@@ -45,3 +45,15 @@ function resolveWs(): string {
 
 /** Full WebSocket endpoint for the market research workflow. */
 export const WS_URL = resolveWs();
+
+/**
+ * The site's own public URL, used only for canonical metadata (sitemap, robots).
+ * Kept beside the API URLs so there is exactly one place that knows what domain
+ * this app lives on — never derive it from `API_BASE`, which points at the
+ * backend, not the site.
+ */
+export const SITE_URL =
+  (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://market-research-agent-neon.vercel.app").replace(
+    /\/+$/,
+    ""
+  );

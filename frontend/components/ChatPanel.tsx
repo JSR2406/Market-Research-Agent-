@@ -8,6 +8,8 @@ import {
   FileText,
   Languages,
   Loader2,
+  Mic,
+  MicOff,
   Send,
   Sparkles,
   Trash2,
@@ -21,6 +23,7 @@ import {
   type IntakeAnswers,
 } from "@/lib/intake";
 import { useI18n, type Locale } from "@/lib/i18n";
+import { speechSupport, startListening, type ListenSession } from "@/lib/speech";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -74,8 +77,17 @@ export default function ChatPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [loadedHistory, setLoadedHistory] = useState(false);
   const [lang, setLang] = useState("auto");
+  const [listening, setListening] = useState(false);
+  const [canSpeakOnDevice, setCanSpeakOnDevice] = useState(false);
+  const [voiceMsg, setVoiceMsg] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const listenRef = useRef<ListenSession | null>(null);
+
+  // Voice-first, on the user's own device: no key, no upload, no round trip.
+  useEffect(() => {
+    setCanSpeakOnDevice(speechSupport().recognition);
+  }, []);
 
   // Restore the language choice.
   useEffect(() => {
@@ -185,6 +197,41 @@ export default function ChatPanel({
     }
     inputRef.current?.focus();
   }, [sessionId]);
+
+  // Speak the question instead of typing it — the transcript goes straight in
+  // and is sent, because the whole point is not having to read or write.
+  const startVoice = useCallback(() => {
+    if (listening || isLoading) return;
+    setVoiceMsg("");
+    const session = startListening({
+      locale,
+      onInterim: (text) => setInput(text),
+      onResult: (text) => {
+        setInput("");
+        void send(text);
+      },
+      onError: (code) => {
+        const blocked = code === "not-allowed" || code === "service-not-allowed";
+        setVoiceMsg(blocked ? t("chat.micDenied") : t("chat.micUnheard"));
+        setTimeout(() => setVoiceMsg(""), 4000);
+      },
+      onEnd: () => {
+        listenRef.current = null;
+        setListening(false);
+      },
+    });
+    if (!session) {
+      setVoiceMsg(t("chat.micUnheard"));
+      setTimeout(() => setVoiceMsg(""), 4000);
+      return;
+    }
+    listenRef.current = session;
+    setListening(true);
+  }, [listening, isLoading, locale, send, t]);
+
+  const stopVoice = useCallback(() => {
+    listenRef.current?.stop();
+  }, []);
 
   const intakeSummary = buildIntakeSummary(intake);
   const intakeMissing = describeMissingIntake(intake);
@@ -501,6 +548,30 @@ export default function ChatPanel({
             outline: "none",
           }}
         />
+        {canSpeakOnDevice && (
+          <button
+            type="button"
+            onClick={listening ? stopVoice : startVoice}
+            disabled={isLoading}
+            title={listening ? t("chat.micStop") : t("chat.mic")}
+            aria-label={listening ? t("chat.micStop") : t("chat.mic")}
+            aria-pressed={listening}
+            style={{
+              border: `1px solid ${listening ? "rgba(248,113,113,0.5)" : "rgba(255,255,255,0.12)"}`,
+              background: listening ? "rgba(248,113,113,0.15)" : "rgba(255,255,255,0.06)",
+              color: listening ? "var(--error)" : "var(--text-secondary)",
+              borderRadius: "12px",
+              padding: "0 12px",
+              cursor: isLoading ? "not-allowed" : "pointer",
+              opacity: isLoading ? 0.5 : 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {listening ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => send()}
@@ -522,6 +593,18 @@ export default function ChatPanel({
           <Send size={16} />
         </button>
       </div>
+      {(listening || voiceMsg) && (
+        <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
+          {listening ? (
+            <Mic size={12} color="var(--error)" aria-hidden="true" />
+          ) : (
+            <CircleHelp size={12} color="var(--warn)" aria-hidden="true" />
+          )}
+          <span style={{ fontSize: "0.7rem", color: listening ? "var(--error)" : "var(--warn)" }}>
+            {listening ? t("chat.listening") : voiceMsg}
+          </span>
+        </div>
+      )}
       {messages.length === 0 && !isLoading && (
         <div style={{ marginTop: "10px", display: "flex", gap: "6px", alignItems: "center" }}>
           <User size={12} color="var(--text-muted)" />

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Square, Zap, Sparkles, Mic, MicOff, Loader, Check, ShieldCheck } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { speechSupport, startListening, type ListenSession } from "@/lib/speech";
 
 interface Props {
   onStart: (topic: string, maxSteps: number) => void;
@@ -42,7 +43,7 @@ const ENGINE_LABELS: Record<string, string> = {
 const engineLabel = (key: string): string => ENGINE_LABELS[key] ?? key;
 
 export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const examples = EXAMPLE_KEYS.map((key, i) => t(key) || EXAMPLE_FALLBACK[i]);
   const [topic, setTopic] = useState("");
   const [maxSteps, setMaxSteps] = useState(4);
@@ -50,9 +51,18 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
   const [voiceMsg, setVoiceMsg] = useState("");
   const [voiceOk, setVoiceOk] = useState(false);
   const [voiceCap, setVoiceCap] = useState<VoiceCap | null>(null);
+  /** True when this device can turn speech into text by itself (no upload). */
+  const [deviceSpeech, setDeviceSpeech] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const listenRef = useRef<ListenSession | null>(null);
+
+  // Feature-detect the on-device path before offering it (SSR-safe: client only).
+  useEffect(() => {
+    const support = speechSupport();
+    setDeviceSpeech(support.recognition);
+  }, []);
 
   // Reveal which engines back the voice button (privacy-by-default claim).
   useEffect(() => {
@@ -117,9 +127,48 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
     mediaRecorderRef.current = null;
   }, []);
 
+  // On-device listening: the words are typed into the box as they are spoken and
+  // the audio never leaves the handset. Falls through to the server recorder
+  // when the browser cannot do it.
+  const startBrowserListen = useCallback(() => {
+    setVoiceMsg("");
+    setVoiceOk(false);
+    const session = startListening({
+      locale,
+      onInterim: (text) => setTopic(text),
+      onResult: (text) => {
+        setTopic(text);
+        setVoiceMsg(t("mic.done"));
+        setVoiceOk(true);
+      },
+      onError: (code) => {
+        const blocked = code === "not-allowed" || code === "service-not-allowed";
+        setVoiceMsg(blocked ? t("mic.denied") : t("mic.unheard"));
+        setVoiceOk(false);
+      },
+      onEnd: () => {
+        listenRef.current = null;
+        setVoiceState("idle");
+      },
+    });
+    if (!session) {
+      setVoiceMsg(t("mic.unavailable"));
+      setVoiceState("error");
+      setTimeout(() => setVoiceState("idle"), 3000);
+      return;
+    }
+    listenRef.current = session;
+    setVoiceState("recording");
+  }, [locale, t]);
+
   const handleMicClick = () => {
     if (isRunning) return;
-    if (voiceState === "recording") stopRecording();
+    if (voiceState === "recording") {
+      if (listenRef.current) listenRef.current.stop();
+      else stopRecording();
+      return;
+    }
+    if (deviceSpeech) startBrowserListen();
     else startRecording();
   };
 
@@ -310,7 +359,7 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
         </div>
 
         {/* Voice privacy & engine chip (from /api/voice/status) */}
-        {voiceCap && (
+        {(deviceSpeech || voiceCap) && (
           <div
             style={{
               display: "flex",
@@ -325,11 +374,13 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
           >
             <ShieldCheck
               size={14}
-              color={voiceCap.private_by_default ? "var(--success)" : "var(--accent)"}
+              color={deviceSpeech || voiceCap?.private_by_default ? "var(--success)" : "var(--accent)"}
               aria-hidden="true"
             />
             <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
-              {voiceCap.private_by_default ? (
+              {deviceSpeech ? (
+                <>{t("voice.device")}</>
+              ) : voiceCap?.private_by_default ? (
                 <>
                   {t("voice.private")}{" "}
                   {t("voice.stt")}: <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>

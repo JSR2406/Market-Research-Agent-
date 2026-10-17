@@ -1,11 +1,12 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText, ExternalLink, Link2 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import EligibilityPanel, { type EligibilityFamily } from "@/components/EligibilityPanel";
 import ActionLedger, { type LedgerScore } from "@/components/ActionLedger";
 import { useI18n } from "@/lib/i18n";
+import { speak, speechSupport, stopSpeaking, type SpeakSession } from "@/lib/speech";
 
 interface CashFlow {
   [key: string]: string | number;
@@ -102,11 +103,15 @@ function ScoreGauge({ score }: { score: number }) {
 }
 
 export default function AdvisoryCard({ report, topic, simplified, sessionId }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [audioState, setAudioState] = useState<AudioState>("idle");
   const [audioMsg, setAudioMsg] = useState("");
   const [copied, setCopied] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speakRef = useRef<SpeakSession | null>(null);
+
+  // Leaving the page must not leave a voice talking.
+  useEffect(() => () => stopSpeaking(), []);
 
   let data: AdvisoryData = {};
   try {
@@ -163,22 +168,49 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
   };
 
   const handleListen = async () => {
+    // A second tap stops whatever is talking — device voice or server audio.
     if (audioState === "playing") {
+      speakRef.current?.stop();
+      speakRef.current = null;
       audioRef.current?.pause();
+      audioRef.current = null;
       setAudioState("idle");
       return;
     }
-    setAudioState("loading");
     setAudioMsg("");
+    const words = buildSpeakText();
+
+    // Prefer the device's own voice: it starts instantly, needs no server round
+    // trip, and speaks the page's language (so a Hindi page is read in Hindi).
+    if (speechSupport().synthesis) {
+      const session = speak(words, locale, {
+        onStart: () => setAudioState("playing"),
+        onEnd: () => {
+          speakRef.current = null;
+          setAudioState("idle");
+        },
+        onError: () => {
+          speakRef.current = null;
+          setAudioState("idle");
+          setAudioMsg(t("listen.error"));
+        },
+      });
+      if (session) {
+        speakRef.current = session;
+        setAudioState("playing");
+        return;
+      }
+    }
+
+    setAudioState("loading");
     try {
       const res = await fetch(`${BACKEND_URL}/api/voice/speak`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: buildSpeakText() }),
+        body: JSON.stringify({ text: words }),
       });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setAudioMsg(j.detail ?? "Voice unavailable right now.");
+        setAudioMsg(t("listen.error"));
         setAudioState("error");
         setTimeout(() => setAudioState("idle"), 4000);
         return;
@@ -188,11 +220,11 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => { setAudioState("idle"); URL.revokeObjectURL(url); };
-      audio.onerror = () => { setAudioState("error"); setAudioMsg("Audio playback failed."); setTimeout(() => setAudioState("idle"), 3000); };
+      audio.onerror = () => { setAudioMsg(t("listen.playbackFailed")); setAudioState("error"); setTimeout(() => setAudioState("idle"), 3000); };
       await audio.play();
       setAudioState("playing");
     } catch {
-      setAudioMsg("Voice unavailable right now — no disruption to the text view.");
+      setAudioMsg(t("listen.error"));
       setAudioState("error");
       setTimeout(() => setAudioState("idle"), 4000);
     }
@@ -204,9 +236,9 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
     : <Volume2 size={13} />;
 
   const audioLabel =
-    audioState === "loading" ? "Generating audio…"
-    : audioState === "playing" ? "Stop"
-    : "Listen to Advisory";
+    audioState === "loading" ? t("listen.loading")
+    : audioState === "playing" ? t("listen.stop")
+    : t("listen.start");
 
   return (
     <motion.div

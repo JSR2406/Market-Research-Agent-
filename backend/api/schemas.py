@@ -232,3 +232,38 @@ class LangChainRunResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     model: str
+
+
+# ── analytics (WS-12) ───────────────────────────────────────────────────────
+
+class AnalyticsEvent(BaseModel):
+    """One allowlisted usage event. Property values are sanitised server-side."""
+
+    name: str = Field(..., min_length=1, max_length=40)
+    ts: Optional[float] = None
+    props: Dict[str, Any] = {}
+
+
+class AnalyticsBatchRequest(BaseModel):
+    session_id: Optional[str] = Field(default=None, max_length=64)
+    events: List[AnalyticsEvent] = Field(default_factory=list, max_length=50)
+
+
+class AnalyticsBatchResponse(BaseModel):
+    accepted: int = 0
+    rejected: int = 0
+
+
+class AnalyticsFunnelStep(BaseModel):
+    step: str
+    count: int
+    rate: float
+
+
+class AnalyticsSummaryResponse(BaseModel):
+    days: int = 7
+    generated_at: str = ""
+    total_events: int = 0
+    unique_sessions: int = 0
+    by_name: Dict[str, int] = {}
+    funnel: List[AnalyticsFunnelStep] = []

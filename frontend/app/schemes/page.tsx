@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { API_BASE } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useI18n } from "@/lib/i18n";
 
 type SchemeCheck = {
@@ -360,7 +361,11 @@ export default function SchemesPage() {
 
                 <button
                   type="button"
-                  onClick={() => setOpenId(expanded ? null : s.id)}
+                  onClick={() => {
+                    const next = !expanded;
+                    setOpenId(next ? s.id : null);
+                    if (next) track("scheme_view", { page: s.id });
+                  }}
                   aria-expanded={expanded}
                   aria-controls={`scheme-details-${s.id}`}
                   style={{

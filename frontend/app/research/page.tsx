@@ -11,6 +11,7 @@ import SessionHistory from "@/components/SessionHistory";
 const CashflowSimulator = dynamic(() => import("@/components/CashflowSimulator"), { ssr: false });
 import { useI18n } from "@/lib/i18n";
 import { migrateIntake } from "@/lib/intake";
+import { track } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { AlertTriangle, MessageSquare, X } from "lucide-react";
@@ -240,12 +241,14 @@ export default function ResearchPage() {
         setStatusMessage(translate("timeline.complete"));
         setHistoryTick((v) => v + 1);
         retriesRef.current = 0;
+        track("research_done", { engine: String(data.engine ?? "") });
         break;
       case "cancelled":
         setIsRunning(false);
         setNodes((prev) => prev.map((n) => (n.status === "running" ? { ...n, status: "done" } : n)));
         setStatusMessage(translate("timeline.cancelled"));
         retriesRef.current = 0;
+        track("research_cancel");
         break;
       case "error":
         setIsRunning(false);
@@ -326,6 +329,7 @@ export default function ResearchPage() {
     setStatusMessage(t("timeline.connecting"));
     setErrorMessage("");
     retriesRef.current = 0;
+    track("research_start", { count: maxSteps });
 
     // The Business Check-up answers travel as STRUCTURED data ({field_id: text}).
     // The backend owns the canonical snippet from them — it is folded into the

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ChevronDown,
@@ -11,6 +11,7 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import { track } from "@/lib/analytics";
 import { useI18n } from "@/lib/i18n";
 import {
   activeQuestions,
@@ -57,6 +58,26 @@ export default function StartupQuiz({
   const total = questions.length;
   const progress = intakeProgress(value);
   const answered = progress.answered;
+
+  // Funnel edges (WS-12): "started" the first time the panel is opened, and
+  // "complete" once every active question has an answer. Both fire once per
+  // session, and neither ever sends what the user actually typed.
+  const startedRef = useRef(false);
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (open && !startedRef.current) {
+      startedRef.current = true;
+      track("checkup_start", { page: "/research" });
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (total > 0 && answered >= total && !completedRef.current) {
+      completedRef.current = true;
+      track("checkup_complete", { count: answered });
+    }
+  }, [total, answered]);
 
   // Keep the cursor on a question that still exists.
   const currentStep = Math.min(step, Math.max(0, total - 1));

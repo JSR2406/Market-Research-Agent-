@@ -14,6 +14,7 @@ from backend.core.config import ALLOWED_ORIGINS
 from backend.api.schemas import HealthResponse
 from backend.api.ledger import router as ledger_router
 from backend.api.schemes import router as schemes_router
+from backend.api.analytics import router as analytics_router
 from backend.api.voice import router as voice_router
 from backend.api.chat import router as chat_router
 from backend.api.sessions import router as sessions_router
@@ -21,6 +22,7 @@ from backend.api.langchain import router as langchain_router
 from backend.api.whatsapp import router as whatsapp_router
 from backend.api.ws_market import router as ws_router
 from backend.core.memory import cleanup_old_sessions
+from backend.core.analytics import cleanup_analytics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +44,13 @@ async def lifespan(app: FastAPI):
             logger.info(f"[Memory] Retention cleanup: removed {deleted} expired session(s).")
     except Exception as e:
         logger.error(f"[Memory] Retention cleanup failed: {e}")
+    # Analytics retention: daily event files are pruned after 30 days.
+    try:
+        removed = cleanup_analytics()
+        if removed:
+            logger.info(f"[Analytics] Retention cleanup: removed {removed} expired file(s).")
+    except Exception as e:
+        logger.error(f"[Analytics] Retention cleanup failed: {e}")
     yield
 
 
@@ -115,6 +124,7 @@ app.include_router(langchain_router)
 app.include_router(whatsapp_router)
 app.include_router(ledger_router)
 app.include_router(schemes_router)
+app.include_router(analytics_router)
 
 
 @app.get("/health", response_model=HealthResponse)

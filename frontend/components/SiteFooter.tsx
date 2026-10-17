@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Handshake } from "lucide-react";
+import AnalyticsToggle from "@/components/AnalyticsToggle";
 import { useI18n } from "@/lib/i18n";
 
 /**
@@ -100,6 +101,9 @@ export function SiteFooter() {
           <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", lineHeight: 1.6, margin: 0 }}>
             {t("footer.rights")}
           </p>
+          <div style={{ marginTop: "14px" }}>
+            <AnalyticsToggle />
+          </div>
         </div>
       </div>
 

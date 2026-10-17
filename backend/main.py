@@ -18,6 +18,7 @@ from backend.api.documents import router as documents_router
 from backend.api.dpr import router as dpr_router
 from backend.api.schemes import router as schemes_router
 from backend.api.analytics import router as analytics_router
+from backend.api.tracker import router as tracker_router
 from backend.api.voice import router as voice_router
 from backend.api.chat import router as chat_router
 from backend.api.sessions import router as sessions_router
@@ -131,6 +132,7 @@ app.include_router(documents_router)
 app.include_router(dpr_router)
 app.include_router(schemes_router)
 app.include_router(analytics_router)
+app.include_router(tracker_router)
 
 
 @app.get("/health", response_model=HealthResponse)

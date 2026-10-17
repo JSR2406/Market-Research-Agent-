@@ -8,6 +8,7 @@ import {
   CornerDownLeft,
   FileSpreadsheet,
   Gavel,
+  ListChecks,
   PencilLine,
   RotateCcw,
   Stethoscope,
@@ -451,26 +452,49 @@ export default function StartupQuiz({
           {openNow.length > 0 && <BenefitCalculator intake={value} />}
           {openNow.length > 0 && <DocumentChecklist intake={value} />}
           {openNow.length > 0 && (
-            <Link
-              href="/dpr"
-              style={{
-                marginTop: "12px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "7px",
-                padding: "9px 16px",
-                borderRadius: "10px",
-                border: "1px solid var(--border-bright)",
-                background: "var(--accent-glow)",
-                color: "var(--accent)",
-                textDecoration: "none",
-                fontSize: "0.78rem",
-                fontWeight: 700,
-              }}
-            >
-              <FileSpreadsheet size={14} />
-              {t("dpr.cta")}
-            </Link>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+              <Link
+                href="/dpr"
+                style={{
+                  marginTop: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  padding: "9px 16px",
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-bright)",
+                  background: "var(--accent-glow)",
+                  color: "var(--accent)",
+                  textDecoration: "none",
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                }}
+              >
+                <FileSpreadsheet size={14} />
+                {t("dpr.cta")}
+              </Link>
+              {/* The tracker turns "you qualify" into "did you apply". */}
+              <Link
+                href="/tracker"
+                style={{
+                  marginTop: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  padding: "9px 16px",
+                  borderRadius: "10px",
+                  border: "1px solid var(--border-bright)",
+                  background: "var(--accent-glow)",
+                  color: "var(--accent)",
+                  textDecoration: "none",
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                }}
+              >
+                <ListChecks size={14} />
+                {t("tracker.cta")}
+              </Link>
+            </div>
           )}
         </div>
       )}

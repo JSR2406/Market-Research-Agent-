@@ -5,6 +5,10 @@
   --bg-main: #0d0d10;
   --bg-surface: #0f1623;
   --bg-card: #16161c;
+  /* Panels that sit on top of the page (report sections, tracker cards) used
+     `--bg-elevated`, which was never defined — so they rendered transparent.
+     Aliased to the card colour so both names work. */
+  --bg-elevated: var(--bg-card);
   --bg-card-hover: #192235;
   --border: #1e2d45;
   --border-bright: #2a3f60;

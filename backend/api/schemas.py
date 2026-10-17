@@ -335,3 +335,60 @@ class AnalyticsSummaryResponse(BaseModel):
     unique_sessions: int = 0
     by_name: Dict[str, int] = {}
     funnel: List[AnalyticsFunnelStep] = []
+
+
+# ── tracker / deadlines (WS-6) ────────────────────────────────────────────────
+
+class TrackerApplication(BaseModel):
+    """One scheme the user is applying for, with their own status and target date."""
+
+    scheme_id: str = Field("", max_length=64)
+    status: str = Field("planning", max_length=32)
+    target_date: str = Field("", max_length=10)  # "YYYY-MM-DD" or empty
+    notes: str = Field("", max_length=500)
+
+
+class TrackerAlert(BaseModel):
+    """Alert subscription. Consent is explicit and required (see validate_alert)."""
+
+    channel: str = Field("", max_length=16)  # "" | whatsapp | email
+    value: str = Field("", max_length=200)
+    events: List[str] = Field(default_factory=list, max_length=8)
+    consent: bool = False
+
+
+class TrackerRequest(BaseModel):
+    """Save a session's tracker: the applications, an optional alert, and intake."""
+
+    applications: List[TrackerApplication] = Field(default_factory=list, max_length=50)
+    alert: Optional[TrackerAlert] = None
+    intake: Dict[str, str] = Field(default_factory=dict)
+    topic: str = Field("", max_length=2000)
+    lang: str = Field("en", max_length=8)
+
+
+class TrackerStatusLabel(BaseModel):
+    """One column of the board: the status id plus its localised label."""
+
+    id: str
+    label: str
+
+
+class TrackerResponse(BaseModel):
+    """The tracker state: applications, the deadline board and the alert preview."""
+
+    session_id: str = ""
+    applications: List[Dict[str, Any]] = []
+    board: Dict[str, Any] = {}
+    alerts: Dict[str, Any] = {}
+    alert: Dict[str, Any] = {}
+    statuses: List[TrackerStatusLabel] = []
+    disclaimer: str = ""
+    error: str = ""
+
+
+class DeadlineListResponse(BaseModel):
+    """Public deadline rows with their live state — no session needed."""
+
+    deadlines: List[Dict[str, Any]] = []
+    disclaimer: str = ""

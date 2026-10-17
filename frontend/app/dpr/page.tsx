@@ -96,14 +96,17 @@ export default function DprPage() {
         const data = await res.json();
         const seen = new Set<string>();
         const next: Option[] = [];
-        for (const verdict of data.verdicts ?? []) {
-          if (!["eligible", "likely", "blocked"].includes(verdict.status)) continue;
+        // `/api/eligibility` returns the scored, open schemes under `ranked`
+        // (each carrying `name`). Reading `verdicts` here used to leave the
+        // dropdown empty, which silently disabled the whole page.
+        for (const verdict of data.ranked ?? []) {
+          if (!["eligible", "likely"].includes(verdict.status)) continue;
           const family = verdict.tier_group || verdict.scheme_id;
           if (seen.has(family)) continue;
           seen.add(family);
           next.push({
             scheme_id: verdict.scheme_id,
-            scheme_name: verdict.scheme_name,
+            scheme_name: verdict.name,
             status: verdict.status,
             status_label: verdict.status_label,
           });
@@ -221,6 +224,9 @@ export default function DprPage() {
                     </option>
                   ))}
                 </select>
+                {options.length === 0 && (
+                  <p style={{ marginTop: "6px", fontSize: "0.74rem", color: "var(--text-muted)", lineHeight: 1.5 }}>{t("dpr.noSchemes")}</p>
+                )}
               </Field>
               <Field label={`${t("dpr.cost")} (${t("dpr.optional")})`} htmlFor="dpr-cost">
                 <input

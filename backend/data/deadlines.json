@@ -1,0 +1,32 @@
+[
+  {
+    "scheme_id": "pmfme",
+    "kind": "window_pending",
+    "date": "2026-09-30",
+    "title": {
+      "en": "PMFME temporary application window",
+      "hi": "PMFME की अस्थायी आवेदन अवधि"
+    },
+    "note": {
+      "en": "The temporary window ended on 30 Sep 2026. A five-year extension (2026-31) has been proposed by the ministry; confirm the current status with your State Nodal Agency before you spend money on the application.",
+      "hi": "अस्थायी अवधि 30 सितंबर 2026 को ख़त्म हुई। मंत्रालय ने पाँच साल का विस्तार (2026-31) प्रस्तावित किया है; आवेदन पर ख़र्च करने से पहले अपनी राज्य नोडल एजेंसी से मौजूदा स्थिति पक्की करें।"
+    },
+    "source_url": "https://www.newindianexpress.com/business/2026/Aug/24/pmfme-scheme-achieves-two-lakh-unit-target-likely-to-be-extended-beyond-september-30-deadline",
+    "last_verified_at": "2026-10-18"
+  },
+  {
+    "scheme_id": "pm-svanidhi",
+    "kind": "scheme_end",
+    "date": "2030-03-31",
+    "title": {
+      "en": "PM SVANidhi lending period ends",
+      "hi": "PM SVANidhi की कर्ज़ अवधि ख़त्म"
+    },
+    "note": {
+      "en": "The Union Cabinet extended PM SVANidhi lending to 31 March 2030 (approved 27 Aug 2025). Loans are sanctioned continuously until then, so there is no closing date to race.",
+      "hi": "मंत्रिमंडल ने PM SVANidhi की कर्ज़ अवधि 31 मार्च 2030 तक बढ़ाई (27 अगस्त 2025 को मंज़ूरी)। तब तक कर्ज़ लगातार मंज़ूर होते रहेंगे, जल्दी करने की कोई आख़िरी तारीख़ नहीं।"
+    },
+    "source_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2161157",
+    "last_verified_at": "2026-10-18"
+  }
+]

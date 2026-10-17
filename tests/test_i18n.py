@@ -158,10 +158,12 @@ def test_no_source_file_is_mojibake():
         root / "backend" / "core" / "benefits.py",
         root / "backend" / "core" / "documents.py",
         root / "backend" / "core" / "dpr.py",
+        root / "backend" / "core" / "tracker.py",
         root / "frontend" / "lib" / "i18n.tsx",
         root / "frontend" / "lib" / "intake.ts",
         root / "frontend" / "components" / "StartupQuiz.tsx",
         SCHEMES,
+        root / "backend" / "data" / "deadlines.json",
     ]
     for path in suspects:
         text = path.read_text(encoding="utf-8")

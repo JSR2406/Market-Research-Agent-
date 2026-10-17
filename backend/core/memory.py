@@ -436,7 +436,7 @@ def build_resume_context(prior_data: dict) -> str:
 
 
 def delete_session(session_id: str) -> None:
-    """GDPR right-to-delete: drop the session file and its chat memory."""
+    """GDPR right-to-delete: drop the session file, chat memory and tracker."""
     _require_valid_session_id(session_id)
     path = _session_file(session_id)
     if path.exists():
@@ -445,6 +445,14 @@ def delete_session(session_id: str) -> None:
         except Exception:
             pass
     clear_chat(session_id)
+    # The application tracker (WS-6) is another sibling file held under the same
+    # session id, so right-to-delete has to take it with it.
+    tracker_path = SESSIONS_DIR / f"{session_id}_tracker.json"
+    if tracker_path.exists():
+        try:
+            tracker_path.unlink()
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────

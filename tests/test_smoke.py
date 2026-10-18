@@ -245,6 +245,7 @@ def test_langchain_status(client):
 
 def test_chat_agent_injects_profile(monkeypatch):
     from backend.agents import chat as chat_mod
+    import backend.core.llm_client as llm_client
 
     captured: dict = {}
 
@@ -252,7 +253,7 @@ def test_chat_agent_injects_profile(monkeypatch):
         captured["messages"] = messages
         return "Here is your tailored next step."
 
-    monkeypatch.setattr(chat_mod, "call_llm", _fake_llm)
+    monkeypatch.setattr(llm_client, "call_llm", _fake_llm)
     reply = asyncio.run(
         chat_mod.chat_agent(
             "What loan can I get?",
@@ -268,6 +269,7 @@ def test_chat_agent_injects_profile(monkeypatch):
 def test_chat_api_uses_saved_session_profile(client, monkeypatch):
     from backend.agents import chat as chat_mod
     from backend.core.memory import delete_session, save_session
+    import backend.core.llm_client as llm_client
 
     sid = "test-profile-chat-session"
     save_session(
@@ -281,7 +283,7 @@ def test_chat_api_uses_saved_session_profile(client, monkeypatch):
         captured["messages"] = messages
         return "ok"
 
-    monkeypatch.setattr(chat_mod, "call_llm", _fake_llm)
+    monkeypatch.setattr(llm_client, "call_llm", _fake_llm)
     try:
         r = client.post("/api/chat", json={"message": "what next?", "session_id": sid})
         assert r.status_code == 200

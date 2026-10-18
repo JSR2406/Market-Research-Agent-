@@ -5,7 +5,7 @@ from typing import Optional
 
 from backend.core.config import WEB_SEARCH_ENABLED, WEB_SEARCH_MAX_RESULTS
 from backend.core.heuristics import extract_topic, match_schemes, parse_amount, schemes_brief
-from backend.core.llm_client import call_llm
+from backend.core.langchain_adapter import build_advisory_chain, run_prompt
 from backend.core.market import live_context as market_live_context
 from backend.core.web_research import web_context
 
@@ -86,23 +86,25 @@ async def research_agent(task: str, agent_hint: Optional[str] = "research", live
             f"web-search estimate):\n{market_note}"
         )
 
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Financial research analyst. Read the provided MSME schemes data and "
-                "filter facts relevant to the entrepreneur's profile described in the "
-                "task. Use the Live Web Context only to confirm or correct scheme "
-                "details — never invent figures. "
-                "Structure: Business Profile | Relevant Schemes | Key Eligibility Facts. "
-                "Use bullet points. STRICTLY to the point, NO exaggeration, maximum brevity."
-            ),
-        },
-        {"role": "user", "content": user_content},
-    ]
-
+    chain = build_advisory_chain(
+        (
+            "Financial research analyst. Read the provided MSME schemes data and "
+            "filter facts relevant to the entrepreneur's profile described in the "
+            "task. Use the Live Web Context only to confirm or correct scheme "
+            "details — never invent figures. "
+            "Structure: Business Profile | Relevant Schemes | Key Eligibility Facts. "
+            "Use bullet points. STRICTLY to the point, NO exaggeration, maximum brevity."
+        ),
+        agent_hint=agent_hint or "research",
+        temperature=0.3,
+        max_tokens=400,
+    )
     try:
-        return await call_llm(messages, temperature=0.3, max_tokens=400, agent_hint=agent_hint)
+        return await run_prompt(
+            chain,
+            user_content,
+            agent_hint=agent_hint or "research",
+        )
     except Exception as e:
         logger.error(f"LLM call failed during research: {e}")
         return heuristic_research(task, market_note=market_note)

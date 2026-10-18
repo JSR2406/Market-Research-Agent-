@@ -182,6 +182,7 @@ def test_frontend_and_backend_field_ids_agree():
 def test_chat_api_uses_structured_intake_and_asks_for_the_gaps(client, monkeypatch):
     from backend.agents import chat as chat_mod
     from backend.core.memory import delete_session
+    import backend.core.llm_client as llm_client
 
     captured: dict = {}
 
@@ -189,7 +190,7 @@ def test_chat_api_uses_structured_intake_and_asks_for_the_gaps(client, monkeypat
         captured["messages"] = messages
         return "Here is your tailored next step."
 
-    monkeypatch.setattr(chat_mod, "call_llm", _fake_llm)
+    monkeypatch.setattr(llm_client, "call_llm", _fake_llm)
     sid = "test-intake-chat-session"
     try:
         r = client.post(
@@ -219,6 +220,7 @@ def test_chat_api_uses_structured_intake_and_asks_for_the_gaps(client, monkeypat
 def test_chat_api_falls_back_to_the_intake_saved_with_the_run(client, monkeypatch):
     from backend.agents import chat as chat_mod
     from backend.core.memory import delete_session, save_session
+    import backend.core.llm_client as llm_client
 
     sid = "test-intake-saved-session"
     save_session(
@@ -236,7 +238,7 @@ def test_chat_api_falls_back_to_the_intake_saved_with_the_run(client, monkeypatc
         captured["messages"] = messages
         return "ok"
 
-    monkeypatch.setattr(chat_mod, "call_llm", _fake_llm)
+    monkeypatch.setattr(llm_client, "call_llm", _fake_llm)
     try:
         r = client.post("/api/chat", json={"message": "what next?", "session_id": sid})
         assert r.status_code == 200

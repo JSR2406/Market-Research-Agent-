@@ -602,6 +602,7 @@ def test_the_research_agent_prefers_the_live_figure(store, monkeypatch):
     monkeypatch.setattr(market, "_fetch_ogd", _feed(_record(days_ago=1, modal=2450)))
 
     from backend.agents import research as research_mod
+    import backend.core.llm_client as llm_client
 
     captured: dict = {}
 
@@ -609,7 +610,7 @@ def test_the_research_agent_prefers_the_live_figure(store, monkeypatch):
         captured["messages"] = messages
         return "ok"
 
-    monkeypatch.setattr(research_mod, "call_llm", _fake_llm)
+    monkeypatch.setattr(llm_client, "call_llm", _fake_llm)
     monkeypatch.setattr(research_mod, "WEB_SEARCH_ENABLED", False)
 
     out = asyncio.run(research_mod.research_agent("I grow onions in Maharashtra and want a better price"))
@@ -624,11 +625,12 @@ def test_the_research_agent_prefers_the_live_figure(store, monkeypatch):
 
 def test_the_research_agent_is_unchanged_without_a_feed(store, monkeypatch):
     from backend.agents import research as research_mod
+    import backend.core.llm_client as llm_client
 
     async def _fake_llm(messages, **kwargs):
         return "ok"
 
-    monkeypatch.setattr(research_mod, "call_llm", _fake_llm)
+    monkeypatch.setattr(llm_client, "call_llm", _fake_llm)
     monkeypatch.setattr(research_mod, "WEB_SEARCH_ENABLED", False)
 
     assert asyncio.run(research_mod.research_agent("I run a tailoring shop")) == "ok"

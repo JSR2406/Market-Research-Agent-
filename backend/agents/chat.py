@@ -27,7 +27,7 @@ from backend.core.intake import (
     next_question,
     normalize_intake,
 )
-from backend.core.llm_client import call_llm
+from backend.core.langchain_adapter import build_advisory_chain, run_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -168,111 +168,104 @@ async def chat_agent(
     missing = missing_fields(intake_answers)
     coverage = coverage_report(intake_answers, effective)
 
-    history: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # ── Build a combined system prompt (all system directives merged) ──
+    system_parts: List[str] = [SYSTEM_PROMPT]
 
     # Inject cross-session facts for personalization
     if facts_context:
-        history.append({
-            "role": "system",
-            "content": f"[Cross-session memory]\n{facts_context}\nUse this to personalize your advice. Do not repeat it verbatim; let it inform your suggestions."
-        })
+        system_parts.append(
+            f"[Cross-session memory]\n{facts_context}\nUse this to personalize your advice. "
+            "Do not repeat it verbatim; let it inform your suggestions."
+        )
 
     if effective == "hi":
-        history.append({
-            "role": "system",
-            "content": (
-                "Reply ONLY in simple Hindi or Hinglish, written in Devanagari "
-                "script. Keep scheme names, loan amounts and official terms "
-                "(Udyam, GST, MUDRA, PM SVANidhi) in English. End with one "
-                "concrete next step."
-            ),
-        })
+        system_parts.append(
+            "Reply ONLY in simple Hindi or Hinglish, written in Devanagari "
+            "script. Keep scheme names, loan amounts and official terms "
+            "(Udyam, GST, MUDRA, PM SVANidhi) in English. End with one "
+            "concrete next step."
+        )
     elif effective == "en":
-        history.append({
-            "role": "system",
-            "content": "Reply in simple English only. End with one concrete next step.",
-        })
+        system_parts.append("Reply in simple English only. End with one concrete next step.")
     else:
-        history.append({
-            "role": "system",
-            "content": (
-                "Match the language the user writes in: if they write in Hindi "
-                "or Hinglish, reply in Hindi/Hinglish; if English, reply in "
-                "English. Keep scheme names and amounts in English. End with "
-                "one concrete next step."
-            ),
-        })
+        system_parts.append(
+            "Match the language the user writes in: if they write in Hindi "
+            "or Hinglish, reply in Hindi/Hinglish; if English, reply in "
+            "English. Keep scheme names and amounts in English. End with "
+            "one concrete next step."
+        )
 
     if profile:
-        history.append({
-            "role": "system",
-            "content": (
-                "The user's Business Check-up intake answers:\n"
-                + profile[:1000]
-                + "\nTailor every answer to this profile (business type, what they "
-                "sell, size, time running, earnings, location, registration, "
-                "borrowing history, main need). Never re-ask anything already "
-                "answered here."
-            ),
-        })
+        system_parts.append(
+            "The user's Business Check-up intake answers:\n"
+            + profile[:1000]
+            + "\nTailor every answer to this profile (business type, what they "
+            "sell, size, time running, earnings, location, registration, "
+            "borrowing history, main need). Never re-ask anything already "
+            "answered here."
+        )
 
-    # Deterministic gap detection — this is the intake layer doing its job:
-    # we know exactly which detail is still missing, so Saathi asks for that
-    # one instead of giving generic advice. See backend/core/intake.py.
+    # Deterministic gap detection — the intake layer knows exactly which
+    # detail is still missing, so Saathi asks for that one instead of giving
+    # generic advice.
     gap_note = followup_instruction(intake_answers, effective)
     if gap_note:
-        history.append({"role": "system", "content": gap_note})
+        system_parts.append(gap_note)
 
-    # Graded coverage: a "thin" answer (earnings = "some days") is half an
-    # answer and is worth re-probing before asking about something untouched.
+    # Graded coverage: re-probe thin answers before moving on.
     thin = coverage.get("thin") or []
     if thin:
         fields = ", ".join(
             f"{f['label']} ({f['note']})" for f in coverage["fields"] if f["status"] == "thin"
         )
-        history.append({
-            "role": "system",
-            "content": (
-                "These answers were given but are too vague to use: " + fields + ". "
-                "Ask ONE gentle follow-up on the vaguest of them, in the user's "
-                "language, before answering — do not ask about fields already filled."
-            ),
-        })
+        system_parts.append(
+            "These answers were given but are too vague to use: " + fields + ". "
+            "Ask ONE gentle follow-up on the vaguest of them, in the user's "
+            "language, before answering — do not ask about fields already filled."
+        )
 
-    # First turn of a session with a nearly-empty intake: open with the intake
-    # question rather than answering blind.
+    # First turn of a session with a nearly-empty intake: open with the
+    # intake question rather than answering blind.
     if not chat_history and len(missing) >= 3:
         opener = next_question(intake_answers, effective)
         if opener:
-            history.append({
-                "role": "system",
-                "content": (
-                    "This is the first message of this conversation and the user "
-                    "has barely filled in their Business Check-up. Start by asking "
-                    f'them exactly this, in their language, then answer their '
-                    f'message: "{opener}"'
-                ),
-            })
+            system_parts.append(
+                "This is the first message of this conversation and the user "
+                "has barely filled in their Business Check-up. Start by asking "
+                f'them exactly this, in their language, then answer their '
+                f'message: "{opener}"'
+            )
 
     if advisory_context:
-        history.append({
-            "role": "system",
-            "content": "The user's latest Loan Readiness Advisory (reference only):\n" + advisory_context[:2500],
-        })
+        system_parts.append(
+            "The user's latest Loan Readiness Advisory (reference only):\n"
+            + advisory_context[:2500]
+        )
 
+    system_prompt = "\n\n".join(system_parts)
+
+    # Build user input from recent chat history + current message
+    user_parts: List[str] = []
     for m in (chat_history or [])[-10:]:
         role = m.get("role") or "user"
         content = m.get("content") or ""
         if role in ("user", "assistant"):
-            history.append({"role": role, "content": content})
+            user_parts.append(f"{role}: {content}")
+    user_parts.append(f"user: {message}")
+    user_input = "\n".join(user_parts)
 
-    history.append({
-        "role": "user",
-        "content": f"User question (their current business topic: {topic or 'not provided'}): {message}",
-    })
-
+    # ── LCEL model chaining: system_prompt | GrameenChatModel | StrOutputParser ──
+    chain = build_advisory_chain(
+        system_prompt,
+        agent_hint="chat",
+        temperature=0.6,
+    )
     try:
-        reply = await call_llm(history, temperature=0.6, agent_hint=agent_hint)
+        reply = await run_prompt(
+            chain,
+            user_input,
+            agent_hint="chat",
+        )
         reply = (reply or "").strip()
         if reply:
             return reply

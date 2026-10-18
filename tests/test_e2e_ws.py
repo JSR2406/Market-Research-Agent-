@@ -22,17 +22,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Every module that calls the LLM directly (agents + the agentic router/critic).
+# All agent LLM traffic now flows through backend.core.llm_client.call_llm
+# (via langchain_adapter.run_prompt), so patch it at the source. supervisor
+# keeps its own module-level import, so it is listed separately.
 LLM_MODULES = [
-    "backend.agents.planner",
-    "backend.agents.research",
-    "backend.agents.analyst",
-    "backend.agents.opportunity",
-    "backend.agents.writer",
-    "backend.agents.editor",
-    "backend.agents.simplifier",
-    "backend.agents.chat",
+    "backend.core.llm_client",
     "backend.agentic.supervisor",
-    "backend.agentic.nodes",
 ]
 
 PERSONAS = [

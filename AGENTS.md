@@ -20,7 +20,7 @@ Never report a phase complete without all four passing.
 - Backend: Python, FastAPI, WebSockets, httpx, uvicorn, python-dotenv
 - Frontend: Next.js 15 App Router, TypeScript, Tailwind CSS, Framer Motion, react-markdown, remark-gfm, lucide-react
 - LLM: Multi-provider via backend/core/llm_client.py — Ollama (local, free), Hugging Face Inference API (free tier), OpenRouter (cloud)
-- LangChain / LangGraph: the advisory engine is **agentic** (`backend/agentic/`) — a LangGraph StateGraph (planner → supervisor → research/analyst/schemes → writer → critic/refine → finalize) with a native pure-asyncio fallback runner, so the same topology runs with or without `langgraph`/`langchain-core` installed. `backend/core/langchain_adapter.py` additionally exposes the multi-provider stack as a LangChain `BaseChatModel` (`GrameenChatModel`) + tools + `build_advisory_chain()`; REST via `backend/api/langchain.py` (`GET /api/langchain/status` incl. agentic engine info, `POST /api/langchain/run`). Requires `langchain-core` + `langgraph` (in `backend/requirements.txt`).
+- LangChain / LangGraph: the advisory engine is **agentic** (`backend/agentic/`) — a LangGraph StateGraph (planner → supervisor → research/analyst/schemes → writer → critic/refine → finalize). LangChain and LangGraph are **required** dependencies (in `backend/requirements.txt`). All agent LLM calls use LCEL model chaining (`prompt | model | output_parser`) via `GrameenChatModel` + `build_advisory_chain()` / `build_json_advisory_chain()` / `run_prompt()` in `backend/core/langchain_adapter.py`. REST via `backend/api/langchain.py` (`GET /api/langchain/status` incl. agentic engine info, `POST /api/langchain/run`).
 - Web research: googlesearch-python + httpx + BeautifulSoup (no keys, Google → DuckDuckGo fallback)
 
 ## Data & Accuracy Principles (non-negotiable)
@@ -84,18 +84,18 @@ market-research-agent/
 │   │   ├── __init__.py
 │   │   ├── executor.py         # thin adapter: runs the agentic graph, emits done, persists session + loan-ready score attach
 │   │   └── routing.py          # legacy keyword step→agent mapping (kept for chat advisor classification)
-│   ├── agentic/                # the agentic advisory engine (LangGraph + native fallback)
+│   ├── agentic/                # the agentic advisory engine (LangGraph)
 │   │   ├── __init__.py         # public exports: run_agentic_workflow, EventEmitter, engine_name
 │   │   ├── state.py            # AgenticState TypedDict + Annotated reducers + initial_state
 │   │   ├── events.py           # EventEmitter (graph/plan/node_start/node_end/thought/tool_call/tool_result/reflection), WorkflowCancelled
-│   │   ├── runtime.py          # LANGGRAPH_AVAILABLE / LANGCHAIN_AVAILABLE / run_coro_sync / engine_name
+│   │   ├── runtime.py          # LANGGRAPH_AVAILABLE / run_coro_sync / engine_name
 │   │   ├── plan.py             # typed Plan IR: Step(id/node/tool/pre/post/fallback) + parse_plan_json
 │   │   ├── compiler.py         # compile_plan() validates before any model call; default_plan() fallback; best_plan()
 │   │   ├── executor.py         # run_plan(): preconditions → run → postconditions → fallback; never raises
 │   │   ├── supervisor.py       # decide(): heuristic routing + guardrails (+LLM when up); ACTION_TO_NODE
 │   │   ├── nodes.py            # planner, supervisor, research, analyst, schemes, writer, critic, refine, finalize (+NODE_META)
 │   │   ├── graph.py            # topology + conditional routers + build_langgraph() + graph_topology()
-│   │   ├── runner.py           # run_agentic_workflow; _run_langgraph + _run_native (identical events/state)
+│   │   ├── runner.py           # run_agentic_workflow; _run_langgraph (identical events/state)
 │   │   └── tools.py            # deterministic tools: web_search, scheme_match, loan_ready_score, document_checklist, cashflow_projection (+langchain_tools())
 │   ├── data/
 │   │   └── schemes.json        # curated Indian MSME schemes (id, source_url, last_verified_at,
@@ -146,7 +146,7 @@ market-research-agent/
 - Agents never hardcode a provider; they just pass `agent_hint` and the client handles fallback.
 - Per-agent OpenRouter model priority (`AGENT_OPENROUTER_MODELS` in `backend/core/config.py`) — each agent leads with a distinct model so no single model's quota gets exhausted; the global `FALLBACK_MODELS` chain is appended as backup.
 - OpenRouter key rotation: `OPENROUTER_API_KEY_2` (in `backend/.env`) is used automatically on 429/402/timeout and once healthy it becomes the preferred key for later calls.
-- LangChain rule: `GrameenChatModel` and all chains must route through `call_llm` (never call a provider SDK directly); `run_prompt()` must keep the heuristic fallback so endpoints never hard-fail when LangChain or the LLM is unreachable.
+- LangChain rule: `GrameenChatModel` (in `backend/core/langchain_adapter.py`) wraps `call_llm` as a LangChain `BaseChatModel`. All agents use LCEL model chaining (`prompt | model | output_parser`) via `build_advisory_chain()` / `build_json_advisory_chain()` / `run_prompt()` — `run_prompt()` keeps the heuristic fallback so endpoints never hard-fail when the LLM is unreachable. LangChain and LangGraph are **required** dependencies (see `backend/requirements.txt`).
 
 ## Voice / TTS
 - `backend/core/voice.py` — never raises, always falls back through:
@@ -173,7 +173,7 @@ market-research-agent/
 - **Model rule: the `chat` agent's primary OpenRouter model must stay OPEN-SOURCE** (`mistralai/mistral-7b-instruct`). Call path follows the normal chain: Ollama (local) → Hugging Face (free) → OpenRouter.
 
 ## Agentic Engine
-- The advisory pipeline is a LangGraph StateGraph in `backend/agentic/` (topology + routers + nodes), executed by LangGraph when importable and otherwise by the built-in native async runner — both produce identical state and an identical WebSocket event stream. `engine` (on `graph` and `done` events) is `"langgraph"` or `"native"`.
+- The advisory pipeline is a LangGraph StateGraph in `backend/agentic/` (topology + routers + nodes), executed by LangGraph. `engine` on `graph` and `done` events is always `"langgraph"`.
 - Topology: `START → planner → supervisor`; supervisor routes to `research | analyst | schemes | writer | finalize` (heuristic `decide()` in `supervisor.py`, LLM-assisted when a provider is up). `research/analyst/schemes → supervisor` (they loop until the supervisor has enough). `writer → critic | refine`; `critic → writer (revise) | refine` for up to `AGENTIC_MAX_ITERATIONS`; `refine → finalize → END`.
 - Nodes degrade to deterministic heuristic outputs whenever the LLM fails — the offline guarantee applies to every node. Deterministic tools (`backend/agentic/tools.py`) are bound where relevant: `web_search` (research), `scheme_match` (schemes), `cashflow_projection` (analyst), `loan_ready_score` + `document_checklist` (finalize).
 - `finalize` keeps the deterministic post-pass (`_finalize_report`): loan-ready score injection, scheme source annotation, provenance sources. Entity rule: planner/supervisor/critic routing and scores stay deterministic; the LLM only writes prose within the given schema.
@@ -210,7 +210,7 @@ The advisory run is a **propose → dispose** loop, not a chatbot that talks its
 - `agentic/plan.py` — typed Plan IR. A `Step` names the graph node, the deterministic tool (if any), `pre` state keys that must hold, `post` keys that must be produced, and a `fallback` node. `parse_plan_json()` turns model output into a `Plan`, returning `None` on anything unusable.
 - `agentic/compiler.py` — `compile_plan()` validates **before any model call is spent**: unique step ids, real graph nodes, real tools, real state keys, reachable pre/postconditions, valid fallbacks. `default_plan()` is the fallback topology; `best_plan()` prefers the candidate and falls back. Compilation never raises.
 - `agentic/executor.py` — `run_plan()` runs a compiled plan transactionally: check preconditions → run → check postconditions → run fallback or record failure. Never raises; returns a `PlanRun` written to `state["plan_run"]`.
-- `with_postconditions()` wraps every node so a step that claims success but produced nothing is recorded as **failed** in the trace. Applied to both runners.
+- `with_postconditions()` wraps every node so a step that claims success but produced nothing is recorded as **failed** in the trace.
 - The **supervisor follows the compiled plan** when one exists (`_decide_with_plan`); with no plan it uses the heuristic `decide()` exactly as before — so a rejected plan costs the user nothing.
 - LangGraph node wrappers must type `config` as `RunnableConfig`; a `Dict` hint makes LangGraph omit the config and the node then fails for lack of an emitter.
 

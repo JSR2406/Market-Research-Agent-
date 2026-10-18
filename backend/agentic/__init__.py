@@ -17,7 +17,7 @@ from backend.agentic.plan import Plan, Step, parse_plan_json
 from backend.agentic.compiler import CompiledPlan, best_plan, compile_plan
 from backend.agentic.executor import PlanRun, run_plan, with_postconditions
 from backend.agentic.runner import run_agentic_workflow
-from backend.agentic.runtime import LANGGRAPH_AVAILABLE, LANGCHAIN_AVAILABLE, engine_name
+from backend.agentic.runtime import LANGGRAPH_AVAILABLE, engine_name
 from backend.agentic.state import AgenticState, initial_state
 
 __all__ = [
@@ -27,7 +27,6 @@ __all__ = [
     "graph_topology",
     "run_agentic_workflow",
     "LANGGRAPH_AVAILABLE",
-    "LANGCHAIN_AVAILABLE",
     "engine_name",
     "AgenticState",
     "initial_state",

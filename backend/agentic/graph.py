@@ -133,37 +133,30 @@ def graph_topology() -> Dict[str, Any]:
 
 # ── LangGraph builder ─────────────────────────────────────────────────────────
 
-def build_langgraph() -> Optional[Any]:
-    """Compile the graph with LangGraph, or return None when unavailable."""
-    if not LANGGRAPH_AVAILABLE:
-        return None
-    try:
-        from langgraph.graph import END, START, StateGraph
+def build_langgraph() -> Any:
+    """Compile the LangGraph StateGraph. langgraph is required — always compiles."""
+    from langgraph.graph import END, START, StateGraph
 
-        from backend.agentic.state import AgenticState
+    from backend.agentic.state import AgenticState
 
-        g = StateGraph(AgenticState)
-        for nid, fn in NODE_FUNCS.items():
-            # Postcondition checking is applied here so LangGraph mode and the
-            # native runner behave identically. The wrapper reads the live state
-            # at call time, so no state needs to be bound up front.
-            g.add_node(nid, with_postconditions(fn, nid))
+    g = StateGraph(AgenticState)
+    for nid, fn in NODE_FUNCS.items():
+        # Postcondition checking is applied so the compiled graph behaves
+        # identically to the node spec. The wrapper reads live state at call time.
+        g.add_node(nid, with_postconditions(fn, nid))
 
-        g.add_edge(START, "planner")
-        g.add_edge("planner", "supervisor")
-        g.add_conditional_edges(
-            "supervisor",
-            route_from_supervisor,
-            {k: k for k in ("research", "analyst", "schemes", "writer", "finalize")},
-        )
-        for nid in ("research", "analyst", "schemes"):
-            g.add_edge(nid, "supervisor")
-        g.add_conditional_edges("writer", route_after_writer, {"critic": "critic", "refine": "refine"})
-        g.add_conditional_edges("critic", route_after_critic, {"writer": "writer", "refine": "refine"})
-        g.add_edge("refine", "finalize")
-        g.add_edge("finalize", END)
+    g.add_edge(START, "planner")
+    g.add_edge("planner", "supervisor")
+    g.add_conditional_edges(
+        "supervisor",
+        route_from_supervisor,
+        {k: k for k in ("research", "analyst", "schemes", "writer", "finalize")},
+    )
+    for nid in ("research", "analyst", "schemes"):
+        g.add_edge(nid, "supervisor")
+    g.add_conditional_edges("writer", route_after_writer, {"critic": "critic", "refine": "refine"})
+    g.add_conditional_edges("critic", route_after_critic, {"writer": "writer", "refine": "refine"})
+    g.add_edge("refine", "finalize")
+    g.add_edge("finalize", END)
 
-        return g.compile()
-    except Exception as e:  # pragma: no cover — fall back to native runner
-        logger.warning("[Agentic] LangGraph compile failed, using native runner: %s", e)
-        return None
+    return g.compile()

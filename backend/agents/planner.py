@@ -5,7 +5,7 @@ import re
 from typing import List, Optional
 
 from backend.core.heuristics import fallback_plan
-from backend.core.llm_client import call_llm
+from backend.core.langchain_adapter import build_advisory_chain, run_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -48,16 +48,17 @@ async def structured_plan_agent(
             f"{previous_context[:600]}"
         )
 
-    messages = [
-        {"role": "system", "content": STRUCTURED_PLAN_PROMPT},
-        {
-            "role": "user",
-            "content": f'Business: "{topic}".{context_note}',
-        },
-    ]
+    chain = build_advisory_chain(
+        STRUCTURED_PLAN_PROMPT,
+        agent_hint="planner",
+        temperature=0.2,
+        max_tokens=700,
+    )
     try:
-        content = await call_llm(
-            messages, temperature=0.2, max_tokens=700, agent_hint="planner"
+        content = await run_prompt(
+            chain,
+            f'Business: "{topic}".{context_note}',
+            agent_hint="planner",
         )
     except Exception as e:
         logger.error(f"[Planner] structured plan failed: {e}")
@@ -133,28 +134,26 @@ async def planner_agent(
             f"{previous_context[:800]}"
         )
 
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Financial advisory planner. "
-                "Output ONLY a raw Python list of exactly 5 short step strings. "
-                "No explanation, no markdown."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
+    chain = build_advisory_chain(
+        (
+            "Financial advisory planner. "
+            "Output ONLY a raw Python list of exactly 5 short step strings. "
+            "No explanation, no markdown."
+        ),
+        agent_hint=agent_hint or "planner",
+        temperature=0.7,
+        max_tokens=300,
+    )
+    try:
+        content = await run_prompt(
+            chain,
+            (
                 f'Plan the financial advisory steps needed for a rural micro-entrepreneur based on their described business: "{topic}". '
                 "Cover: product/service, daily/monthly rough income, location type, whether they have any formal registration, report synthesis. "
                 f'Format: ["step1","step2","step3","step4","step5"]'
                 f"{context_note}"
             ),
-        },
-    ]
-    try:
-        content = await call_llm(
-            messages, temperature=0.7, max_tokens=300, agent_hint=agent_hint
+            agent_hint=agent_hint or "planner",
         )
         return _parse_plan(content)
     except Exception as e:

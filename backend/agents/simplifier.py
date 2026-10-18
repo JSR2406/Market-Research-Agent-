@@ -3,7 +3,7 @@ import logging
 from typing import Optional
 
 from backend.core.heuristics import build_simplified_summary
-from backend.core.llm_client import call_llm
+from backend.core.langchain_adapter import build_advisory_chain, run_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -29,25 +29,23 @@ async def simplifier_agent(
         if lang == "hi"
         else "Write in very simple English."
     )
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You write for a first-time borrower with basic literacy. Convert the "
-                "advisory JSON into a short plain-language document: 4-6 numbered lines, "
-                "very simple words, no jargon, no abbreviations like CGTMSE/marginal. "
-                f"{language_rule} "
-                "Return plain text only — no markdown, no JSON."
-            ),
-        },
-        {
-            "role": "user",
-            "content": f"Topic: {topic}\n\nAdvisory JSON:\n{advisory_json}",
-        },
-    ]
+    chain = build_advisory_chain(
+        (
+            "You write for a first-time borrower with basic literacy. Convert the "
+            "advisory JSON into a short plain-language document: 4-6 numbered lines, "
+            "very simple words, no jargon, no abbreviations like CGTMSE/marginal. "
+            f"{language_rule} "
+            "Return plain text only — no markdown, no JSON."
+        ),
+        agent_hint=agent_hint or "simplifier",
+        temperature=0.3,
+        max_tokens=200,
+    )
     try:
-        return await call_llm(
-            messages, temperature=0.3, max_tokens=200, agent_hint=agent_hint
+        return await run_prompt(
+            chain,
+            f"Topic: {topic}\n\nAdvisory JSON:\n{advisory_json}",
+            agent_hint=agent_hint or "simplifier",
         )
     except Exception as e:
         logger.error(f"Simplifier agent LLM failed: {e}")

@@ -1,37 +1,28 @@
 """
-backend/agentic/runner.py — executes the agent graph.
+backend/agentic/runner.py — executes the agent graph via LangGraph.
 
-Two interchangeable runners produce identical state and identical real-time
-events:
-
-  1. **LangGraph runner** — used when ``langgraph`` is importable. Compiles the
-     StateGraph from ``graph.py`` and invokes it; nodes stream events themselves.
-  2. **Native runner** — a tiny async loop over the same node functions + routers
-     (``successors``). Used when LangGraph is absent, so the offline guarantee
-     holds even in a minimal install.
-
-``run_agentic_workflow`` picks the best available runner and never raises: it
-returns ``(final_state, status)`` where status ∈ {"done", "cancelled", "error"}.
+LangGraph is the REQUIRED execution engine. ``run_agentic_workflow`` compiles
+the StateGraph from ``graph.py`` and invokes it; nodes stream real-time events
+through the shared ``EventEmitter``. Never raises — returns
+``(final_state, status)`` where status ∈ {"done", "cancelled", "error"}.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-import operator
 from typing import Any, Dict, Optional, Tuple
 
 from backend.agentic import runtime
 from backend.agentic.events import EventEmitter, WorkflowCancelled
 from backend.agentic.executor import with_postconditions
-from backend.agentic.graph import NODE_FUNCS, REDUCERS, START_NODE, graph_topology, successors
+from backend.agentic.graph import NODE_FUNCS, REDUCERS, START_NODE, graph_topology
 from backend.agentic.state import AgenticState, initial_state
 
 logger = logging.getLogger(__name__)
 
-
-# The same registry, wrapped for postcondition checking. LangGraph mode and the
-# native runner both execute through this surface, so a step's declared
-# postconditions get checked whichever engine is available.
+# The same registry, wrapped for postcondition checking. The compiled LangGraph
+# executes through this surface, so a step's declared postconditions get checked.
 POSTCONDITION_FUNCS: Dict[str, Any] = {
     nid: with_postconditions(fn, nid) for nid, fn in NODE_FUNCS.items()
 }
@@ -47,28 +38,6 @@ def _merge(state: Dict, update: Optional[Dict]) -> None:
             state[key] = state[key] + value
         else:
             state[key] = value
-
-
-async def _run_native(state: Dict, config: Dict) -> Tuple[Dict, str]:
-    """Pure-asyncio execution of the same graph spec."""
-    em: EventEmitter = config["configurable"]["emitter"]
-    node: Optional[str] = START_NODE
-    guard = 0
-    while node is not None:
-        guard += 1
-        if guard > 64:  # hard safety net against an accidental cycle
-            logger.error("[Agentic] native runner exceeded node guard")
-            break
-        if em.is_cancelled:
-            raise WorkflowCancelled()
-        fn = NODE_FUNCS.get(node)
-        if fn is None:
-            logger.error("[Agentic] unknown node %s", node)
-            break
-        update = await POSTCONDITION_FUNCS[node](state, config)
-        _merge(state, update)
-        node = successors(node, state)
-    return state, "done"
 
 
 async def _run_langgraph(state: Dict, config: Dict, graph: Any) -> Tuple[Dict, str]:
@@ -90,7 +59,7 @@ async def run_agentic_workflow(
     eligibility_note: str = "",
     output_lang: str = "en",
 ) -> Tuple[AgenticState, str]:
-    """Run the advisory graph end-to-end. Never raises — returns (state, status)."""
+    """Run the advisory graph end-to-end via LangGraph. Never raises."""
     state = initial_state(topic, max_steps, profile, session_context, eligibility_note)
     state["output_lang"] = output_lang
     config: Dict[str, Any] = {
@@ -105,17 +74,12 @@ async def run_agentic_workflow(
     await emitter.graph(engine, topo["nodes"], topo["edges"])
     await emitter.status("Understanding your business…")
 
-    compiled = None
-    if runtime.LANGGRAPH_AVAILABLE:
-        from backend.agentic.graph import build_langgraph
+    from backend.agentic.graph import build_langgraph
 
-        compiled = build_langgraph()
+    compiled = build_langgraph()
 
     try:
-        if compiled is not None:
-            final_state, status = await _run_langgraph(state, config, compiled)
-        else:
-            final_state, status = await _run_native(state, config)
+        final_state, status = await _run_langgraph(state, config, compiled)
         return final_state, status
     except WorkflowCancelled:
         logger.info("[Agentic] workflow cancelled by user")

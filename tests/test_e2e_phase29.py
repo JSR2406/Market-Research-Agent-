@@ -12,8 +12,10 @@ from fastapi.testclient import TestClient
 def llm_forced_down():
     import importlib
 
-    mods = ["planner", "research", "analyst", "opportunity", "writer", "editor", "simplifier", "chat"]
-    modules = [importlib.import_module(f"backend.agents.{name}") for name in mods]
+    # All agent LLM traffic now flows through backend.core.llm_client.call_llm
+    # (via langchain_adapter.run_prompt). supervisor keeps its own import.
+    mods = ["backend.core.llm_client", "backend.agentic.supervisor"]
+    modules = [importlib.import_module(m) for m in mods]
     saved = {m: m.call_llm for m in modules}
 
     async def _boom(*args, **kwargs):

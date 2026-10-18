@@ -446,3 +446,135 @@ class MarketStatusResponse(BaseModel):
     datasets: List[MarketDatasetInfo] = []
     disclaimer: str = ""
     server_time: str = ""
+
+
+# ── advisor workspace (WS-11) ────────────────────────────────────────────────
+
+_ADVISOR_ENGINE_VERSION = "elig-1.0.0"
+
+
+class AdvisorSignupRequest(BaseModel):
+    email: str = Field(..., max_length=200)
+    password: str = Field(..., min_length=8, max_length=128)
+    name: str = Field("", max_length=100)
+    org_name: str = Field("", max_length=200)
+
+
+class AdvisorSignupResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    locale: str
+
+
+class AdvisorLoginRequest(BaseModel):
+    email: str = Field(..., max_length=200)
+    password: str = Field(..., max_length=128)
+
+
+class AdvisorLoginResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    locale: str
+    token: str = ""  # bearer token the client stores and sends as Authorization: Bearer
+
+
+class AuthMeResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    org_name: str
+    locale: str
+    plan: str
+
+
+class ClientProfile(BaseModel):
+    label: str = Field(..., max_length=200)
+    sector: str = Field("", max_length=64)
+    state: str = Field("", max_length=64)
+    stage: str = Field("", max_length=32)  # idea | operating | expanding
+    profile: Dict[str, str] = Field(default_factory=dict)
+
+
+class ClientResponse(BaseModel):
+    id: str
+    label: str
+    sector: Optional[str] = None
+    state: Optional[str] = None
+    stage: Optional[str] = None
+    readiness: Optional[int] = None
+    profile: Dict[str, Any] = {}
+    created_at: float = 0.0
+    updated_at: float = 0.0
+
+
+class ClientListResponse(BaseModel):
+    clients: List[ClientResponse] = []
+
+
+class ClientUpdateRequest(BaseModel):
+    label: Optional[str] = Field(None, max_length=200)
+    sector: Optional[str] = Field(None, max_length=64)
+    state: Optional[str] = Field(None, max_length=64)
+    stage: Optional[str] = Field(None, max_length=32)
+    profile: Optional[Dict[str, str]] = None
+
+
+class MatchRequest(BaseModel):
+    topic: str = Field("", max_length=2000)
+    amount: Optional[int] = None
+    lang: str = Field("en", max_length=8)
+    intake: Dict[str, str] = Field(default_factory=dict)
+
+
+class MatchResponse(BaseModel):
+    client_id: str
+    label: str
+    readiness: Optional[int] = None
+    business_class: str = ""
+    business_label: str = ""
+    ranked: List[Dict[str, Any]] = []
+    snapshot_id: str = ""
+
+
+class BulkMatchRequest(BaseModel):
+    client_ids: List[str] = Field(default_factory=list, max_length=200)
+
+
+class BulkMatchResponse(BaseModel):
+    engine_version: str = _ADVISOR_ENGINE_VERSION
+    results: List[Dict[str, Any]] = []
+
+
+class NoteRequest(BaseModel):
+    body: str = Field(..., max_length=4000)
+
+
+class NoteResponse(BaseModel):
+    id: str
+    body: str
+    created_at: float
+
+
+class NoteListResponse(BaseModel):
+    notes: List[NoteResponse] = []
+
+
+class ReportRequest(BaseModel):
+    kind: str = Field("combined", max_length=16)  # combined | single
+    client_ids: List[str] = Field(default_factory=list, max_length=200)
+    locale: str = Field("en", max_length=8)
+
+
+class ReportResponse(BaseModel):
+    id: str
+    kind: str
+    client_ids: List[str] = []
+    locale: str = ""
+    file_path: str = ""
+    created_at: float = 0.0
+
+
+class ReportListResponse(BaseModel):
+    reports: List[ReportResponse] = []

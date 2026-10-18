@@ -19,6 +19,7 @@ from backend.api.dpr import router as dpr_router
 from backend.api.schemes import router as schemes_router
 from backend.api.analytics import router as analytics_router
 from backend.api.tracker import router as tracker_router
+from backend.api.advisor import router as advisor_router
 from backend.api.market import router as market_router
 from backend.api.voice import router as voice_router
 from backend.api.chat import router as chat_router
@@ -133,6 +134,7 @@ app.include_router(schemes_router)
 app.include_router(analytics_router)
 app.include_router(tracker_router)
 app.include_router(market_router)
+app.include_router(advisor_router)
 
 
 @app.get("/health", response_model=HealthResponse)

@@ -57,6 +57,15 @@ EVENT_ALLOWLIST = frozenset(
         "tracker_scheme_added",
         "tracker_alerts_saved",
         "market_view",
+        # Advisor workspace (WS-11) — ids and counts only, no PII.
+        "advisor_signed_up",
+        "advisor_signed_in",
+        "advisor_client_added",
+        "advisor_client_updated",
+        "advisor_client_deleted",
+        "advisor_note_added",
+        "bulk_match_run",
+        "advisor_report_generated",
     }
 )
 
@@ -75,6 +84,10 @@ PROP_SCHEMA: Dict[str, type] = {
     "dataset": str,
     "scheme": str,
     "channel": str,
+    "clientCount": int,
+    "kind": str,
+    "locale": str,
+    "plan": str,
 }
 
 _MAX_PROPS = len(PROP_SCHEMA)

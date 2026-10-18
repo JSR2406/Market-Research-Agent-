@@ -489,6 +489,12 @@ class AuthMeResponse(BaseModel):
     plan: str
 
 
+class AdvisorUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    org_name: Optional[str] = Field(None, max_length=200)
+    locale: Optional[str] = Field(None, max_length=8)
+
+
 class ClientProfile(BaseModel):
     label: str = Field(..., max_length=200)
     sector: str = Field("", max_length=64)

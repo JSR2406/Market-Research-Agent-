@@ -30,6 +30,7 @@ from backend.api.schemas import (
     AdvisorSignupRequest,
     AdvisorSignupResponse,
     AuthMeResponse,
+    AdvisorUpdateRequest,
     BulkMatchRequest,
     BulkMatchResponse,
     ClientListResponse,
@@ -124,6 +125,26 @@ async def advisor_me(advisor: Dict[str, Any] = Depends(get_current_advisor)):
         id=advisor["id"], email=advisor["email"], name=advisor.get("name", ""),
         org_name=advisor.get("org_name", ""), locale=advisor.get("locale", "en"),
         plan=advisor.get("plan", "free"),
+    )
+
+
+@router.patch("/auth/me", response_model=AuthMeResponse)
+async def advisor_update_me(
+    req: AdvisorUpdateRequest, advisor: Dict[str, Any] = Depends(get_current_advisor),
+):
+    """Update the signed-in advisor's public profile (name, org, locale)."""
+    updated = advisor_repo.update_advisor(
+        advisor["id"],
+        name=req.name,
+        org_name=req.org_name,
+        locale=req.locale,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Advisor not found.")
+    return AuthMeResponse(
+        id=updated["id"], email=updated["email"], name=updated.get("name", ""),
+        org_name=updated.get("org_name", ""), locale=updated.get("locale", "en"),
+        plan=updated.get("plan", "free"),
     )
 
 
@@ -452,6 +473,15 @@ async def generate_report(
         })
 
     blocks = _build_pdf_blocks(advisor, summaries, req.locale, req.kind)
+    if advisor.get("plan") == "free":
+        blocks.insert(
+            1,
+            {
+                "style": "body",
+                "text": ("Free plan — sample report (watermarked). Upgrade for clean, client-ready reports. "
+                         "Not a lending decision."),
+            },
+        )
     pdf_bytes = render_pdf(
         title="Advisor Report",
         blocks=blocks,

@@ -76,7 +76,7 @@ export default function HistoryPage() {
           <p style={{ color: "var(--text-secondary)" }}>{t("history.subtitle")}</p>
         </motion.div>
 
-        {sessionId && <SessionHistory sessionId={sessionId} />}
+        {sessionId && <SessionHistory sessionId={sessionId} approvalHref="/research" />}
 
         <Link
           href="/research"

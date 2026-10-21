@@ -306,6 +306,50 @@ def test_match_creates_snapshot_and_readiness(client):
     assert 0 <= r.json()["readiness"] <= 100
 
 
+def test_top_scheme_is_cached_for_the_dashboard(client):
+    """
+    The dashboard client card names a scheme — copied from the deterministic
+    engine, never written by a model.
+    """
+    tok = signin(client, "topscheme@example.com")["token"]
+    advisor = advisor_repo.authenticate_advisor("topscheme@example.com", "Secret1234")
+    client_id = advisor_repo.create_client(
+        advisor["id"], label="Tea stall", profile={},
+    )["id"]
+
+    results = {"ranked": [
+        {
+            "scheme_id": "pmegp", "name": "PMEGP", "status": "likely",
+            "status_label": "Likely eligible", "score": 55,
+            "source_url": "https://www.kviconline.gov.in/pmegpeportal/",
+            "last_verified_at": "2026-01-01",
+        },
+        {
+            "scheme_id": "mudra", "name": "MUDRA", "status": "eligible",
+            "status_label": "Eligible", "score": 80,
+            "source_url": "https://www.mudra.org.in/",
+            "last_verified_at": "2026-01-01",
+        },
+    ]}
+    advisor_repo.save_snapshot(advisor["id"], client_id, advisor_repo.ENGINE_VERSION, results)
+
+    got = advisor_repo.get_client(advisor["id"], client_id)
+    assert got["readiness"] == 80  # best score of the run
+    assert got["top_scheme"]["scheme_id"] == "mudra"  # highest score wins
+    assert got["top_scheme"]["status_label"] == "Eligible"
+    assert got["top_scheme"]["source_url"].startswith("https://")
+
+    # The same signal rides on the dashboard list endpoint.
+    listed = client.get("/api/advisor/clients", headers=auth_header(tok)).json()["clients"]
+    assert [c["id"] for c in listed] == [client_id]
+    assert listed[0]["top_scheme"]["name"] == "MUDRA"
+
+    # A later run that matches nothing clears the signal instead of keeping a
+    # stale scheme on the card.
+    advisor_repo.save_snapshot(advisor["id"], client_id, advisor_repo.ENGINE_VERSION, {"ranked": []})
+    assert advisor_repo.get_client(advisor["id"], client_id)["top_scheme"] == {}
+
+
 def test_match_deterministic(client):
     """Same profile -> same ranked result set on re-run."""
     tok = signin(client, "alice@example.com")["token"]

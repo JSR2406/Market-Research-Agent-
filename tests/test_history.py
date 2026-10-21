@@ -18,8 +18,11 @@ from backend.core.memory import (
     get_session_facts,
     load_last_session,
     load_latest_run,
+    load_pending_gate_summary,
     load_run,
+    record_gate_decision,
     save_session,
+    save_session_gate,
     update_session_state,
 )
 
@@ -200,6 +203,82 @@ def test_session_history_endpoints(client):
         assert facts.status_code == 200
         assert facts.json()["facts"]["business_type"] == "tea stall"
         assert facts.json()["intake"]["location"] == "Pune"
+    finally:
+        delete_session(sid)
+
+
+def test_dashboard_shows_waiting_approval_and_chosen_scheme(client):
+    """
+    The history/dashboard view must reflect the gate, not just the reports.
+
+    A parked run has no report, so the waiting gate is the only sign that a run
+    is still the user's to decide. And a run that got through a scheme gate
+    carries the scheme the user actually committed to.
+    """
+    sid = "test-history-dashboard"
+    try:
+        state = _state("gated run")
+        state["scheme_choice"] = {
+            "value": "mudra",
+            "name": "MUDRA — Tarun",
+            "status": "Eligible",
+            "loan_ceiling": "₹10,00,000",
+            "source_url": "https://www.mudra.org.in/",
+            "last_verified_at": "2026-01-01",
+            "is_none": False,
+        }
+        save_session(sid, "gated run", state)
+
+        body = client.get(f"/api/sessions/{sid}/runs").json()
+        listed = body["runs"][0]
+        assert listed["scheme_choice"]["name"] == "MUDRA — Tarun"
+        assert listed["scheme_choice"]["source_url"].startswith("https://")
+        assert listed["scheme_choice"]["is_none"] is False
+        # Nothing has been parked yet.
+        assert body["pending_gate"] == {}
+
+        run_id = listed["run_id"]
+        detail = client.get(f"/api/sessions/{sid}/runs/{run_id}").json()
+        assert detail["scheme_choice"]["name"] == "MUDRA — Tarun"
+
+        # A decision that is still pending shows up on the dashboard.
+        gate = {
+            "gate_id": "gate-dashboard-1",
+            "kind": "plan_approval",
+            "status": "pending",
+            "question": "May we go to the web?",
+            "created_at": 123.0,
+        }
+        save_session_gate(sid, gate)
+        pending = client.get(f"/api/sessions/{sid}/runs").json()["pending_gate"]
+        assert pending["gate_id"] == "gate-dashboard-1"
+        assert pending["question"] == "May we go to the web?"
+        assert pending["status"] == "pending"
+
+        # Once decided, the dashboard stops asking.
+        record_gate_decision(sid, {"gate_id": "gate-dashboard-1", "decision": "approve"})
+        assert client.get(f"/api/sessions/{sid}/runs").json()["pending_gate"] == {}
+        assert load_pending_gate_summary(sid) == {}
+    finally:
+        delete_session(sid)
+
+
+def test_pending_gate_summary_prefers_the_newest_pending_gate():
+    sid = "test-history-pending-gates"
+    try:
+        save_session_gate(sid, {
+            "gate_id": "old", "kind": "plan_approval", "status": "pending",
+            "question": "old", "created_at": 10.0,
+        })
+        save_session_gate(sid, {
+            "gate_id": "new", "kind": "scheme_approval", "status": "pending",
+            "question": "new", "created_at": 20.0,
+        })
+        assert load_pending_gate_summary(sid)["gate_id"] == "new"
+
+        # An unknown session has nothing waiting — never raises.
+        assert load_pending_gate_summary("no-such-session") == {}
+        assert load_pending_gate_summary("bad id") == {}
     finally:
         delete_session(sid)
 

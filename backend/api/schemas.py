@@ -60,10 +60,16 @@ class RunSummary(BaseModel):
     has_report: bool
     eligibility: Dict[str, Any] = {}
     loan_ready_score: Optional[int] = None
+    # The scheme the user committed to at the gate (empty when the run never
+    # passed through one) — shown on the history/dashboard list.
+    scheme_choice: Dict[str, Any] = {}
 
 
 class RunsListResponse(BaseModel):
     runs: List[RunSummary] = []
+    # A run that parked at an approval gate has no report yet, so it is not in
+    # ``runs``. This is how the dashboard can still say "one approval is waiting".
+    pending_gate: Dict[str, Any] = {}
 
 
 class RunDetailResponse(BaseModel):
@@ -74,6 +80,8 @@ class RunDetailResponse(BaseModel):
     simplified_report: str = ""
     eligibility: Dict[str, Any] = {}
     action_ledger: Dict[str, Any] = {}
+    # The scheme the user chose at the gate — deterministic, user-authored.
+    scheme_choice: Dict[str, Any] = {}
     # `plan` is the compiled step list (list[str]) in the run state, or a dict in
     # the advisory JSON — accept either so neither shape 500s the endpoint.
     plan: Any = {}
@@ -129,6 +137,9 @@ class SessionExportResponse(BaseModel):
     facts: Dict[str, Any] = {}
     intake: Dict[str, str] = {}
     chat: List[Dict[str, Any]] = []
+    # Every approval the session has seen — including a still-pending one that
+    # belongs to a run which never produced a report.
+    gates: List[Dict[str, Any]] = []
 
 
 # ── Eligibility + Action Ledger — deterministic, never LLM-generated ──────────
@@ -531,6 +542,10 @@ class ClientResponse(BaseModel):
     stage: Optional[str] = None
     readiness: Optional[int] = None
     profile: Dict[str, Any] = {}
+    # The best scheme of the client's latest deterministic match, cached on the
+    # client so the dashboard can show it without loading every snapshot.
+    # Empty until the advisor runs a match.
+    top_scheme: Dict[str, Any] = {}
     created_at: float = 0.0
     updated_at: float = 0.0
 

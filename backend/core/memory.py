@@ -120,6 +120,10 @@ def _run_from_state(topic: str, state: Dict[str, Any], *, run_id: Optional[str] 
         "simplified_report": state.get("simplified_report", ""),
         "eligibility": state.get("eligibility", {}) or {},
         "ledger": state.get("ledger", {}) or {},
+        # The scheme the user committed to at the approval gate (empty when the
+        # run did not pass through a gate). Kept at the top level too so the
+        # dashboard can show the commitment without loading the whole state.
+        "scheme_choice": state.get("scheme_choice", {}) or {},
         "plan": state.get("plan", []) or [],
         "plan_run": state.get("plan_run", {}) or {},
         "intake": state.get("intake", {}) or {},
@@ -189,6 +193,27 @@ def _normalize_session(session_id: str, data: Any) -> Dict[str, Any]:
 # Facts — the cross-session memory the advisor chat reads
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _compact_scheme_choice(choice: Any) -> Dict[str, Any]:
+    """
+    Trim a gate's scheme choice to the fields a list/dashboard view needs.
+
+    The user's choice is a stored fact (see ``backend/core/gates.py``), so this
+    only narrows it — it never adds, changes or guesses a scheme. An empty dict
+    means the run never passed through a scheme gate.
+    """
+    if not isinstance(choice, dict) or not choice:
+        return {}
+    return {
+        "value": str(choice.get("value") or ""),
+        "name": str(choice.get("name") or ""),
+        "status": str(choice.get("status") or ""),
+        "loan_ceiling": str(choice.get("loan_ceiling") or ""),
+        "source_url": str(choice.get("source_url") or ""),
+        "last_verified_at": str(choice.get("last_verified_at") or ""),
+        "is_none": bool(choice.get("is_none")),
+    }
+
+
 # Human-readable fact keys for the intake field ids (kept explicit so the chat
 # context reads naturally instead of echoing internal ids like `loan`).
 _INTAKE_FACT_KEYS = {
@@ -225,6 +250,15 @@ def _extract_facts(run: Dict[str, Any]) -> Dict[str, Any]:
     ledger = run.get("ledger") or {}
     if isinstance(ledger, dict) and ledger.get("score") is not None:
         facts["last_loan_ready_score"] = ledger["score"]
+
+    # The scheme the user committed to at the gate is a fact about the business
+    # plan, so the advisor chat can answer "which scheme did I pick?" — it comes
+    # from the user's decision, never from the model's prose.
+    choice = _compact_scheme_choice(run.get("scheme_choice"))
+    if choice.get("name"):
+        facts["last_scheme_choice"] = choice["name"]
+    elif choice.get("is_none"):
+        facts["last_scheme_choice"] = "no loan right now"
 
     # `plan` is a list of step strings in the run state (older builds and the
     # agentic planner both emit a list); tolerate a dict too.
@@ -327,8 +361,8 @@ def update_session_state(session_id: str, patch: dict) -> None:
         run = session["runs"][0]
         run["state"] = state
         for key in ("final_report", "simplified_report", "eligibility", "ledger",
-                    "plan", "plan_run", "intake", "profile", "sources",
-                    "token_usage", "engine"):
+                    "scheme_choice", "plan", "plan_run", "intake", "profile",
+                    "sources", "token_usage", "engine"):
             if key in state:
                 run[key] = state[key]
         session["facts"] = _merge_facts(session.get("facts", {}), _extract_facts(run))
@@ -423,6 +457,42 @@ def load_session_gates(session_id: str) -> Dict[str, Dict[str, Any]]:
 def load_session_gate_by_id(session_id: str, gate_id: str) -> Dict[str, Any]:
     """One gate by id (empty when the session has no such gate)."""
     return load_session_gates(session_id).get(str(gate_id or ""), {})
+
+
+def _gate_age(gate: Dict[str, Any]) -> float:
+    """Sort key for gates: the stored creation time, tolerant of junk."""
+    try:
+        return float((gate or {}).get("created_at") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def load_pending_gate_summary(session_id: str) -> Dict[str, Any]:
+    """
+    The approval this session is still waiting for, trimmed for a list view.
+
+    A run that parked at a gate produced no report, so it never appears in the
+    run history. Without this the dashboard would show nothing at all and the
+    user would have to remember that a run was waiting — so the pending gate is
+    surfaced next to the runs, pointing back to where it can be decided.
+
+    Empty dict when nothing is pending.
+    """
+    pending = [
+        gate for gate in load_session_gates(session_id).values()
+        if str(gate.get("status") or "") == "pending"
+    ]
+    if not pending:
+        return {}
+    gate = max(pending, key=_gate_age)
+    return {
+        "gate_id": str(gate.get("gate_id") or ""),
+        "kind": str(gate.get("kind") or ""),
+        "status": "pending",
+        # Gates carry the wording the user was shown — never re-worded here.
+        "question": str(gate.get("question") or ""),
+        "created_at": gate.get("created_at"),
+    }
 
 
 def load_session_gate_decisions(session_id: str) -> Dict[str, Dict[str, str]]:
@@ -525,6 +595,7 @@ def get_runs_list(session_id: str) -> List[Dict[str, Any]]:
     for run in session.get("runs", []):
         ledger = run.get("ledger") or {}
         eligibility = run.get("eligibility") or {}
+        state = run.get("state") if isinstance(run.get("state"), dict) else {}
         runs.append({
             "run_id": run.get("run_id"),
             "created_at": run.get("created_at"),
@@ -536,6 +607,10 @@ def get_runs_list(session_id: str) -> List[Dict[str, Any]]:
                 "amount": eligibility.get("amount"),
             },
             "loan_ready_score": ledger.get("score"),
+            # Older runs kept the choice only inside the full state.
+            "scheme_choice": _compact_scheme_choice(
+                run.get("scheme_choice") or state.get("scheme_choice")
+            ),
         })
     return runs
 

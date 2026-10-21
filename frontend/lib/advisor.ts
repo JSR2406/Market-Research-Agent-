@@ -170,6 +170,17 @@ export async function updateAdvisor(advisorId: string, body: {
 // Clients
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface TopScheme {
+  scheme_id: string;
+  name: string;
+  status: string;
+  status_label: string;
+  score: number;
+  tier_group?: string;
+  source_url: string;
+  last_verified_at: string;
+}
+
 export interface Client {
   id: string;
   label: string;
@@ -177,6 +188,8 @@ export interface Client {
   state?: string | null;
   stage?: string | null;
   readiness?: number | null;
+  /** Best scheme of the latest deterministic match (empty until a match runs). */
+  top_scheme?: TopScheme | null;
   profile: Json;
   created_at: number;
   updated_at: number;

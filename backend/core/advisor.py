@@ -304,6 +304,8 @@ def create_client(
         "state": (state or "").strip() or None,
         "stage": (stage or "").strip() or None,
         "readiness": None,
+        # Filled by the first deterministic match — see _refresh_client_signals.
+        "top_scheme": {},
         "created_at": now,
         "updated_at": now,
     }
@@ -318,7 +320,7 @@ def list_clients(advisor_id: str) -> List[Dict[str, Any]]:
             continue
         safe = {k: c.get(k) for k in (
             "id", "label", "profile", "sector", "state", "stage",
-            "readiness", "created_at", "updated_at",
+            "readiness", "top_scheme", "created_at", "updated_at",
         )}
         out.append(safe)
     out.sort(key=lambda c: c.get("updated_at") or 0, reverse=True)
@@ -444,20 +446,53 @@ def save_snapshot(
         "run_at": now,
     }
     _write(_SNAPSHOTS, snapshot_id, snapshot)
-    # Refresh the client's cached readiness from this run.
-    _refresh_readiness(advisor_id, client_id, results)
+    # Refresh the client's cached dashboard signals from this run.
+    _refresh_client_signals(advisor_id, client_id, results)
     return snapshot
 
 
-def _refresh_readiness(advisor_id: str, client_id: str, results: Dict[str, Any]) -> None:
+def _refresh_client_signals(advisor_id: str, client_id: str, results: Dict[str, Any]) -> None:
+    """
+    Cache the two things the dashboard shows about a client, from one match.
+
+    Both are deterministic outputs of the eligibility engine, copied verbatim —
+    nothing here is model-written:
+
+    * ``readiness`` — the best score of the run (0-100).
+    * ``top_scheme`` — the best-scoring scheme of the run, with the verdict
+      label and its official source, so a client card can name a scheme instead
+      of showing a bare number. Empty when the run matched nothing.
+    """
     c = _read(_CLIENTS, client_id)
     if not c or c.get("advisor_id") != advisor_id:
         return
     ranked = results.get("ranked") or []
     best = max((r.get("score") or 0 for r in ranked), default=0)
     c["readiness"] = int(max(0, min(100, best)))
+    c["top_scheme"] = _compact_top_scheme(ranked)
     c["updated_at"] = time.time()
     _write(_CLIENTS, client_id, c)
+
+
+def _compact_top_scheme(ranked: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """The highest-scoring ranked verdict, trimmed to the fields a card needs."""
+    rows = [r for r in (ranked or []) if isinstance(r, dict)]
+    if not rows:
+        return {}
+    try:
+        best = max(rows, key=lambda r: float(r.get("score") or 0))
+    except (TypeError, ValueError):
+        best = rows[0]
+    return {
+        "scheme_id": str(best.get("scheme_id") or ""),
+        "name": str(best.get("name") or ""),
+        "status": str(best.get("status") or ""),
+        "status_label": str(best.get("status_label") or ""),
+        "score": int(best.get("score") or 0),
+        "tier_group": str(best.get("tier_group") or ""),
+        "source_url": str(best.get("source_url") or ""),
+        "last_verified_at": str(best.get("last_verified_at") or ""),
+    }
 
 
 def get_latest_snapshot(advisor_id: str, client_id: str) -> Optional[Dict[str, Any]]:

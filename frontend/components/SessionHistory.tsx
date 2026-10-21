@@ -12,6 +12,7 @@ import {
   Download,
   Trash2,
   ArrowRight,
+  Clock,
 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -27,6 +28,26 @@ export type RunSummary = {
     amount?: number | null;
   };
   loan_ready_score?: number | null;
+  /** The scheme the user committed to at the approval gate, if any. */
+  scheme_choice?: {
+    value?: string;
+    name?: string;
+    status?: string;
+    loan_ceiling?: string;
+    source_url?: string;
+    last_verified_at?: string;
+    is_none?: boolean;
+  } | null;
+};
+
+/** The approval a parked run is waiting on (it has no report yet). */
+export type PendingGate = {
+  gate_id?: string;
+  kind?: string;
+  status?: string;
+  /** The wording the user was shown at the gate (already localised). */
+  question?: string;
+  created_at?: number | null;
 };
 
 interface Props {
@@ -39,6 +60,13 @@ interface Props {
   limit?: number;
   /** Offer the "open full history" link (off on the /history page itself). */
   showViewAll?: boolean;
+  /**
+   * Where the user can decide a waiting approval (normally `/research`).
+   *
+   * The approval row only renders when this is set: on /research the gate card
+   * is already on screen, so repeating it there would just be noise.
+   */
+  approvalHref?: string;
   /** Called after the user deletes the session. */
   onDeleted?: () => void;
 }
@@ -71,10 +99,12 @@ export default function SessionHistory({
   refreshKey,
   limit,
   showViewAll = false,
+  approvalHref,
   onDeleted,
 }: Props) {
   const { t, locale } = useI18n();
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [pendingGate, setPendingGate] = useState<PendingGate | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -86,6 +116,7 @@ export default function SessionHistory({
   const load = useCallback(async () => {
     if (!sessionId) {
       setRuns([]);
+      setPendingGate(null);
       setLoading(false);
       return;
     }
@@ -96,10 +127,13 @@ export default function SessionHistory({
       if (!res.ok) throw new Error("bad status");
       const body = await res.json();
       setRuns(Array.isArray(body?.runs) ? (body.runs as RunSummary[]) : []);
+      const waiting = body?.pending_gate as PendingGate | undefined;
+      setPendingGate(waiting?.gate_id ? waiting : null);
     } catch (err) {
       console.error("history load failed:", err);
       setFailed(true);
       setRuns([]);
+      setPendingGate(null);
     } finally {
       setLoading(false);
     }
@@ -118,7 +152,11 @@ export default function SessionHistory({
       if (sessionId) {
         fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/runs`)
           .then((r) => (r.ok ? r.json() : null))
-          .then((b) => Array.isArray(b?.runs) && setRuns(b.runs as RunSummary[]))
+          .then((b) => {
+            if (Array.isArray(b?.runs)) setRuns(b.runs as RunSummary[]);
+            const waiting = b?.pending_gate as PendingGate | undefined;
+            setPendingGate(waiting?.gate_id ? waiting : null);
+          })
           .catch(() => {});
       }
     }, 5000);
@@ -181,6 +219,7 @@ export default function SessionHistory({
       });
       if (!res.ok) throw new Error("bad status");
       setRuns([]);
+      setPendingGate(null);
       setOpenId(null);
       setNotice(t("history.clearDone"));
       onDeleted?.();
@@ -194,6 +233,11 @@ export default function SessionHistory({
 
   const visible = typeof limit === "number" ? runs.slice(0, limit) : runs;
   const hidden = runs.length - visible.length;
+  // Only surface the waiting approval where the user can act on it.
+  const showApproval = Boolean(approvalHref && pendingGate?.gate_id);
+  // A parked run has no report but its session (and gate) still exists, so
+  // export/delete must stay available — otherwise the user could not remove it.
+  const hasContent = runs.length > 0 || runningTopic !== "" || Boolean(pendingGate?.gate_id);
 
   return (
     <section
@@ -234,8 +278,8 @@ export default function SessionHistory({
           <button
             type="button"
             onClick={exportSession}
-            disabled={busy || (!runs.length && !runningTopic)}
-            aria-label="Export session data"
+            disabled={busy || !hasContent}
+            aria-label={t("history.export")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -249,7 +293,7 @@ export default function SessionHistory({
               fontWeight: 600,
               cursor: busy ? "default" : "pointer",
               fontFamily: "inherit",
-              opacity: busy || (!runs.length && !runningTopic) ? 0.5 : 1,
+              opacity: busy || !hasContent ? 0.5 : 1,
             }}
           >
             <Download size={14} aria-hidden="true" />
@@ -258,7 +302,7 @@ export default function SessionHistory({
           <button
             type="button"
             onClick={deleteSession}
-            disabled={busy || (!runs.length && !runningTopic)}
+            disabled={busy || !hasContent}
             aria-label={t("history.clear")}
             style={{
               display: "inline-flex",
@@ -273,7 +317,7 @@ export default function SessionHistory({
               fontWeight: 600,
               cursor: busy ? "default" : "pointer",
               fontFamily: "inherit",
-              opacity: busy || (!runs.length && !runningTopic) ? 0.5 : 1,
+              opacity: busy || !hasContent ? 0.5 : 1,
             }}
           >
             <Trash2 size={14} aria-hidden="true" />
@@ -330,6 +374,55 @@ export default function SessionHistory({
 
       {!loading && !failed && (
         <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+          {/* A parked run produced no report, so the waiting approval is the
+              entry that tells the user something is still theirs to decide. */}
+          {showApproval && (
+            <li>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "11px 14px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--warn)",
+                  background: "rgba(251,191,36,0.10)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <Clock size={15} color="var(--warn)" aria-hidden="true" />
+                <div style={{ flex: 1, minWidth: "160px" }}>
+                  <p style={{ fontSize: "0.86rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                    {t("history.approvalWaiting")}
+                  </p>
+                  <p style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                    {pendingGate?.question || t("history.approvalHint")}
+                  </p>
+                </div>
+                <Link
+                  href={approvalHref as string}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 12px",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border-bright)",
+                    background: "transparent",
+                    color: "var(--text-primary)",
+                    textDecoration: "none",
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  {t("history.approvalOpen")}
+                  <ArrowRight size={13} aria-hidden="true" />
+                </Link>
+              </div>
+            </li>
+          )}
+
           {/* Real-time entry while a run is in progress. */}
           {runningTopic !== "" && (
             <li>
@@ -366,7 +459,7 @@ export default function SessionHistory({
             </li>
           )}
 
-          {!loading && !failed && visible.length === 0 && runningTopic === "" && (
+          {!loading && !failed && visible.length === 0 && runningTopic === "" && !showApproval && (
             <li style={{ color: "var(--text-muted)", fontSize: "0.84rem", padding: "6px 0" }}>
               {t("history.empty")}
             </li>
@@ -378,6 +471,7 @@ export default function SessionHistory({
               const label = run.eligibility?.business_label || "";
               const amount = run.eligibility?.amount;
               const score = run.loan_ready_score;
+              const choice = run.scheme_choice ?? null;
               return (
                 <motion.li
                   key={run.run_id}
@@ -415,6 +509,12 @@ export default function SessionHistory({
                         {typeof score === "number" && (
                           <span>
                             · {t("history.loanReady")} {score}/100
+                          </span>
+                        )}
+                        {choice?.is_none && <span>· {t("history.noLoan")}</span>}
+                        {!choice?.is_none && choice?.name && (
+                          <span>
+                            · {t("history.scheme")}: {choice.name}
                           </span>
                         )}
                       </p>
@@ -467,6 +567,38 @@ export default function SessionHistory({
                         style={{ overflow: "hidden", borderTop: "1px solid var(--border)" }}
                       >
                         <div style={{ padding: "12px 14px" }}>
+                          {choice?.name && !choice.is_none && (
+                            <p
+                              style={{
+                                fontSize: "0.76rem",
+                                color: "var(--text-muted)",
+                                marginBottom: "8px",
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {t("history.scheme")}:{" "}
+                              <strong style={{ color: "var(--text-primary)" }}>{choice.name}</strong>
+                              {choice.source_url && (
+                                <>
+                                  {" · "}
+                                  <a
+                                    href={choice.source_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: "var(--accent)" }}
+                                  >
+                                    {t("gate.source")}
+                                  </a>
+                                </>
+                              )}
+                              {choice.last_verified_at && (
+                                <span>
+                                  {" "}
+                                  ({t("gate.verified")} {choice.last_verified_at})
+                                </span>
+                              )}
+                            </p>
+                          )}
                           {reportLoading ? (
                             <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "var(--text-muted)", fontSize: "0.82rem" }}>
                               <Loader2 size={14} className="spin" aria-hidden="true" />

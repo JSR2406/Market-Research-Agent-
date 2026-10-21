@@ -20,6 +20,7 @@ from backend.core.memory import (
     is_valid_session_id,
     load_chat_history,
     load_last_session,
+    load_pending_gate_summary,
     load_run,
 )
 
@@ -70,15 +71,21 @@ async def get_session(session_id: str):
 
 @router.get("/{session_id}/runs", response_model=RunsListResponse)
 async def get_session_runs(session_id: str):
-    """Return a lightweight list of all historical runs for a session."""
+    """Return a lightweight list of all historical runs for a session.
+
+    ``pending_gate`` carries the approval a parked run is waiting on: that run
+    has no report yet, so without it the dashboard would look empty even though
+    the product is waiting on the user.
+    """
     if not is_valid_session_id(session_id):
         raise HTTPException(status_code=404, detail="No saved runs for this session.")
     try:
         runs = get_runs_list(session_id)
+        pending = load_pending_gate_summary(session_id)
     except Exception as e:
         logger.error(f"Failed to list runs for {session_id}: {e}")
         raise HTTPException(status_code=500, detail="Could not load run history.")
-    return {"runs": runs}
+    return {"runs": runs, "pending_gate": pending}
 
 
 @router.get("/{session_id}/runs/{run_id}", response_model=RunDetailResponse)
@@ -108,6 +115,7 @@ async def get_session_run(session_id: str, run_id: str):
         # The run state calls it `ledger`; the advisory JSON calls it
         # `action_ledger`. Accept both so the history view shows the score.
         "action_ledger": state.get("action_ledger") or state.get("ledger") or {},
+        "scheme_choice": state.get("scheme_choice") or {},
         "plan": state.get("plan") or {},
         "plan_run": state.get("plan_run") or {},
         "intake": state.get("intake", {}) or {},
@@ -192,6 +200,13 @@ async def export_session(session_id: str):
         chat = []
 
     runs = data.get("runs", []) or []
+    raw_gates = data.get("gates")
+    if isinstance(raw_gates, dict):
+        gates = [g for g in raw_gates.values() if isinstance(g, dict)]
+    elif isinstance(raw_gates, list):
+        gates = [g for g in raw_gates if isinstance(g, dict)]
+    else:
+        gates = []
     return {
         "session_id": session_id,
         "exported_at": _time.time(),
@@ -201,6 +216,7 @@ async def export_session(session_id: str):
         "facts": data.get("facts", {}) or {},
         "intake": data.get("intake", {}) or {},
         "chat": chat,
+        "gates": gates,
     }
 
 

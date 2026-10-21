@@ -48,6 +48,22 @@ export default function WorkspacePage() {
 
   const avgReadiness = clients.filter((c) => c.readiness != null).reduce((a, c) => a + (c.readiness ?? 0), 0) / Math.max(clients.filter((c) => c.readiness != null).length, 1);
 
+  // Deterministic count: clients whose latest match found a scheme they can
+  // actually use. `blocked` verdicts are not "ready", so they do not count.
+  const withScheme = clients.filter((c) => {
+    const status = c.top_scheme?.status;
+    return Boolean(c.top_scheme?.name) && (status === "eligible" || status === "likely");
+  }).length;
+
+  const schemeStatusColor = (status: string | undefined) => {
+    switch (status) {
+      case "eligible": return "var(--success)";
+      case "likely": return "var(--warn)";
+      case "blocked": return "var(--error)";
+      default: return "var(--text-muted)";
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--text-muted)" }}>
@@ -83,12 +99,16 @@ export default function WorkspacePage() {
       {/* Stats */}
       <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: "150px", padding: "16px 18px", borderRadius: "var(--radius-lg)", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Clients</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("workspace.clients")}</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, marginTop: "4px" }}>{clients.length}</div>
         </div>
         <div style={{ flex: 1, minWidth: "150px", padding: "16px 18px", borderRadius: "var(--radius-lg)", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Avg readiness</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("workspace.avg_readiness")}</div>
           <div style={{ fontSize: "1.75rem", fontWeight: 800, marginTop: "4px" }}>{Number.isFinite(avgReadiness) ? avgReadiness.toFixed(0) : "—"} / 100</div>
+        </div>
+        <div style={{ flex: 1, minWidth: "150px", padding: "16px 18px", borderRadius: "var(--radius-lg)", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("workspace.schemes_ready")}</div>
+          <div style={{ fontSize: "1.75rem", fontWeight: 800, marginTop: "4px", color: withScheme ? "var(--success)" : "var(--text-muted)" }}>{withScheme}</div>
         </div>
         <div style={{ flex: 1, minWidth: "150px", padding: "16px 18px", borderRadius: "var(--radius-lg)", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
           <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("workspace.readiness_score")}</div>
@@ -185,9 +205,41 @@ export default function WorkspacePage() {
                 {c.sector && <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "2px" }}>{t("workspace.sector")}: {c.sector}</div>}
                 {c.state && <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "2px" }}>{t("workspace.state")}: {c.state}</div>}
                 {c.stage && <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "10px" }}>{t("workspace.stage")}: {c.stage}</div>}
-                <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                  <TrendingUp size={14} style={{ marginRight: "6px" }} /> {t("workspace.matches")}
-                </div>
+                {c.top_scheme?.name ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <TrendingUp size={14} style={{ color: "var(--text-muted)" }} aria-hidden="true" />
+                    <span
+                      title={c.top_scheme.name}
+                      style={{
+                        fontSize: "0.82rem",
+                        fontWeight: 700,
+                        color: "var(--text-primary)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: "100%",
+                      }}
+                    >
+                      {c.top_scheme.name}
+                    </span>
+                    {c.top_scheme.status_label && (
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          color: schemeStatusColor(c.top_scheme.status),
+                        }}
+                      >
+                        {c.top_scheme.status_label}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                    <TrendingUp size={14} style={{ marginRight: "6px" }} aria-hidden="true" />
+                    {t("workspace.no_scheme")}
+                  </div>
+                )}
               </a>
             ))}
           </div>

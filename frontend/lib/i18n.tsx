@@ -350,6 +350,25 @@ const EN: Record<string, string> = {
   "timeline.offline":
     "We couldn't reach your Business Saathi just now. Please check your internet connection and try again.",
 
+  // ── approval gate ───────────────────────────────────────────────────────
+  "gate.title": "Your approval",
+  "gate.waiting": "Waiting for you",
+  "gate.approved": "Approved — continuing",
+  "gate.rejected": "You said no — nothing was run",
+  "gate.parked": "Paused. We saved your plan — approve it to continue.",
+  "gate.stepsLabel": "What we will do",
+  "gate.schemesLabel": "Schemes we will check",
+  "gate.approve": "Yes, go ahead",
+  "gate.reject": "No, stop here",
+  "gate.note": "Add a note (optional)",
+  "gate.notePlaceholder": "Anything we should know?",
+  "gate.toggle": "Show me the plan first",
+  "gate.toggleHint": "We plan the research, you approve it, then we start.",
+  "gate.source": "Source",
+  "gate.verified": "Verified",
+  "gate.approveAria": "Approve the plan and continue the research",
+  "gate.rejectAria": "Stop the research here",
+
   // ── report ──────────────────────────────────────────────────────────────
   "report.sources": "Sources",
   "report.summary": "Business Summary",
@@ -1015,6 +1034,25 @@ const HI: Record<string, string> = {
   "timeline.retry": "कनेक्शन टूटा — फिर कोशिश हो रही है ({n}/{max})…",
   "timeline.offline":
     "आपके बिज़नेस साथी से संपर्क नहीं हो पाया। कृपया इंटरनेट जाँचकर फिर कोशिश करें।",
+
+  // ── approval gate ───────────────────────────────────────────────────────
+  "gate.title": "आपकी मंज़ूरी",
+  "gate.waiting": "आपका इंतज़ार",
+  "gate.approved": "मंज़ूर — आगे बढ़ रहे हैं",
+  "gate.rejected": "आपने मना कर दिया — कुछ नहीं चलाया गया",
+  "gate.parked": "रुका हुआ। आपका प्लान सेव है — मंज़ूरी देकर आगे बढ़ें।",
+  "gate.stepsLabel": "हम क्या करेंगे",
+  "gate.schemesLabel": "हम कौन-कौन सी योजनाएँ देखेंगे",
+  "gate.approve": "हाँ, आगे बढ़ें",
+  "gate.reject": "नहीं, यहीं रोकें",
+  "gate.note": "कुछ कहना है? (ज़रूरी नहीं)",
+  "gate.notePlaceholder": "कुछ बताना हो तो यहाँ लिखें",
+  "gate.toggle": "पहले प्लान दिखाएँ",
+  "gate.toggleHint": "हम प्लान बनाते हैं, आप मंज़ूरी देते हैं, फिर हम शुरू करते हैं।",
+  "gate.source": "स्रोत",
+  "gate.verified": "जाँचा गया",
+  "gate.approveAria": "प्लान मंज़ूर करके रिसर्च आगे बढ़ाएँ",
+  "gate.rejectAria": "रिसर्च यहीं रोकें",
 
   "report.sources": "स्रोत",
   "report.summary": "आपके बिज़नेस की झलक",

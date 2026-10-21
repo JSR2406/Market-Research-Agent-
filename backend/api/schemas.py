@@ -98,6 +98,21 @@ class SessionDeleteResponse(BaseModel):
     session_id: str
 
 
+class SessionGateResponse(BaseModel):
+    """
+    The approval gate stored for a session.
+
+    A run that parked at the gate produced no report, so the gate is the only
+    thing left to show — this is how the user finds it again after a reload
+    and decides it.
+    """
+
+    session_id: str
+    gate: Dict[str, Any] = {}
+    topic: str = ""
+    intake: Dict[str, str] = {}
+
+
 class SessionExportResponse(BaseModel):
     """A full, self-contained dump of one session the user owns."""
 

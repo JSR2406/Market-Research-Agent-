@@ -27,11 +27,12 @@ logger = logging.getLogger(__name__)
 STATE_KEYS: frozenset = frozenset(
     {
         "topic", "profile", "session_context", "max_steps", "eligibility_note",
-        "output_lang", "plan", "iteration",
+        "eligibility_families", "intake", "output_lang", "plan", "iteration",
         "findings", "sources", "errors", "trace", "visited",
         "research_notes", "analysis", "schemes_text", "draft", "reflection",
         "reflected", "report", "simplified", "loan_ready_score",
         "compiled_plan", "plan_run",
+        "gate", "gate_decision",
         "next_action", "finished",
     }
 )
@@ -40,7 +41,7 @@ STATE_KEYS: frozenset = frozenset(
 # A step that names a node outside this set can never run.
 NODE_IDS: frozenset = frozenset(
     {
-        "planner", "supervisor", "research", "analyst", "schemes",
+        "planner", "gate", "supervisor", "research", "analyst", "schemes",
         "writer", "critic", "refine", "finalize",
     }
 )

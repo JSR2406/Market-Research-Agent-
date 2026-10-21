@@ -14,7 +14,7 @@ terminal ``done`` event (with the full agentic trace) and persists the session.
 import logging
 
 import json
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from backend.agentic import EventEmitter, run_agentic_workflow
 from backend.agentic import engine_name
@@ -112,6 +112,11 @@ async def run_research_workflow(
     profile: str = "",
     intake: Optional[Dict[str, str]] = None,
     lang: str = "en",
+    *,
+    gates_enabled: bool = False,
+    gate_broker: Optional[Any] = None,
+    gate: Optional[Dict[str, Any]] = None,
+    gate_decision: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Run the agentic advisory graph. ``session_context`` is an optional string
@@ -122,6 +127,10 @@ async def run_research_workflow(
     the run topic, the synthesis prompts and the advisor chat all consume, so the
     written advisory and any follow-up question answer agree. ``profile`` is the
     legacy flat-string form and is only used when no structured intake arrived.
+
+    ``gates_enabled`` turns on the human approval gate. When the run parks at
+    the gate it emits ``gate_paused`` and stops — no report, no run in the
+    history — and the gate stays on disk to be decided later.
     """
     reset_session_state()
 
@@ -178,12 +187,34 @@ async def run_research_workflow(
             session_id=session_id,
             eligibility_note=eligibility_note,
             output_lang=output_lang,
+            intake=intake_answers,
+            eligibility_families=eligibility.get("families") or [],
+            gates_enabled=bool(gates_enabled),
+            gate_broker=gate_broker,
+            gate=gate,
+            gate_decision=gate_decision,
         )
     finally:
         set_run_source_sink(None)
 
     if status in ("cancelled", "error"):
         # The engine already emitted the terminal event.
+        return
+
+    if status == "paused":
+        # The run is waiting for a human decision. The gate is already
+        # persisted; nothing else is saved — a parked run is not a run.
+        paused_gate = state.get("gate") or {}
+        await emitter.send({
+            "type": "gate_paused",
+            "gate": paused_gate,
+            "status": str(paused_gate.get("status") or "pending"),
+        })
+        logger.info(
+            "Agentic run paused at gate %s (status=%s)",
+            paused_gate.get("gate_id"),
+            paused_gate.get("status"),
+        )
         return
 
     final_report = _finalize_report(

@@ -10,7 +10,7 @@ identical whether or not ``langgraph`` is installed.
 from __future__ import annotations
 
 import operator
-from typing import Annotated, Any, Dict, List, TypedDict
+from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 
 class TraceEntry(TypedDict, total=False):
@@ -33,8 +33,19 @@ class AgenticState(TypedDict, total=False):
     # Deterministic verdicts computed in code before any LLM runs — the writer
     # is told these so the prose can never contradict the rule engine.
     eligibility_note: str
+    # The same verdicts as structured data (name, status, source url) so a
+    # human-facing surface — the approval gate — can show them with their
+    # provenance instead of a prose blob.
+    eligibility_families: List[Dict[str, Any]]
     # Language the whole advisory must be written in, set from the UI language.
     output_lang: str
+    # The Business Check-up answers, carried into the run so a parked gate can
+    # be resumed with the same intake (the eligibility verdicts depend on it).
+    intake: Dict[str, str]
+
+    # ── approval gates ──────────────────────────────────────────────────────
+    gate: Dict[str, Any]           # the gate record (pending or decided)
+    gate_decision: Dict[str, Any]  # a decision injected into a resumed run
 
     # ── planning ────────────────────────────────────────────────────────────
     plan: Annotated[List[str], operator.add]
@@ -70,6 +81,11 @@ def initial_state(
     profile: str = "",
     session_context: str = "",
     eligibility_note: str = "",
+    *,
+    intake: Optional[Dict[str, str]] = None,
+    eligibility_families: Optional[List[Dict[str, Any]]] = None,
+    gate: Optional[Dict[str, Any]] = None,
+    gate_decision: Optional[Dict[str, Any]] = None,
 ) -> AgenticState:
     """Fresh state for one advisory run."""
     return AgenticState(
@@ -77,6 +93,11 @@ def initial_state(
         profile=profile,
         session_context=session_context,
         eligibility_note=eligibility_note,
+        eligibility_families=list(eligibility_families or []),
+        intake=dict(intake or {}),
+        gate=dict(gate or {}),
+        gate_decision=dict(gate_decision or {}),
+        output_lang="en",
         max_steps=max(1, min(int(max_steps or 5), 6)),
         plan=[],
         iteration=0,

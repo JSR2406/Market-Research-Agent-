@@ -97,6 +97,7 @@ def _empty_session(session_id: str = "") -> Dict[str, Any]:
         "runs": [],
         "facts": {},
         "intake": {},
+        "gate": {},
         "created_at": now,
         "updated_at": now,
     }
@@ -330,6 +331,84 @@ def update_session_state(session_id: str, patch: dict) -> None:
     _write(session_id, session)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Approval gates
+# ─────────────────────────────────────────────────────────────────────────────
+# A parked run has not produced a report yet, so it must NOT appear in the run
+# history — but the gate itself has to outlive the socket, so it lives on the
+# session record next to the topic and the intake it belongs to. That makes a
+# gate resumable: the user can approve it tomorrow and the run picks up from
+# the same Business Check-up answers.
+
+def save_session_gate(
+    session_id: str,
+    gate: Dict[str, Any],
+    *,
+    topic: str = "",
+    intake: Optional[Dict[str, str]] = None,
+) -> None:
+    """Persist a pending or decided gate without appending a run."""
+    _require_valid_session_id(session_id)
+    if not isinstance(gate, dict) or not gate:
+        return
+    _init_dir()
+
+    session = _normalize_session(session_id, _read_raw(session_id))
+    session["gate"] = gate
+    if topic:
+        session["topic"] = topic
+    if isinstance(intake, dict) and intake:
+        session["intake"] = intake
+    _write(session_id, session)
+
+
+def load_session_gate(session_id: str) -> Dict[str, Any]:
+    """The gate stored for a session (empty when there is none)."""
+    if not is_valid_session_id(session_id):
+        return {}
+    gate = (load_last_session(session_id) or {}).get("gate")
+    return gate if isinstance(gate, dict) else {}
+
+
+def record_gate_decision(session_id: str, decision: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Apply a decision to the stored gate and persist it.
+
+    Returns the updated gate record. A decision for an unknown gate — or for a
+    gate id that is not the one on the session — is a no-op: the user gets a
+    friendly answer and nothing is written.
+    """
+    _require_valid_session_id(session_id)
+    gate = load_session_gate(session_id)
+    if not gate:
+        return {}
+    if str(gate.get("gate_id")) != str(decision.get("gate_id")):
+        return {}
+
+    from backend.core.gates import apply_decision
+
+    updated = apply_decision(gate, decision)
+    save_session_gate(session_id, updated)
+    return updated
+
+
+def clear_session_gate(session_id: str) -> None:
+    """
+    Drop the stored gate for a session.
+
+    A fresh run means a fresh gate: leaving the old one behind would let a
+    stale approval resume a run the user has already replaced.
+    """
+    _require_valid_session_id(session_id)
+    if not _session_file(session_id).exists():
+        return
+    session = _normalize_session(session_id, _read_raw(session_id))
+    if not session.get("gate"):
+        return
+    session["gate"] = {}
+    _write(session_id, session)
+
+
 def load_last_session(session_id: str) -> Optional[Dict[str, Any]]:
     """Load the full session (runs + facts + intake + latest state)."""
     if not is_valid_session_id(session_id):
@@ -337,7 +416,6 @@ def load_last_session(session_id: str) -> Optional[Dict[str, Any]]:
     if not _session_file(session_id).exists():
         return None
     return _normalize_session(session_id, _read_raw(session_id))
-
 
 def load_session_state(session_id: str) -> Dict[str, Any]:
     """Return the latest run's state dict (empty when nothing is stored)."""

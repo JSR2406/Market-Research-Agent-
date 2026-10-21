@@ -23,7 +23,7 @@ import json
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-from backend.agentic.events import EventEmitter, WorkflowCancelled
+from backend.agentic.events import EventEmitter, GatePaused, WorkflowCancelled
 from backend.agentic.compiler import compile_plan
 from backend.agentic.plan import parse_plan_json
 from backend.agentic.supervisor import ACTION_TO_NODE, decide
@@ -35,7 +35,15 @@ from backend.agents.planner import planner_agent, structured_plan_agent
 from backend.agents.research import research_agent
 from backend.agents.simplifier import simplifier_agent
 from backend.agents.writer import writer_agent
-from backend.core.config import AGENTIC_REFLECTION_ENABLED
+from backend.core.config import AGENTIC_REFLECTION_ENABLED, GATE_WAIT_SECONDS
+from backend.core.gates import (
+    DECISION_APPROVE,
+    DECISION_REJECT,
+    GATE_APPROVED,
+    GATE_PENDING,
+    GATE_REJECTED,
+    build_plan_gate,
+)
 from backend.core.heuristics import (
     extract_topic,
     match_schemes,
@@ -53,6 +61,7 @@ logger = logging.getLogger(__name__)
 
 NODE_META: Dict[str, Dict[str, str]] = {
     "planner":    {"label": "Planning",          "icon": "map"},
+    "gate":       {"label": "Your Approval",     "icon": "shield-check"},
     "supervisor": {"label": "Supervisor",        "icon": "brain"},
     "research":   {"label": "Live Research",     "icon": "globe"},
     "analyst":    {"label": "Cash-Flow Analysis", "icon": "chart"},
@@ -140,6 +149,136 @@ async def planner_node(state: Dict, config: RunnableConfig) -> Dict:
         # wrapper both read state["compiled_plan"] as a plain dict.
         update["compiled_plan"] = compiled.as_dict()
     return update
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# gate (human approval)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _configurable(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The `configurable` block of a LangGraph run config (never None)."""
+    if not isinstance(config, dict):
+        return {}
+    return config.get("configurable") or {}
+
+
+async def gate_node(state: Dict, config: RunnableConfig) -> Dict:
+    """
+    The human approval gate.
+
+    S1 ships exactly one gate: *approve the research plan before we go to the
+    web*. The payload is deterministic — the plan steps the planner proposed
+    plus the eligibility families with their official source URLs — so nothing
+    the model wrote can become a claim the user approves.
+
+    Three outcomes:
+
+    * a decision is already on the state (this run is the resumed half of a
+      gate the user already answered) → honour it and move on;
+    * the user approves while the run waits → the run continues;
+    * nobody answers in time, or the user declines → the run parks
+      (``GatePaused``) and the gate stays on disk to be decided later.
+    """
+    em = _emitter(config)
+    meta = NODE_META["gate"]
+    idx = await em.node_start("gate", meta["label"], icon=meta["icon"])
+    _check_cancel(em)
+
+    configurable = _configurable(config)
+    session_id = str(configurable.get("session_id") or "")
+    broker = configurable.get("gate_broker")
+    lang = str(state.get("output_lang") or "en")
+
+    # ── a decision that already exists ─────────────────────────────────────
+    decision = state.get("gate_decision") or {}
+    choice = str(decision.get("decision") or "")
+    if choice == DECISION_REJECT:
+        gate = dict(state.get("gate") or {})
+        gate["status"] = GATE_REJECTED
+        await em.node_end(
+            "gate", meta["label"], idx,
+            summary="You said no — nothing was run",
+            output="",
+            ok=True,
+        )
+        raise GatePaused(gate, status=GATE_REJECTED)
+    if choice == DECISION_APPROVE:
+        await em.thought("gate", "You approved this plan — continuing.")
+        await em.node_end(
+            "gate", meta["label"], idx,
+            summary="Approved by you",
+            output="",
+            ok=True,
+        )
+        return {"gate_decision": decision, "visited": ["gate"]}
+
+    # ── build the gate ─────────────────────────────────────────────────────
+    gate = build_plan_gate(
+        lang=lang,
+        steps=list(state.get("plan") or []),
+        schemes=list(state.get("eligibility_families") or []),
+        max_steps=int(state.get("max_steps") or 4),
+    )
+
+    # Persist before we wait: a parked run must survive the socket, and the
+    # decision has to be able to arrive on a later connection.
+    if session_id:
+        try:
+            from backend.core.memory import save_session_gate
+
+            save_session_gate(
+                session_id,
+                gate,
+                topic=str(state.get("topic") or ""),
+                intake=state.get("intake") or {},
+            )
+        except Exception:
+            logger.warning("[Gate] could not persist the gate", exc_info=True)
+
+    await em.gate_pending(gate)
+
+    if broker is None:
+        # No way to receive a decision on this run — park rather than block.
+        await em.node_end(
+            "gate", meta["label"], idx,
+            summary="Waiting for your approval",
+            output="",
+            ok=True,
+        )
+        raise GatePaused(gate, status=GATE_PENDING)
+
+    answer = await broker.wait(gate["gate_id"], GATE_WAIT_SECONDS)
+    if not answer:
+        # Nobody answered in time. The gate stays pending on disk; the run is
+        # not approved by default and is not failed either.
+        await em.node_end(
+            "gate", meta["label"], idx,
+            summary="Waiting for your approval",
+            output="",
+            ok=True,
+        )
+        raise GatePaused(gate, status=GATE_PENDING)
+
+    answer = dict(answer)
+    if str(answer.get("decision")) == DECISION_REJECT:
+        await em.gate_decided({**gate, "status": GATE_REJECTED})
+        await em.node_end(
+            "gate", meta["label"], idx,
+            summary="You said no — nothing was run",
+            output="",
+            ok=True,
+        )
+        raise GatePaused({**gate, "status": GATE_REJECTED}, status=GATE_REJECTED)
+
+    await em.gate_decided({**gate, "status": GATE_APPROVED})
+    await em.thought("gate", "You approved this plan — continuing.")
+    await em.node_end(
+        "gate", meta["label"], idx,
+        summary="Approved by you",
+        output="",
+        ok=True,
+    )
+    return {"gate_decision": answer, "gate": {**gate, "status": GATE_APPROVED}, "visited": ["gate"]}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

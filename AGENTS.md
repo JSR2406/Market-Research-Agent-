@@ -60,6 +60,7 @@ market-research-agent/
 │   │   │                       # → eligible | likely | blocked | not_eligible | wrong_tier;
 │   │   │                       # group_by_family() collapses MUDRA tiers into one card
 │   │   ├── ledger.py           # Action Ledger + loan-ready score = f(actions completed)
+│   │   ├── gates.py            # approval gates: gate model, decision validation, GateBroker
 │   │   ├── web_research.py     # search + scrape (Google → DuckDuckGo), no keys
 │   │   ├── ws.py               # SafeWebSocket — serialized sends
 │   │   ├── memory.py           # JSON session store, 7-day retention, session_id allowlist guard
@@ -135,6 +136,7 @@ market-research-agent/
         ├── LiveAdvisorPanel.tsx # realtime voice (LiveKit): join room, mic, agent audio
         ├── StartupQuiz.tsx     # 6-question Business Check-up stepper incl. location (file name legacy; UI copy must say Business Check-up)
         ├── CashflowSimulator.tsx # client-side cash-flow projection + SVG chart
+        ├── GateCard.tsx        # approval gate card (plan + schemes + approve/reject)
         └── Usps.tsx            # "why this isn't a generic chatbot" section
 
 ## LLM Model Routing (all calls via backend/core/llm_client.py only)
@@ -175,6 +177,7 @@ market-research-agent/
 ## Agentic Engine
 - The advisory pipeline is a LangGraph StateGraph in `backend/agentic/` (topology + routers + nodes), executed by LangGraph. `engine` on `graph` and `done` events is always `"langgraph"`.
 - Topology: `START → planner → supervisor`; supervisor routes to `research | analyst | schemes | writer | finalize` (heuristic `decide()` in `supervisor.py`, LLM-assisted when a provider is up). `research/analyst/schemes → supervisor` (they loop until the supervisor has enough). `writer → critic | refine`; `critic → writer (revise) | refine` for up to `AGENTIC_MAX_ITERATIONS`; `refine → finalize → END`.
+- With the approval gate enabled the topology becomes `START → planner → gate → supervisor` — the gate node is **only wired into the compiled graph** when gates are on (`build_langgraph(gates_enabled=...)`), so a normal run's trace never shows a no-op node.
 - Nodes degrade to deterministic heuristic outputs whenever the LLM fails — the offline guarantee applies to every node. Deterministic tools (`backend/agentic/tools.py`) are bound where relevant: `web_search` (research), `scheme_match` (schemes), `cashflow_projection` (analyst), `loan_ready_score` + `document_checklist` (finalize).
 - `finalize` keeps the deterministic post-pass (`_finalize_report`): loan-ready score injection, scheme source annotation, provenance sources. Entity rule: planner/supervisor/critic routing and scores stay deterministic; the LLM only writes prose within the given schema.
 - Config: `AGENTIC_ENGINE_ENABLED`, `AGENTIC_MAX_ITERATIONS` (default 8), `AGENTIC_REFLECTION_ENABLED` (default true), `AGENTIC_CHECKPOINTING`. `supervisor` and `critic` have their own token budgets + OpenRouter model priority (see `AGENT_OPENROUTER_MODELS` in `backend/core/config.py`); they use the same `call_llm` chain as all agents.
@@ -182,9 +185,12 @@ market-research-agent/
 ## WebSocket Events
 Live agentic events: status, graph, plan, node_start, node_end, thought, tool_call, tool_result, reflection, token_usage
 
+Approval-gate events: gate_pending, gate_decided, gate_paused
+
 Terminal/legacy events: done (with simplified_report + trace + engine), cancelled, error, resume_available, session_deleted, session_export
 
-- `start` payload: `{type, topic, max_steps?, session_id?, profile?}` — topic capped at 4000 chars, profile at 1500, `max_steps` coerced to 1–6, `session_id` validated against the allowlist (invalid → `error` event, no run).
+- `start` payload: `{type, topic, max_steps?, session_id?, profile?, intake?, lang?, gates?}` — topic capped at 4000 chars, profile at 1500, `max_steps` coerced to 1–6, `session_id` validated against the allowlist (invalid → `error` event, no run), `gates` opts the run into the approval gate (also enabled deployment-wide by `GATES_ENABLED`).
+- `gate_decision` payload: `{type, gate_id, decision, note?, session_id?}` — `decision` ∈ `approve | reject`, `note` capped at 500 chars, `gate_id` capped at 64. The decision is **persisted first** (so it survives a reload), then the parked run is woken; if nothing was parked, a fresh run is seeded from the stored topic + intake and the gate passes straight through.
 - A malformed frame or unknown type yields an `error` event and the connection stays open.
 
 ## Security & Input Validation (P0 — do not regress)
@@ -203,6 +209,7 @@ Terminal/legacy events: done (with simplified_report + trace + engine), cancelle
 - **Cash-Flow Simulator** (`CashflowSimulator.tsx`) — pure client-side cash-flow projection (capital/weekly sales/weekly expenses, 4–24 weeks), SVG line chart, break-even week, monthly surplus. No backend calls.
 - **Business Check-up** (`StartupQuiz.tsx` + `frontend/lib/intake.ts` + `backend/core/intake.py`) — the single intake layer. Every question keeps its quick chips **and** accepts a free-text answer ("I sell fruit near the bus stand in Nagpur" beats "Street vendor / cart"). Questions **branch** on earlier answers via `showIf`/`prompt`, so a farmer is asked what they grow and how much land they have. Persisted in `localStorage["grameenai_profile"]` (old chip-code format auto-migrated by `migrateIntake()`) and sent to the backend as structured `intake` (`{field_id: text}`) on both the WS `start` message and `POST /api/chat`. **The field ids in `frontend/lib/intake.ts` and `backend/core/intake.py` must match** — `tests/test_intake.py` fails if they drift. The backend builds the one canonical snippet from them (`build_intake_snippet`) and uses it for the run topic, synthesis, persistence and chat, so every surface reads the same intake. Coverage is graded (`unaddressed`/`thin`/`answered`) and the chat re-probes the vaguest answer before asking about an untouched field.
 - **Resume last advisory** — page mount calls `GET /api/sessions/{session_id}` and restores the saved advisory (report + simplified + grey-out of run state) until the user runs again. Backend lives in `backend/api/sessions.py`.
+- **Approval Gate** (`backend/core/gates.py` + `backend/agentic/nodes.py::gate_node` + `frontend/components/GateCard.tsx`) — a human approval gate between the planner and the research: the user sees the exact plan steps and the exact schemes (with `source_url` + `last_verified_at`) **before** anything is searched, then approves or rejects. The gate payload is deterministic (never model-written), the decision is persisted on the session before it is applied, and a run that nobody answers **parks** (no report, no failed run) so it can be decided later — `GET /api/sessions/{session_id}/gate` finds it again after a reload. Off by default; a run opts in with `gates: true` in the `start` payload or the deployment sets `GATES_ENABLED=true`. `GATE_WAIT_SECONDS` (default 180) bounds the in-process wait before the run parks.
 
 ## Planner / Executor (Phase B) — code decides, the model proposes
 The advisory run is a **propose → dispose** loop, not a chatbot that talks its way through a task:

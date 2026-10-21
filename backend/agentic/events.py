@@ -19,6 +19,8 @@ status/done contract):
     tool_result   {node, tool, summary, ok}
     reflection    {node, text, action}
     token_usage   {input_tokens, output_tokens, total_tokens}
+    gate_pending  {gate}
+    gate_decided  {gate}
     done          {topic, final_report, simplified_report, token_usage, trace, engine}
 
 The emitter also keeps an in-memory trace so the final ``done`` event can carry
@@ -34,6 +36,21 @@ logger = logging.getLogger(__name__)
 
 class WorkflowCancelled(Exception):
     """Raised (or detected) when the user cancels a run."""
+
+
+class GatePaused(Exception):
+    """
+    Raised when a run stops at an approval gate.
+
+    The gate travels with the exception so the caller can tell the user what is
+    waiting. ``status`` is ``pending`` (nobody answered yet — the run parked)
+    or ``rejected`` (the user said no — the run ends on purpose).
+    """
+
+    def __init__(self, gate: Dict[str, Any], status: str = "pending") -> None:
+        super().__init__(f"gate {gate.get('gate_id', '?')} is waiting for a decision")
+        self.gate = gate
+        self.status = status
 
 
 class EventEmitter:
@@ -159,6 +176,14 @@ class EventEmitter:
 
     async def error(self, message: str) -> None:
         await self.send({"type": "error", "message": message})
+
+    async def gate_pending(self, gate: Dict[str, Any]) -> None:
+        """The run is waiting for the user to approve or decline."""
+        await self.send({"type": "gate_pending", "gate": gate})
+
+    async def gate_decided(self, gate: Dict[str, Any]) -> None:
+        """The user's decision has been recorded."""
+        await self.send({"type": "gate_decided", "gate": gate})
 
     async def cancelled(self) -> None:
         await self.send({"type": "cancelled"})

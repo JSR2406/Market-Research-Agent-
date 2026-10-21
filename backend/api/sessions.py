@@ -9,6 +9,7 @@ from backend.api.schemas import (
     SessionDeleteResponse,
     SessionExportResponse,
     SessionFactsResponse,
+    SessionGateResponse,
     SessionResponse,
 )
 from backend.core.memory import (
@@ -115,6 +116,35 @@ async def get_session_run(session_id: str, run_id: str):
         "token_usage": state.get("token_usage", {}) or {},
         "engine": state.get("engine", ""),
         "created_at": run.get("updated_at"),
+    }
+
+
+@router.get("/{session_id}/gate", response_model=SessionGateResponse)
+async def get_session_gate(session_id: str):
+    """
+    The approval gate waiting on this session, if there is one.
+
+    A run that parked at the gate produced no report, so the gate is the only
+    thing left to show. This is how the user finds it again after a reload
+    and decides it — the decision then resumes the parked run.
+    """
+    if not is_valid_session_id(session_id):
+        raise HTTPException(status_code=404, detail="No saved approval for this session.")
+    try:
+        data = load_last_session(session_id) or {}
+    except Exception as e:
+        logger.error(f"Failed to load session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Could not load session.")
+
+    gate = data.get("gate") or {}
+    if not isinstance(gate, dict) or not gate:
+        raise HTTPException(status_code=404, detail="No saved approval for this session.")
+
+    return {
+        "session_id": session_id,
+        "gate": gate,
+        "topic": data.get("topic", ""),
+        "intake": data.get("intake", {}) or {},
     }
 
 

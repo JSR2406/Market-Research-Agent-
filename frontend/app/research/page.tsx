@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import TopicInput from "@/components/TopicInput";
 import AgentTimeline, { type TraceNode } from "@/components/AgentTimeline";
 import AdvisoryCard from "@/components/AdvisoryCard";
+import GateCard, { type GatePayload } from "@/components/GateCard";
 import Usps from "@/components/Usps";
 import StartupQuiz, { type ProfileInit } from "@/components/StartupQuiz";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -56,6 +57,13 @@ export default function ResearchPage() {
   const [sessionId, setSessionId] = useState("");
   const [profile, setProfile] = useState<ProfileInit>({});
   const [resumeNote, setResumeNote] = useState("");
+  // The approval gate: off by default, on when the user asks to see the plan.
+  const [gatesOn, setGatesOn] = useState(false);
+  const [gate, setGate] = useState<GatePayload | null>(null);
+  // A decision is in flight — the card's buttons lock until the server answers.
+  const [gateBusy, setGateBusy] = useState(false);
+  // The run parked without an answer; the gate can still be decided later.
+  const [gateParked, setGateParked] = useState(false);
   // Bumped when a run finishes, so the Session History section refetches and
   // the just-saved run appears in real time.
   const [historyTick, setHistoryTick] = useState(0);
@@ -112,6 +120,21 @@ export default function ResearchPage() {
         setResumeNote(tRef.current("misc.resumeNote"));
       } catch {
         /* backend offline — nothing to resume */
+      }
+
+      // A run that parked at the approval gate left the gate behind. Find it
+      // so the user can decide it after a reload — the decision is stored on
+      // the server, so nothing is lost by closing the tab.
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/gate`);
+        if (!res.ok) return;
+        const body = await res.json();
+        if (cancelled || !body?.gate?.gate_id) return;
+        if (body.gate.status !== "pending") return;
+        setGate(body.gate as GatePayload);
+        setGateParked(true);
+      } catch {
+        /* no parked gate */
       }
     })();
     return () => {
@@ -235,6 +258,39 @@ export default function ResearchPage() {
         );
         break;
       }
+      case "gate_pending": {
+        const payload = (data.gate ?? null) as GatePayload | null;
+        if (!payload) break;
+        setGate(payload);
+        setGateBusy(false);
+        setGateParked(false);
+        // The run is waiting for the user, not broken.
+        setIsRunning(true);
+        setStatusMessage(translate("gate.waiting"));
+        break;
+      }
+      case "gate_decided": {
+        const payload = (data.gate ?? null) as GatePayload | null;
+        if (payload) setGate({ ...payload });
+        setGateBusy(false);
+        setGateParked(false);
+        break;
+      }
+      case "gate_paused": {
+        const payload = (data.gate ?? null) as GatePayload | null;
+        if (payload) setGate({ ...payload });
+        setGateBusy(false);
+        // Pending = nobody answered (the run parked, the plan is saved).
+        // Rejected = the user said no — the run ended on purpose.
+        const status = String(data.status ?? payload?.status ?? "pending");
+        setGateParked(status === "pending");
+        setIsRunning(false);
+        setNodes((prev) => prev.map((n) => (n.status === "running" ? { ...n, status: "done" } : n)));
+        setStatusMessage(
+          status === "rejected" ? translate("gate.rejected") : translate("gate.parked")
+        );
+        break;
+      }
       case "done":
         setFinalReport(data.final_report as string);
         setSimplifiedReport(((data.simplified_report as string) ?? "").trim());
@@ -329,6 +385,10 @@ export default function ResearchPage() {
     setResumeNote("");
     setStatusMessage(t("timeline.connecting"));
     setErrorMessage("");
+    // A new run means a new gate — the old decision must not carry over.
+    setGate(null);
+    setGateBusy(false);
+    setGateParked(false);
     retriesRef.current = 0;
     track("research_start", { count: maxSteps });
 
@@ -345,6 +405,8 @@ export default function ResearchPage() {
       // The advisory is written in the language the site is set to, so the
       // report matches the interface instead of arriving in English only.
       lang: backendLang,
+      // Opt in to the approval gate: the plan is shown before anything runs.
+      gates: gatesOn,
     };
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -364,6 +426,7 @@ export default function ResearchPage() {
             session_id: pending.sessionId,
             intake: pending.intake,
             lang: backendLang,
+            gates: gatesOn,
           })
         );
         pendingStartRef.current = null;
@@ -390,6 +453,35 @@ export default function ResearchPage() {
     setIsRunning(false);
     setStatusMessage("");
   };
+
+  /**
+   * Send the user's decision on the approval gate.
+   *
+   * The decision is a fact about the user's business, not a UI state: the
+   * server records it on the session, so it survives a reload and a parked
+   * run can be resumed from it.
+   */
+  const sendGateDecision = useCallback(
+    (decision: "approve" | "reject", note: string) => {
+      if (!gate) return;
+      const ws = wsRef.current;
+      if (ws?.readyState !== WebSocket.OPEN) {
+        setErrorMessage(tRef.current("timeline.offline"));
+        return;
+      }
+      setGateBusy(true);
+      ws.send(
+        JSON.stringify({
+          type: "gate_decision",
+          session_id: sessionId,
+          gate_id: gate.gate_id,
+          decision,
+          note: note.slice(0, 500),
+        })
+      );
+    },
+    [gate, sessionId]
+  );
 
   useEffect(() => () => { wsRef.current?.close(); }, []);
 
@@ -467,8 +559,19 @@ export default function ResearchPage() {
           onStart={handleStart}
           onCancel={handleCancel}
           isRunning={isRunning}
+          gatesOn={gatesOn}
+          onGatesChange={setGatesOn}
         />
       </div>
+
+      {/* Approval gate — the run stops here until the user says yes */}
+      <AnimatePresence>
+        {gate && (
+          <div style={{ width: "100%", maxWidth: "760px", marginTop: "16px" }}>
+            <GateCard gate={gate} onDecide={sendGateDecision} busy={gateBusy} parked={gateParked} />
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Error banner */}
       <AnimatePresence>

@@ -8,12 +8,16 @@ or without the dependency.
 
 Topology:
 
-    START → planner → supervisor
+    START → planner → [gate] → supervisor
     supervisor -cond-> research | analyst | schemes | writer | finalize
     research | analyst | schemes → supervisor
     writer -cond-> critic (reflection) | refine
     critic -cond-> writer (revise) | refine
     refine → finalize → END
+
+``[gate]`` is the human approval gate. It is only wired into the graph when
+gates are switched on for the run — otherwise the topology is exactly what it
+always was.
 """
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ from backend.agentic.nodes import (
     analyst_node,
     critic_node,
     finalize_node,
+    gate_node,
     planner_node,
     refine_node,
     research_node,
@@ -43,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 NODE_FUNCS: Dict[str, Callable] = {
     "planner": planner_node,
+    "gate": gate_node,
     "supervisor": supervisor_node,
     "research": research_node,
     "analyst": analyst_node,
@@ -93,6 +99,8 @@ def route_after_critic(state: Dict) -> str:
 def successors(node: str, state: Dict) -> Optional[str]:
     """Next node for the native runner; None means END."""
     if node == "planner":
+        return "gate"
+    if node == "gate":
         return "supervisor"
     if node == "supervisor":
         return route_from_supervisor(state)
@@ -109,7 +117,14 @@ def successors(node: str, state: Dict) -> Optional[str]:
 
 # ── topology metadata for the UI ─────────────────────────────────────────────
 
-def graph_topology() -> Dict[str, Any]:
+def graph_topology(gates_enabled: bool = False) -> Dict[str, Any]:
+    """
+    The nodes and edges for the UI.
+
+    The approval gate is only part of the graph when gates are switched on —
+    otherwise the run is exactly what it always was, and the trace does not
+    show a node that does nothing.
+    """
     nodes = [{"id": nid, **meta} for nid, meta in NODE_META.items()]
     edges = [
         ["planner", "supervisor"],
@@ -128,25 +143,38 @@ def graph_topology() -> Dict[str, Any]:
         ["refine", "finalize"],
         ["finalize", "END"],
     ]
+    if gates_enabled:
+        nodes = [n for n in nodes if n["id"] != "gate"]
+        nodes.insert(1, {"id": "gate", **NODE_META["gate"]})
+        edges = [["planner", "gate"], ["gate", "supervisor"]] + edges[1:]
     return {"nodes": nodes, "edges": edges}
 
 
 # ── LangGraph builder ─────────────────────────────────────────────────────────
 
-def build_langgraph() -> Any:
+def build_langgraph(gates_enabled: bool = False) -> Any:
     """Compile the LangGraph StateGraph. langgraph is required — always compiles."""
     from langgraph.graph import END, START, StateGraph
 
     from backend.agentic.state import AgenticState
 
     g = StateGraph(AgenticState)
-    for nid, fn in NODE_FUNCS.items():
+    node_funcs = dict(NODE_FUNCS)
+    if not gates_enabled:
+        node_funcs.pop("gate", None)
+    for nid, fn in node_funcs.items():
         # Postcondition checking is applied so the compiled graph behaves
         # identically to the node spec. The wrapper reads live state at call time.
         g.add_node(nid, with_postconditions(fn, nid))
 
     g.add_edge(START, "planner")
-    g.add_edge("planner", "supervisor")
+    if gates_enabled:
+        # The gate sits between planning and the first research action: the
+        # user approves the plan *before* the agent spends a token on the web.
+        g.add_edge("planner", "gate")
+        g.add_edge("gate", "supervisor")
+    else:
+        g.add_edge("planner", "supervisor")
     g.add_conditional_edges(
         "supervisor",
         route_from_supervisor,

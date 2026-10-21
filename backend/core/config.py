@@ -127,6 +127,22 @@ AGENTIC_CHECKPOINTING: bool = os.getenv("AGENTIC_CHECKPOINTING", "true").strip()
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Human approval gates
+# ──────────────────────────────────────────────────────────────────────────────
+# A gate pauses the advisory run until the user approves it in the UI. It is
+# OFF by default: gating every research step would be friction for a
+# micro-entrepreneur, and the product promise is "your report, without a
+# queue". Turn it on per run from the UI, or globally here for a deployment
+# that wants every run reviewed. A run that never gets an answer parks — it is
+# never silently approved.
+GATES_ENABLED: bool = os.getenv("GATES_ENABLED", "false").strip().lower() in (
+    "1", "true", "yes",
+)
+# How long a parked run waits for the user's decision before it parks on disk
+# and waits to be resumed. Bounded so a forgotten tab cannot hold a worker.
+GATE_WAIT_SECONDS: int = int(os.getenv("GATE_WAIT_SECONDS", "180"))
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Real-time web research
 # ──────────────────────────────────────────────────────────────────────────────
 WEB_SEARCH_ENABLED: bool = os.getenv("WEB_SEARCH_ENABLED", "true").strip().lower() in (

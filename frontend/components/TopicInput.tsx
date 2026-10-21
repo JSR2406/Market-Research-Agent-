@@ -10,6 +10,9 @@ interface Props {
   onStart: (topic: string, maxSteps: number) => void;
   onCancel: () => void;
   isRunning: boolean;
+  /** Ask the user to approve the plan before the research starts. */
+  gatesOn: boolean;
+  onGatesChange: (on: boolean) => void;
 }
 
 const EXAMPLE_KEYS = ["input.example1", "input.example2", "input.example3"] as const;
@@ -42,7 +45,7 @@ const ENGINE_LABELS: Record<string, string> = {
 
 const engineLabel = (key: string): string => ENGINE_LABELS[key] ?? key;
 
-export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
+export default function TopicInput({ onStart, onCancel, isRunning, gatesOn, onGatesChange }: Props) {
   const { t, locale } = useI18n();
   const examples = EXAMPLE_KEYS.map((key, i) => t(key) || EXAMPLE_FALLBACK[i]);
   const [topic, setTopic] = useState("");
@@ -401,28 +404,57 @@ export default function TopicInput({ onStart, onCancel, isRunning }: Props) {
 
         {/* Footer row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-          {/* Steps selector */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Zap size={13} color="var(--text-muted)" />
-            <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{t("input.depth")}</span>
-            <div style={{ display: "flex", gap: "4px" }}>
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setMaxSteps(n)}
-                  style={{
-                    width: "30px", height: "30px", borderRadius: "8px", fontSize: "0.8rem", fontWeight: 600,
-                    border: `1px solid ${maxSteps === n ? "var(--accent)" : "var(--border)"}`,
-                    background: maxSteps === n ? "var(--accent)" : "transparent",
-                    color: maxSteps === n ? "#fff" : "var(--text-muted)",
-                    cursor: "pointer", transition: "all 0.15s",
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            {/* Steps selector */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Zap size={13} color="var(--text-muted)" />
+              <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{t("input.depth")}</span>
+              <div style={{ display: "flex", gap: "4px" }}>
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setMaxSteps(n)}
+                    style={{
+                      width: "30px", height: "30px", borderRadius: "8px", fontSize: "0.8rem", fontWeight: 600,
+                      border: `1px solid ${maxSteps === n ? "var(--accent)" : "var(--border)"}`,
+                      background: maxSteps === n ? "var(--accent)" : "transparent",
+                      color: maxSteps === n ? "#fff" : "var(--text-muted)",
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t("input.steps")}</span>
             </div>
-            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t("input.steps")}</span>
+
+            {/* Approval gate — the user sees the plan before anything is spent */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={gatesOn}
+              disabled={isRunning}
+              title={t("gate.toggleHint")}
+              onClick={() => onGatesChange(!gatesOn)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 11px",
+                borderRadius: "999px",
+                border: `1px solid ${gatesOn ? "var(--accent)" : "var(--border)"}`,
+                background: gatesOn ? "rgba(79,142,247,0.12)" : "transparent",
+                color: gatesOn ? "var(--accent)" : "var(--text-muted)",
+                fontSize: "0.74rem",
+                fontWeight: 700,
+                cursor: isRunning ? "not-allowed" : "pointer",
+                opacity: isRunning ? 0.6 : 1,
+              }}
+            >
+              <ShieldCheck size={13} />
+              {t("gate.toggle")}
+            </button>
           </div>
 
           {/* Action button */}

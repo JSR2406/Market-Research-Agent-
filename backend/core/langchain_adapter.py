@@ -244,9 +244,13 @@ async def run_prompt(
     except Exception as e:
         logger.warning(f"[LangChain] call_llm failed, heuristic fallback: {e}")
         try:
-            from backend.core.heuristics import build_heuristic_advisory
+            from backend.core.heuristics import build_heuristic_advisory, extract_topic
 
-            fallback = build_heuristic_advisory(user_input)
+            # Match schemes against the *business description*, not against the
+            # whole prompt: the prompt embeds the eligibility note, whose own
+            # scheme names would otherwise out-score the client's business and
+            # push the right scheme out of the list.
+            fallback = build_heuristic_advisory(extract_topic(user_input))
             if isinstance(fallback, str):
                 return fallback
             import json as _json

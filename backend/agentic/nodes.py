@@ -43,6 +43,8 @@ from backend.core.gates import (
     GATE_PENDING,
     GATE_REJECTED,
     build_plan_gate,
+    build_scheme_gate,
+    scheme_choice_from_gate,
 )
 from backend.core.heuristics import (
     extract_topic,
@@ -62,6 +64,7 @@ logger = logging.getLogger(__name__)
 NODE_META: Dict[str, Dict[str, str]] = {
     "planner":    {"label": "Planning",          "icon": "map"},
     "gate":       {"label": "Your Approval",     "icon": "shield-check"},
+    "scheme_gate": {"label": "Your Scheme Choice", "icon": "hand-coins"},
     "supervisor": {"label": "Supervisor",        "icon": "brain"},
     "research":   {"label": "Live Research",     "icon": "globe"},
     "analyst":    {"label": "Cash-Flow Analysis", "icon": "chart"},
@@ -282,6 +285,149 @@ async def gate_node(state: Dict, config: RunnableConfig) -> Dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# scheme_gate (human approval, second gate)
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def scheme_gate_node(state: Dict, config: RunnableConfig) -> Dict:
+    """
+    The scheme-commitment gate.
+
+    The plan gate asked *"may we look this up?"*. This one asks the question
+    that actually costs the user something: *"which scheme shall we build the
+    plan around?"* — because a written loan plan is a commitment to a loan.
+
+    The choices are the deterministic eligibility families (eligible or likely
+    only — a blocked scheme is not a decision), each carrying its official
+    source URL and the date it was last verified, plus a last option for a
+    user who does not want a loan right now.
+
+    Three outcomes, exactly like the plan gate: an existing decision is
+    honoured (a resumed run), an approval continues with the chosen scheme, a
+    rejection or a timeout parks the run.
+    """
+    em = _emitter(config)
+    meta = NODE_META["scheme_gate"]
+    idx = await em.node_start("scheme_gate", meta["label"], icon=meta["icon"])
+    _check_cancel(em)
+
+    configurable = _configurable(config)
+    session_id = str(configurable.get("session_id") or "")
+    broker = configurable.get("gate_broker")
+    lang = str(state.get("output_lang") or "en")
+
+    # ── a decision that already exists ─────────────────────────────────────
+    decision = dict(state.get("scheme_gate_decision") or {})
+    choice_of_decision = str(decision.get("decision") or "")
+    if choice_of_decision in (DECISION_APPROVE, DECISION_REJECT):
+        gate = dict(state.get("scheme_gate") or {})
+        if choice_of_decision == DECISION_REJECT:
+            gate["status"] = GATE_REJECTED
+            await em.node_end(
+                "scheme_gate", meta["label"], idx,
+                summary="You said no — nothing was run",
+                output="",
+                ok=True,
+            )
+            raise GatePaused(gate, status=GATE_REJECTED)
+        chosen = scheme_choice_from_gate(gate, decision.get("selection"))
+        await em.thought("scheme_gate", f"You chose: {chosen.get('name') or 'no loan'}.")
+        await em.node_end(
+            "scheme_gate", meta["label"], idx,
+            summary="Approved by you",
+            output="",
+            ok=True,
+        )
+        return {
+            "scheme_gate_decision": decision,
+            "scheme_choice": chosen,
+            "visited": ["scheme_gate"],
+        }
+
+    # ── build the gate ─────────────────────────────────────────────────────
+    gate = build_scheme_gate(
+        lang=lang,
+        families=list(state.get("eligibility_families") or []),
+        max_steps=int(state.get("max_steps") or 4),
+    )
+
+    # Nothing the user can act on → nothing to ask. The "no loan" option is
+    # always present, so a gate with only that option is not worth a question.
+    if len(gate.get("choices") or []) <= 1:
+        await em.node_end(
+            "scheme_gate", meta["label"], idx,
+            summary="No scheme to choose — continuing",
+            output="",
+            ok=True,
+        )
+        return {"visited": ["scheme_gate"]}
+
+    # Persist before we wait: a parked run must survive the socket, and the
+    # decision has to be able to arrive on a later connection.
+    if session_id:
+        try:
+            from backend.core.memory import save_session_gate
+
+            save_session_gate(
+                session_id,
+                gate,
+                topic=str(state.get("topic") or ""),
+                intake=state.get("intake") or {},
+            )
+        except Exception:
+            logger.warning("[Gate] could not persist the scheme gate", exc_info=True)
+
+    await em.gate_pending(gate)
+
+    if broker is None:
+        # No way to receive a decision on this run — park rather than block.
+        await em.node_end(
+            "scheme_gate", meta["label"], idx,
+            summary="Waiting for your choice",
+            output="",
+            ok=True,
+        )
+        raise GatePaused(gate, status=GATE_PENDING)
+
+    answer = await broker.wait(gate["gate_id"], GATE_WAIT_SECONDS)
+    if not answer:
+        # Nobody answered in time. The gate stays pending on disk; the run is
+        # not approved by default and is not failed either.
+        await em.node_end(
+            "scheme_gate", meta["label"], idx,
+            summary="Waiting for your choice",
+            output="",
+            ok=True,
+        )
+        raise GatePaused(gate, status=GATE_PENDING)
+
+    answer = dict(answer)
+    if str(answer.get("decision")) == DECISION_REJECT:
+        await em.gate_decided({**gate, "status": GATE_REJECTED})
+        await em.node_end(
+            "scheme_gate", meta["label"], idx,
+            summary="You said no — nothing was run",
+            output="",
+            ok=True,
+        )
+        raise GatePaused({**gate, "status": GATE_REJECTED}, status=GATE_REJECTED)
+
+    chosen = scheme_choice_from_gate(gate, answer.get("selection"))
+    await em.gate_decided({**gate, "status": GATE_APPROVED, "selection": chosen.get("value", "")})
+    await em.thought("scheme_gate", f"You chose: {chosen.get('name') or 'no loan'}.")
+    await em.node_end(
+        "scheme_gate", meta["label"], idx,
+        summary="Approved by you",
+        output="",
+        ok=True,
+    )
+    return {
+        "scheme_gate_decision": answer,
+        "scheme_choice": chosen,
+        "visited": ["scheme_gate"],
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # supervisor
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -491,6 +637,44 @@ async def schemes_node(state: Dict, config: RunnableConfig) -> Dict:
 # writer
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _scheme_choice_block(choice: Dict[str, Any]) -> str:
+    """
+    The user's scheme decision, as an instruction the writer cannot ignore.
+
+    The eligibility note says what the rule engine found; this says what the
+    *user* chose. It overrides the prose the model would otherwise write: the
+    report is built around the approved scheme, and never around a different
+    one the model happens to like better.
+    """
+    if not isinstance(choice, dict) or not choice:
+        return ""
+    if choice.get("is_none"):
+        return (
+            "THE USER DECLINED A LOAN (they chose the option 'no loan right "
+            "now'). Write the plan around growing the business with what they "
+            "already have. You may mention a government scheme in passing, but "
+            "you must NOT present any scheme as the recommended route, and you "
+            "must not build a repayment plan for one."
+        )
+    name = str(choice.get("name") or "").strip()
+    if not name:
+        return ""
+    ceiling = str(choice.get("loan_ceiling") or "").strip()
+    source = str(choice.get("source_url") or "").strip()
+    parts = [
+        f"THE USER APPROVED THIS SCHEME: {name}.",
+        "Build the whole report around this scheme — the documents, the steps "
+        "and the repayment plan must be for THIS scheme.",
+        "Do not recommend a different scheme as the main path. You may list "
+        "other schemes as alternatives, clearly marked as not chosen.",
+    ]
+    if ceiling:
+        parts.append(f"The approved scheme's amount: {ceiling}.")
+    if source:
+        parts.append(f"Official source for this scheme: {source}.")
+    return " ".join(parts)
+
+
 async def writer_node(state: Dict, config: RunnableConfig) -> Dict:
     em = _emitter(config)
     meta = NODE_META["writer"]
@@ -505,6 +689,8 @@ async def writer_node(state: Dict, config: RunnableConfig) -> Dict:
     )
     eligibility_note = state.get("eligibility_note", "")
     output_lang = state.get("output_lang", "en")
+    choice = state.get("scheme_choice") or {}
+    choice_block = _scheme_choice_block(choice)
     lang_rule = (
         "Write the ENTIRE advisory in simple, plain Hindi (Devanagari script). "
         "Keep scheme names, loan amounts and official terms (Udyam, GST, MUDRA, "
@@ -530,6 +716,7 @@ async def writer_node(state: Dict, config: RunnableConfig) -> Dict:
             else ""
         )
         + (f"\nCritic notes to address:\n{state.get('reflection')}\n" if state.get("reflection") else "")
+        + (f"\n{choice_block}\n" if choice_block else "")
         + f"\nAccumulated Findings:\n{combined}\n\n"
         f"{lang_rule} "
         "Write a comprehensive Loan Readiness Advisory report in the JSON schema "
@@ -586,6 +773,7 @@ async def critic_node(state: Dict, config: RunnableConfig) -> Dict:
     idx = await em.node_start("critic", meta["label"], iteration=it, icon=meta["icon"])
 
     verdict, notes = "pass", ""
+    choice_block = _scheme_choice_block(state.get("scheme_choice") or {})
     try:
         messages = [
             {"role": "system", "content": _CRITIC_SYSTEM},
@@ -595,7 +783,8 @@ async def critic_node(state: Dict, config: RunnableConfig) -> Dict:
                     f"Topic: {state.get('topic', '')[:400]}\n\n"
                     f"Research:\n{str(state.get('research_notes', ''))[:1200]}\n\n"
                     f"Analysis:\n{str(state.get('analysis', ''))[:800]}\n\n"
-                    f"Draft JSON:\n{state.get('draft', '')[:2500]}"
+                    + (f"{choice_block}\n\n" if choice_block else "")
+                    + f"Draft JSON:\n{state.get('draft', '')[:2500]}"
                 ),
             },
         ]
@@ -644,7 +833,9 @@ async def refine_node(state: Dict, config: RunnableConfig) -> Dict:
     editor_task = (
         f"Research Topic: {state.get('topic', '')}\n\n"
         f"Critic notes to address:\n{state.get('reflection') or 'none'}\n\n"
-        f"Draft Report (JSON):\n{state.get('draft', '')}\n\n"
+        + (f"{_scheme_choice_block(state.get('scheme_choice') or {})}\n\n"
+           if state.get("scheme_choice") else "")
+        + f"Draft Report (JSON):\n{state.get('draft', '')}\n\n"
         f"{editor_lang} "
         "Polish this report from the JSON provided: fix gaps, improve clarity, "
         "ensure the JSON keys exactly match the schema described in your instructions."
@@ -678,7 +869,9 @@ async def finalize_node(state: Dict, config: RunnableConfig) -> Dict:
     from backend.workflows.executor import _finalize_report
 
     sources = list(dict.fromkeys(state.get("sources") or []))
-    final_report = _finalize_report(report_raw, sources)
+    final_report = _finalize_report(
+        report_raw, sources, scheme_choice=state.get("scheme_choice") or {},
+    )
 
     # Offline / empty-draft guarantee: never emit a blank advisory.
     from backend.core.heuristics import build_heuristic_advisory, has_advisory_content
@@ -688,7 +881,9 @@ async def finalize_node(state: Dict, config: RunnableConfig) -> Dict:
             build_heuristic_advisory(extract_topic(state.get("topic", ""))),
             ensure_ascii=False,
         )
-        final_report = _finalize_report(fallback, sources)
+        final_report = _finalize_report(
+            fallback, sources, scheme_choice=state.get("scheme_choice") or {},
+        )
 
     await em.tool_call("finalize", "loan_ready_score", "(deterministic)")
     data = parse_advisory_json(final_report) or {}

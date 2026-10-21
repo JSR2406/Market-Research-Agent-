@@ -44,8 +44,15 @@ class AgenticState(TypedDict, total=False):
     intake: Dict[str, str]
 
     # ── approval gates ──────────────────────────────────────────────────────
-    gate: Dict[str, Any]           # the gate record (pending or decided)
+    gate: Dict[str, Any]           # the plan gate record (pending or decided)
     gate_decision: Dict[str, Any]  # a decision injected into a resumed run
+    # The scheme gate: the second gate in the chain, where the user picks the
+    # scheme the advisory is built around.
+    scheme_gate: Dict[str, Any]
+    scheme_gate_decision: Dict[str, Any]
+    # What the user chose — the writer must build the report around exactly
+    # this and may not recommend a different scheme as the main path.
+    scheme_choice: Dict[str, Any]
 
     # ── planning ────────────────────────────────────────────────────────────
     plan: Annotated[List[str], operator.add]
@@ -86,6 +93,9 @@ def initial_state(
     eligibility_families: Optional[List[Dict[str, Any]]] = None,
     gate: Optional[Dict[str, Any]] = None,
     gate_decision: Optional[Dict[str, Any]] = None,
+    scheme_gate: Optional[Dict[str, Any]] = None,
+    scheme_gate_decision: Optional[Dict[str, Any]] = None,
+    scheme_choice: Optional[Dict[str, Any]] = None,
 ) -> AgenticState:
     """Fresh state for one advisory run."""
     return AgenticState(
@@ -97,6 +107,9 @@ def initial_state(
         intake=dict(intake or {}),
         gate=dict(gate or {}),
         gate_decision=dict(gate_decision or {}),
+        scheme_gate=dict(scheme_gate or {}),
+        scheme_gate_decision=dict(scheme_gate_decision or {}),
+        scheme_choice=dict(scheme_choice or {}),
         output_lang="en",
         max_steps=max(1, min(int(max_steps or 5), 6)),
         plan=[],

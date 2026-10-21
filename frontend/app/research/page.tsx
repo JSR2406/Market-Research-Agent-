@@ -129,9 +129,16 @@ export default function ResearchPage() {
         const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/gate`);
         if (!res.ok) return;
         const body = await res.json();
-        if (cancelled || !body?.gate?.gate_id) return;
-        if (body.gate.status !== "pending") return;
-        setGate(body.gate as GatePayload);
+        if (cancelled) return;
+        // A gated run can hit more than one gate; the one still waiting is
+        // the one the user has to act on.
+        const gates = (body?.gates ?? []).filter(
+          (g: { gate_id?: string; status?: string }) => g?.gate_id && g?.status === "pending"
+        );
+        const waiting = gates.length ? gates[gates.length - 1] : body?.gate;
+        if (!waiting?.gate_id) return;
+        if (waiting.status !== "pending") return;
+        setGate(waiting as GatePayload);
         setGateParked(true);
       } catch {
         /* no parked gate */
@@ -459,10 +466,12 @@ export default function ResearchPage() {
    *
    * The decision is a fact about the user's business, not a UI state: the
    * server records it on the session, so it survives a reload and a parked
-   * run can be resumed from it.
+   * run can be resumed from it. At a choice gate the decision also carries
+   * *what* the user picked — the server only accepts a value the gate itself
+   * offered, so the report is built around the scheme the user chose.
    */
   const sendGateDecision = useCallback(
-    (decision: "approve" | "reject", note: string) => {
+    (decision: "approve" | "reject", note: string, selection?: string) => {
       if (!gate) return;
       const ws = wsRef.current;
       if (ws?.readyState !== WebSocket.OPEN) {
@@ -477,6 +486,7 @@ export default function ResearchPage() {
           gate_id: gate.gate_id,
           decision,
           note: note.slice(0, 500),
+          ...(selection ? { selection } : {}),
         })
       );
     },
@@ -568,7 +578,13 @@ export default function ResearchPage() {
       <AnimatePresence>
         {gate && (
           <div style={{ width: "100%", maxWidth: "760px", marginTop: "16px" }}>
-            <GateCard gate={gate} onDecide={sendGateDecision} busy={gateBusy} parked={gateParked} />
+            <GateCard
+              key={gate.gate_id}
+              gate={gate}
+              onDecide={sendGateDecision}
+              busy={gateBusy}
+              parked={gateParked}
+            />
           </div>
         )}
       </AnimatePresence>

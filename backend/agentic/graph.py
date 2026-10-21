@@ -9,15 +9,20 @@ or without the dependency.
 Topology:
 
     START → planner → [gate] → supervisor
-    supervisor -cond-> research | analyst | schemes | writer | finalize
+    supervisor -cond-> research | analyst | schemes | [scheme_gate] → writer | finalize
     research | analyst | schemes → supervisor
     writer -cond-> critic (reflection) | refine
     critic -cond-> writer (revise) | refine
     refine → finalize → END
 
-``[gate]`` is the human approval gate. It is only wired into the graph when
-gates are switched on for the run — otherwise the topology is exactly what it
-always was.
+``[gate]`` is the human approval gate and ``[scheme_gate]`` the second one:
+the user picks the scheme the advisory is built around. Both are only wired
+into the graph when gates are switched on for the run — otherwise the topology
+is exactly what it always was.
+
+The scheme gate sits on the *only* edge into the writer that starts a new
+draft, so the critic's revision loop never re-asks the user: the commitment
+was made once.
 """
 from __future__ import annotations
 
@@ -36,6 +41,7 @@ from backend.agentic.nodes import (
     planner_node,
     refine_node,
     research_node,
+    scheme_gate_node,
     schemes_node,
     supervisor_node,
     writer_node,
@@ -49,6 +55,7 @@ logger = logging.getLogger(__name__)
 NODE_FUNCS: Dict[str, Callable] = {
     "planner": planner_node,
     "gate": gate_node,
+    "scheme_gate": scheme_gate_node,
     "supervisor": supervisor_node,
     "research": research_node,
     "analyst": analyst_node,
@@ -79,6 +86,24 @@ def route_from_supervisor(state: Dict) -> str:
     return ACTION_TO_NODE.get(action, "research")
 
 
+def make_supervisor_router(scheme_gate_enabled: bool) -> Callable[[Dict], str]:
+    """
+    The supervisor's router.
+
+    When the scheme gate is on, the run does not go straight to the writer —
+    it goes to the scheme gate first, so the user chooses the scheme before
+    the report commits to one. Every other target is untouched.
+    """
+
+    def route(state: Dict) -> str:
+        target = route_from_supervisor(state)
+        if scheme_gate_enabled and target == "writer":
+            return "scheme_gate"
+        return target
+
+    return route
+
+
 def route_after_writer(state: Dict) -> str:
     if AGENTIC_REFLECTION_ENABLED and int(state.get("reflected", 0)) < 2:
         return "critic"
@@ -106,6 +131,8 @@ def successors(node: str, state: Dict) -> Optional[str]:
         return route_from_supervisor(state)
     if node in ("research", "analyst", "schemes"):
         return "supervisor"
+    if node == "scheme_gate":
+        return "writer"
     if node == "writer":
         return route_after_writer(state)
     if node == "critic":
@@ -121,7 +148,7 @@ def graph_topology(gates_enabled: bool = False) -> Dict[str, Any]:
     """
     The nodes and edges for the UI.
 
-    The approval gate is only part of the graph when gates are switched on —
+    The approval gates are only part of the graph when gates are switched on —
     otherwise the run is exactly what it always was, and the trace does not
     show a node that does nothing.
     """
@@ -144,9 +171,20 @@ def graph_topology(gates_enabled: bool = False) -> Dict[str, Any]:
         ["finalize", "END"],
     ]
     if gates_enabled:
-        nodes = [n for n in nodes if n["id"] != "gate"]
+        nodes = [n for n in nodes if n["id"] not in ("gate", "scheme_gate")]
         nodes.insert(1, {"id": "gate", **NODE_META["gate"]})
-        edges = [["planner", "gate"], ["gate", "supervisor"]] + edges[1:]
+        nodes.insert(2, {"id": "scheme_gate", **NODE_META["scheme_gate"]})
+        # The scheme gate takes the place of the direct supervisor → writer
+        # edge: the user chooses the scheme before the report commits to one.
+        edges = (
+            [["planner", "gate"], ["gate", "supervisor"]]
+            + [e for e in edges[1:] if e != ["supervisor", "writer"]]
+            + [["supervisor", "scheme_gate"], ["scheme_gate", "writer"]]
+        )
+    else:
+        # Neither gate is part of a normal run — the trace must not show a
+        # node that does nothing.
+        nodes = [n for n in nodes if n["id"] not in ("gate", "scheme_gate")]
     return {"nodes": nodes, "edges": edges}
 
 
@@ -162,6 +200,7 @@ def build_langgraph(gates_enabled: bool = False) -> Any:
     node_funcs = dict(NODE_FUNCS)
     if not gates_enabled:
         node_funcs.pop("gate", None)
+        node_funcs.pop("scheme_gate", None)
     for nid, fn in node_funcs.items():
         # Postcondition checking is applied so the compiled graph behaves
         # identically to the node spec. The wrapper reads live state at call time.
@@ -175,13 +214,20 @@ def build_langgraph(gates_enabled: bool = False) -> Any:
         g.add_edge("gate", "supervisor")
     else:
         g.add_edge("planner", "supervisor")
+    targets = ["research", "analyst", "schemes", "writer", "finalize"]
+    if gates_enabled:
+        # The scheme gate guards the writer: the user picks the scheme the
+        # advisory is built around before a single line of it is written.
+        targets.append("scheme_gate")
     g.add_conditional_edges(
         "supervisor",
-        route_from_supervisor,
-        {k: k for k in ("research", "analyst", "schemes", "writer", "finalize")},
+        make_supervisor_router(bool(gates_enabled)),
+        {k: k for k in targets},
     )
     for nid in ("research", "analyst", "schemes"):
         g.add_edge(nid, "supervisor")
+    if gates_enabled:
+        g.add_edge("scheme_gate", "writer")
     g.add_conditional_edges("writer", route_after_writer, {"critic": "critic", "refine": "refine"})
     g.add_conditional_edges("critic", route_after_critic, {"writer": "writer", "refine": "refine"})
     g.add_edge("refine", "finalize")

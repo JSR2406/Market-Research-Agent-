@@ -23,6 +23,7 @@ from backend.core.eligibility import (
     evaluate_schemes,
 )
 from backend.core.intake import build_intake_snippet, normalize_intake
+from backend.core.gates import GATE_KIND_SCHEME
 from backend.core.ledger import ledger_and_score
 from backend.core.llm_client import SESSION_TOKEN_USAGE, reset_session_state
 
@@ -36,6 +37,7 @@ def _finalize_report(
     ledger: dict | None = None,
     plan: dict | None = None,
     plan_run: dict | None = None,
+    scheme_choice: dict | None = None,
 ) -> str:
     """
     Single deterministic post-pass on the LLM-written advisory:
@@ -50,6 +52,11 @@ def _finalize_report(
        the UI renders computed facts rather than anything the model claimed.
 
     Runs exactly once so a re-parse cannot drop the injected score.
+
+    ``scheme_choice`` is the scheme the *user* committed to at the approval
+    gate. It is applied here — deterministically — so the approved scheme leads
+    the list even when the model is offline and the heuristic advisory was
+    used: a commitment the user made outranks a recommendation a model made.
     """
     if not report:
         return report
@@ -64,8 +71,29 @@ def _finalize_report(
     if "loan_ready_score" not in data:
         data["loan_ready_score"] = ledger if ledger else compute_loan_ready_score(data)
     schemes = data.get("matched_schemes") or []
+    if isinstance(schemes, str):
+        schemes = [schemes]
+    schemes = [str(s) for s in schemes]
+
+    # The user's own choice leads the list — deterministically, not because
+    # the model happened to mention it first.
+    choice = scheme_choice if isinstance(scheme_choice, dict) else {}
+    chosen_name = str(choice.get("name") or "").strip()
+    chosen_value = str(choice.get("value") or "").strip()
+    if chosen_name and chosen_value and chosen_value != "none":
+        schemes = [chosen_name] + [s for s in schemes if chosen_name.lower() not in s.lower()]
     if schemes:
-        data["matched_schemes"] = annotate_scheme_sources([str(s) for s in schemes])
+        data["matched_schemes"] = annotate_scheme_sources(schemes)
+    if choice:
+        data["scheme_choice"] = {
+            "value": chosen_value,
+            "name": chosen_name,
+            "status": str(choice.get("status") or ""),
+            "loan_ceiling": str(choice.get("loan_ceiling") or ""),
+            "source_url": str(choice.get("source_url") or ""),
+            "last_verified_at": str(choice.get("last_verified_at") or ""),
+            "is_none": bool(choice.get("is_none")),
+        }
     if sources:
         data["sources"] = sources
     if eligibility:
@@ -117,6 +145,8 @@ async def run_research_workflow(
     gate_broker: Optional[Any] = None,
     gate: Optional[Dict[str, Any]] = None,
     gate_decision: Optional[Dict[str, Any]] = None,
+    scheme_gate: Optional[Dict[str, Any]] = None,
+    scheme_gate_decision: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Run the agentic advisory graph. ``session_context`` is an optional string
@@ -193,6 +223,8 @@ async def run_research_workflow(
             gate_broker=gate_broker,
             gate=gate,
             gate_decision=gate_decision,
+            scheme_gate=scheme_gate,
+            scheme_gate_decision=scheme_gate_decision,
         )
     finally:
         set_run_source_sink(None)
@@ -205,6 +237,8 @@ async def run_research_workflow(
         # The run is waiting for a human decision. The gate is already
         # persisted; nothing else is saved — a parked run is not a run.
         paused_gate = state.get("gate") or {}
+        if str((state.get("scheme_gate") or {}).get("kind") or "") == GATE_KIND_SCHEME:
+            paused_gate = state.get("scheme_gate") or {}
         await emitter.send({
             "type": "gate_paused",
             "gate": paused_gate,
@@ -224,6 +258,7 @@ async def run_research_workflow(
         ledger=scored,
         plan=state.get("compiled_plan"),
         plan_run=state.get("plan_run"),
+        scheme_choice=state.get("scheme_choice") or {},
     )
     simplified_report = state.get("simplified") or ""
     plan_steps = state.get("plan") or []
@@ -277,6 +312,10 @@ async def run_research_workflow(
                 "trace": emitter.trace,
                 "engine": engine_name(),
                 "visited": state.get("visited") or [],
+                # The scheme the user committed to at the approval gate — kept
+                # with the run so the report can be read against the decision
+                # the user actually made.
+                "scheme_choice": state.get("scheme_choice") or {},
             }
             save_session(session_id, topic, state_out)
         except Exception as e:

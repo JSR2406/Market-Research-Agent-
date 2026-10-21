@@ -140,9 +140,13 @@ async def get_session_gate(session_id: str):
     if not isinstance(gate, dict) or not gate:
         raise HTTPException(status_code=404, detail="No saved approval for this session.")
 
+    gates = data.get("gates") if isinstance(data.get("gates"), dict) else {}
+    all_gates = [g for g in gates.values() if isinstance(g, dict)]
+
     return {
         "session_id": session_id,
         "gate": gate,
+        "gates": all_gates,
         "topic": data.get("topic", ""),
         "intake": data.get("intake", {}) or {},
     }

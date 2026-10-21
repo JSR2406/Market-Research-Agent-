@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText, ExternalLink, Link2 } from "lucide-react";
+import { BookOpen, IndianRupee, FileCheck, Target, ArrowRight, CheckSquare, Volume2, Loader, VolumeX, Download, Share2, CheckCircle2, FileText, ExternalLink, Link2, BadgeCheck } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import EligibilityPanel, { type EligibilityFamily } from "@/components/EligibilityPanel";
 import ActionLedger, { type LedgerScore } from "@/components/ActionLedger";
@@ -27,6 +27,15 @@ interface AdvisoryData {
     families?: EligibilityFamily[];
   };
   action_ledger?: LedgerScore;
+  scheme_choice?: {
+    value?: string;
+    name?: string;
+    status?: string;
+    loan_ceiling?: string;
+    source_url?: string;
+    last_verified_at?: string;
+    is_none?: boolean;
+  };
 }
 
 interface Props {
@@ -368,6 +377,52 @@ export default function AdvisoryCard({ report, topic, simplified, sessionId }: P
             businessLabel={data.eligibility.business_label}
             amount={data.eligibility.amount}
           />
+        )}
+
+        {/* The scheme the user committed to at the approval gate — a fact about
+            their business, not a suggestion from the model. */}
+        {data.scheme_choice?.value && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.02 }}
+            style={{
+              display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap",
+              background: "linear-gradient(135deg, rgba(45,212,191,0.08), rgba(79,142,247,0.05))",
+              border: "1px solid rgba(45,212,191,0.22)",
+              borderRadius: "12px", padding: "14px 16px",
+            }}
+          >
+            <BadgeCheck size={18} style={{ color: "var(--success)", flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: "220px" }}>
+              <div style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--success)" }}>
+                {data.scheme_choice.is_none ? t("report.noLoan") : t("report.chosenScheme")}
+              </div>
+              {!data.scheme_choice.is_none && data.scheme_choice.name ? (
+                <div style={{ fontSize: "0.94rem", fontWeight: 700, color: "var(--text-primary)", marginTop: "3px" }}>
+                  {data.scheme_choice.name}
+                </div>
+              ) : null}
+              {data.scheme_choice.loan_ceiling ? (
+                <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginTop: "3px" }}>
+                  {t("gate.loanCeiling")} {data.scheme_choice.loan_ceiling}
+                </div>
+              ) : null}
+              {data.scheme_choice.source_url ? (
+                <a
+                  href={data.scheme_choice.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "4px",
+                    marginTop: "5px", fontSize: "0.72rem", color: "var(--accent)", textDecoration: "underline",
+                  }}
+                >
+                  {t("gate.source")}
+                  {data.scheme_choice.last_verified_at ? ` · ${t("gate.verified")} ${data.scheme_choice.last_verified_at}` : ""}
+                  <ExternalLink size={11} />
+                </a>
+              ) : null}
+            </div>
+          </motion.div>
         )}
 
         {/* Action ledger — the loan-ready score measured on the user's own

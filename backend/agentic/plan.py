@@ -32,7 +32,7 @@ STATE_KEYS: frozenset = frozenset(
         "research_notes", "analysis", "schemes_text", "draft", "reflection",
         "reflected", "report", "simplified", "loan_ready_score",
         "compiled_plan", "plan_run",
-        "gate", "gate_decision",
+        "gate", "gate_decision", "scheme_gate", "scheme_gate_decision", "scheme_choice",
         "next_action", "finished",
     }
 )
@@ -42,7 +42,7 @@ STATE_KEYS: frozenset = frozenset(
 NODE_IDS: frozenset = frozenset(
     {
         "planner", "gate", "supervisor", "research", "analyst", "schemes",
-        "writer", "critic", "refine", "finalize",
+        "scheme_gate", "writer", "critic", "refine", "finalize",
     }
 )
 

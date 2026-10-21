@@ -31,6 +31,7 @@ Order of authority for every output the product produces:
 - The LLM is NOT a source of truth. It may explain and recommend, never establish facts.
 - Never let the model invent scheme names, loan amounts, interest rates, eligibility claims, or approval guarantees. Scheme data comes only from `backend/data/schemes.json` (curated, each entry with `source_url` + `last_verified_at`); amounts/eligibility shown to users must be traceable to that data or a cited source.
 - **Eligibility is decided in code, never by the model.** `backend/core/eligibility.py` evaluates the `checks[]` predicates in `schemes.json` against the user's intake and returns `eligible | likely | blocked | not_eligible | wrong_tier`. The writer receives these verdicts as `eligibility_note` and is instructed not to contradict them. A verdict without a `basis` + `source_url` is a bug.
+- **The user's decision is authoritative, too.** What the user picks at an approval gate is a fact, not a suggestion: the scheme they approve is handed to the writer as `state["scheme_choice"]` and the prose must be built around it. A model that recommends a different scheme as the main path is a bug.
 - Every financial or government-scheme claim shown to a user must carry its source (URL or "curated dataset" provenance). Where a number is computed (e.g. loan-ready score, cash-flow projection), the calculation must be deterministic code, not an LLM output.
 - **Loan-ready score = f(user's real state), not f(report quality).** `backend/core/ledger.py` scores the Action Ledger — actions the user has actually completed, ticked via `POST /api/ledger/{session_id}`. The older `compute_loan_ready_score` rubric (which awarded points for the report containing a summary / five documents) is retained only as an offline fallback for sessions saved before the ledger existed. Never reintroduce report-quality scoring under the loan-ready label.
 - Scores and projections: deterministic functions in `backend/core/heuristics.py` / `backend/core/ledger.py` / client-side calculators — never ask the LLM to compute them.
@@ -60,7 +61,8 @@ market-research-agent/
 │   │   │                       # → eligible | likely | blocked | not_eligible | wrong_tier;
 │   │   │                       # group_by_family() collapses MUDRA tiers into one card
 │   │   ├── ledger.py           # Action Ledger + loan-ready score = f(actions completed)
-│   │   ├── gates.py            # approval gates: gate model, decision validation, GateBroker
+│   │   ├── gates.py            # approval gates: plan_approval + scheme_approval,
+│   │   │                       # decision validation, GateBroker
 │   │   ├── web_research.py     # search + scrape (Google → DuckDuckGo), no keys
 │   │   ├── ws.py               # SafeWebSocket — serialized sends
 │   │   ├── memory.py           # JSON session store, 7-day retention, session_id allowlist guard
@@ -109,6 +111,7 @@ market-research-agent/
 │       ├── chat.py             # /api/chat (POST/GET history/DELETE) + chat memory, pydantic caps
 │       ├── ledger.py           # /api/eligibility (rule engine) + /api/ledger/{session_id} (GET/POST)
 │       ├── sessions.py         # GET /api/sessions/{session_id} — resume a saved advisory
+│       │                       # GET /api/sessions/{session_id}/gate — the parked approval
 │       ├── langchain.py        # GET /api/langchain/status, POST /api/langchain/run (heuristic fallback, never 500)
 │       ├── whatsapp.py         # OPTIONAL WhatsApp Cloud API: GET verify, POST incoming → chat_agent → Graph reply (always 200)
 │       └── voice.py            # /api/voice/{status,transcribe,speak,livekit-token}, 5 MB audio cap, WAV/MP3 sniffing
@@ -136,7 +139,7 @@ market-research-agent/
         ├── LiveAdvisorPanel.tsx # realtime voice (LiveKit): join room, mic, agent audio
         ├── StartupQuiz.tsx     # 6-question Business Check-up stepper incl. location (file name legacy; UI copy must say Business Check-up)
         ├── CashflowSimulator.tsx # client-side cash-flow projection + SVG chart
-        ├── GateCard.tsx        # approval gate card (plan + schemes + approve/reject)
+        ├── GateCard.tsx        # approval gate card (plan steps, scheme choices, approve/reject)
         └── Usps.tsx            # "why this isn't a generic chatbot" section
 
 ## LLM Model Routing (all calls via backend/core/llm_client.py only)
@@ -177,7 +180,9 @@ market-research-agent/
 ## Agentic Engine
 - The advisory pipeline is a LangGraph StateGraph in `backend/agentic/` (topology + routers + nodes), executed by LangGraph. `engine` on `graph` and `done` events is always `"langgraph"`.
 - Topology: `START → planner → supervisor`; supervisor routes to `research | analyst | schemes | writer | finalize` (heuristic `decide()` in `supervisor.py`, LLM-assisted when a provider is up). `research/analyst/schemes → supervisor` (they loop until the supervisor has enough). `writer → critic | refine`; `critic → writer (revise) | refine` for up to `AGENTIC_MAX_ITERATIONS`; `refine → finalize → END`.
-- With the approval gate enabled the topology becomes `START → planner → gate → supervisor` — the gate node is **only wired into the compiled graph** when gates are on (`build_langgraph(gates_enabled=...)`), so a normal run's trace never shows a no-op node.
+- With the approval gates enabled the topology becomes `START → planner → gate → supervisor` and `supervisor → scheme_gate → writer` — both gate nodes are **only wired into the compiled graph** when gates are on (`build_langgraph(gates_enabled=...)`), so a normal run's trace never shows a no-op node. The scheme gate sits on the only edge that starts a *new* draft, so the critic's revision loop never re-asks the user.
+- Two gates, in the order the business faces them: `plan_approval` (*may we go to the web?*) and `scheme_approval` (*which scheme shall we build the plan around?* — the point where information becomes a commitment). The scheme gate is skipped automatically when the rule engine found no usable scheme.
+- The user's scheme choice is authoritative: it reaches the writer as `state["scheme_choice"]` and the writer is told to build the report around exactly that scheme (or, for the "no loan" option, around growing the business without one). The model may not recommend a different scheme as the main path.
 - Nodes degrade to deterministic heuristic outputs whenever the LLM fails — the offline guarantee applies to every node. Deterministic tools (`backend/agentic/tools.py`) are bound where relevant: `web_search` (research), `scheme_match` (schemes), `cashflow_projection` (analyst), `loan_ready_score` + `document_checklist` (finalize).
 - `finalize` keeps the deterministic post-pass (`_finalize_report`): loan-ready score injection, scheme source annotation, provenance sources. Entity rule: planner/supervisor/critic routing and scores stay deterministic; the LLM only writes prose within the given schema.
 - Config: `AGENTIC_ENGINE_ENABLED`, `AGENTIC_MAX_ITERATIONS` (default 8), `AGENTIC_REFLECTION_ENABLED` (default true), `AGENTIC_CHECKPOINTING`. `supervisor` and `critic` have their own token budgets + OpenRouter model priority (see `AGENT_OPENROUTER_MODELS` in `backend/core/config.py`); they use the same `call_llm` chain as all agents.
@@ -190,7 +195,7 @@ Approval-gate events: gate_pending, gate_decided, gate_paused
 Terminal/legacy events: done (with simplified_report + trace + engine), cancelled, error, resume_available, session_deleted, session_export
 
 - `start` payload: `{type, topic, max_steps?, session_id?, profile?, intake?, lang?, gates?}` — topic capped at 4000 chars, profile at 1500, `max_steps` coerced to 1–6, `session_id` validated against the allowlist (invalid → `error` event, no run), `gates` opts the run into the approval gate (also enabled deployment-wide by `GATES_ENABLED`).
-- `gate_decision` payload: `{type, gate_id, decision, note?, session_id?}` — `decision` ∈ `approve | reject`, `note` capped at 500 chars, `gate_id` capped at 64. The decision is **persisted first** (so it survives a reload), then the parked run is woken; if nothing was parked, a fresh run is seeded from the stored topic + intake and the gate passes straight through.
+- `gate_decision` payload: `{type, gate_id, decision, note?, selection?, session_id?}` — `decision` ∈ `approve | reject`, `note` capped at 500 chars, `gate_id` capped at 64, `selection` (≤ 64 chars) is the option the user picked at a **choice gate**. The decision is **persisted first** (so it survives a reload), then the parked run is woken; if nothing was parked, a fresh run is seeded from the stored topic + intake and every decision the session already earned is replayed, so the plan is not approved twice. A `selection` the gate never offered is refused — the gate is the authority on what may be chosen.
 - A malformed frame or unknown type yields an `error` event and the connection stays open.
 
 ## Security & Input Validation (P0 — do not regress)
@@ -209,7 +214,12 @@ Terminal/legacy events: done (with simplified_report + trace + engine), cancelle
 - **Cash-Flow Simulator** (`CashflowSimulator.tsx`) — pure client-side cash-flow projection (capital/weekly sales/weekly expenses, 4–24 weeks), SVG line chart, break-even week, monthly surplus. No backend calls.
 - **Business Check-up** (`StartupQuiz.tsx` + `frontend/lib/intake.ts` + `backend/core/intake.py`) — the single intake layer. Every question keeps its quick chips **and** accepts a free-text answer ("I sell fruit near the bus stand in Nagpur" beats "Street vendor / cart"). Questions **branch** on earlier answers via `showIf`/`prompt`, so a farmer is asked what they grow and how much land they have. Persisted in `localStorage["grameenai_profile"]` (old chip-code format auto-migrated by `migrateIntake()`) and sent to the backend as structured `intake` (`{field_id: text}`) on both the WS `start` message and `POST /api/chat`. **The field ids in `frontend/lib/intake.ts` and `backend/core/intake.py` must match** — `tests/test_intake.py` fails if they drift. The backend builds the one canonical snippet from them (`build_intake_snippet`) and uses it for the run topic, synthesis, persistence and chat, so every surface reads the same intake. Coverage is graded (`unaddressed`/`thin`/`answered`) and the chat re-probes the vaguest answer before asking about an untouched field.
 - **Resume last advisory** — page mount calls `GET /api/sessions/{session_id}` and restores the saved advisory (report + simplified + grey-out of run state) until the user runs again. Backend lives in `backend/api/sessions.py`.
-- **Approval Gate** (`backend/core/gates.py` + `backend/agentic/nodes.py::gate_node` + `frontend/components/GateCard.tsx`) — a human approval gate between the planner and the research: the user sees the exact plan steps and the exact schemes (with `source_url` + `last_verified_at`) **before** anything is searched, then approves or rejects. The gate payload is deterministic (never model-written), the decision is persisted on the session before it is applied, and a run that nobody answers **parks** (no report, no failed run) so it can be decided later — `GET /api/sessions/{session_id}/gate` finds it again after a reload. Off by default; a run opts in with `gates: true` in the `start` payload or the deployment sets `GATES_ENABLED=true`. `GATE_WAIT_SECONDS` (default 180) bounds the in-process wait before the run parks.
+- **Approval Gates** (`backend/core/gates.py` + `backend/agentic/nodes.py::gate_node` / `scheme_gate_node` + `frontend/components/GateCard.tsx`) — the human checkpoints where the agent may not act on the user's behalf. Two of them, in the order a business faces them:
+  1. `plan_approval` — between the planner and the research: the user sees the exact plan steps and the exact schemes (with `source_url` + `last_verified_at`) **before** anything is searched.
+  2. `scheme_approval` — between the research and the writer: the user picks the scheme the advisory is built around (or "no loan right now"), because a written loan plan is a commitment. Only the schemes the rule engine found usable (`eligible | likely`) are offered, each with its official source, and the best match is flagged; the gate is skipped when there is nothing to choose.
+
+  Both gate payloads are deterministic (never model-written), the decision is persisted on the session before it is applied, and a run that nobody answers **parks** (no report, no failed run) so it can be decided later — `GET /api/sessions/{session_id}/gate` finds it again after a reload. Every gate the session has seen is kept in `session["gates"]`, so a resumed run replays the decisions it already earned instead of asking again. Off by default; a run opts in with `gates: true` in the `start` payload or the deployment sets `GATES_ENABLED=true`. `GATE_WAIT_SECONDS` (default 180) bounds the in-process wait before the run parks.
+  The approved scheme is applied **deterministically** in `_finalize_report`: it leads `matched_schemes` and is attached to the advisory JSON as `scheme_choice`, so the commitment the user made survives even when every LLM provider is offline.
 
 ## Planner / Executor (Phase B) — code decides, the model proposes
 The advisory run is a **propose → dispose** loop, not a chatbot that talks its way through a task:

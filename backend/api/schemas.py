@@ -105,10 +105,15 @@ class SessionGateResponse(BaseModel):
     A run that parked at the gate produced no report, so the gate is the only
     thing left to show — this is how the user finds it again after a reload
     and decides it.
+
+    ``gate`` is the one the user has to act on (the most recent); ``gates``
+    lists every gate this session has seen, so a run that already earned one
+    approval can show what is still open.
     """
 
     session_id: str
     gate: Dict[str, Any] = {}
+    gates: List[Dict[str, Any]] = []
     topic: str = ""
     intake: Dict[str, str] = {}
 

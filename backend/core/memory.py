@@ -98,6 +98,7 @@ def _empty_session(session_id: str = "") -> Dict[str, Any]:
         "facts": {},
         "intake": {},
         "gate": {},
+        "gates": {},
         "created_at": now,
         "updated_at": now,
     }
@@ -172,6 +173,10 @@ def _normalize_session(session_id: str, data: Any) -> Dict[str, Any]:
         session["facts"] = {}
     if not isinstance(session.get("intake"), dict):
         session["intake"] = {}
+    if not isinstance(session.get("gate"), dict):
+        session["gate"] = {}
+    if not isinstance(session.get("gates"), dict):
+        session["gates"] = {}
     if not isinstance(session.get("state"), dict):
         session["state"] = {}
     session.setdefault("topic", "")
@@ -339,6 +344,41 @@ def update_session_state(session_id: str, patch: dict) -> None:
 # session record next to the topic and the intake it belongs to. That makes a
 # gate resumable: the user can approve it tomorrow and the run picks up from
 # the same Business Check-up answers.
+#
+# A gated run can hit more than one gate (approve the plan, then choose the
+# scheme), so every gate the session has seen is kept in ``session["gates"]``
+# keyed by its id. ``session["gate"]`` stays as the one the user has to act on
+# — the most recent — so the UI contract does not change.
+
+
+def _latest_gate(gates: Dict[str, Any]) -> Dict[str, Any]:
+    """The gate the user has to act on: the most recent one."""
+    best: Dict[str, Any] = {}
+    best_at = -1.0
+    for gate in (gates or {}).values():
+        if not isinstance(gate, dict):
+            continue
+        try:
+            at = float(gate.get("created_at") or 0)
+        except (TypeError, ValueError):
+            at = 0.0
+        if at >= best_at:
+            best_at = at
+            best = gate
+    return best
+
+
+def _store_gate(session: Dict[str, Any], gate: Dict[str, Any]) -> None:
+    """Put a gate into the session's gate map and refresh the pending pointer."""
+    gates = session.get("gates")
+    if not isinstance(gates, dict):
+        gates = {}
+    gate_id = str((gate or {}).get("gate_id") or "")
+    if gate_id:
+        gates[gate_id] = gate
+    session["gates"] = gates
+    session["gate"] = _latest_gate(gates)
+
 
 def save_session_gate(
     session_id: str,
@@ -354,7 +394,7 @@ def save_session_gate(
     _init_dir()
 
     session = _normalize_session(session_id, _read_raw(session_id))
-    session["gate"] = gate
+    _store_gate(session, gate)
     if topic:
         session["topic"] = topic
     if isinstance(intake, dict) and intake:
@@ -363,11 +403,47 @@ def save_session_gate(
 
 
 def load_session_gate(session_id: str) -> Dict[str, Any]:
-    """The gate stored for a session (empty when there is none)."""
+    """The gate the user has to act on (empty when there is none)."""
     if not is_valid_session_id(session_id):
         return {}
     gate = (load_last_session(session_id) or {}).get("gate")
     return gate if isinstance(gate, dict) else {}
+
+
+def load_session_gates(session_id: str) -> Dict[str, Dict[str, Any]]:
+    """Every gate this session has seen, keyed by gate id."""
+    if not is_valid_session_id(session_id):
+        return {}
+    gates = (load_last_session(session_id) or {}).get("gates")
+    if not isinstance(gates, dict):
+        return {}
+    return {k: v for k, v in gates.items() if isinstance(v, dict)}
+
+
+def load_session_gate_by_id(session_id: str, gate_id: str) -> Dict[str, Any]:
+    """One gate by id (empty when the session has no such gate)."""
+    return load_session_gates(session_id).get(str(gate_id or ""), {})
+
+
+def load_session_gate_decisions(session_id: str) -> Dict[str, Dict[str, str]]:
+    """
+    The decisions already taken on this session's gates, keyed by gate kind.
+
+    A resumed run needs every decision it already earned: approving the plan
+    must not be asked again just because the run stopped later, at the scheme
+    gate.
+    """
+    from backend.core.gates import decision_from_gate
+
+    decisions: Dict[str, Dict[str, str]] = {}
+    for gate in load_session_gates(session_id).values():
+        kind = str(gate.get("kind") or "")
+        if not kind:
+            continue
+        decision = decision_from_gate(gate)
+        if decision.get("decision"):
+            decisions[kind] = decision
+    return decisions
 
 
 def record_gate_decision(session_id: str, decision: Dict[str, str]) -> Dict[str, Any]:
@@ -375,37 +451,41 @@ def record_gate_decision(session_id: str, decision: Dict[str, str]) -> Dict[str,
     Apply a decision to the stored gate and persist it.
 
     Returns the updated gate record. A decision for an unknown gate — or for a
-    gate id that is not the one on the session — is a no-op: the user gets a
-    friendly answer and nothing is written.
+    gate that has already been decided — is a no-op: the user gets a friendly
+    answer and nothing is written.
     """
     _require_valid_session_id(session_id)
-    gate = load_session_gate(session_id)
+    gate = load_session_gate_by_id(session_id, str(decision.get("gate_id") or ""))
     if not gate:
         return {}
-    if str(gate.get("gate_id")) != str(decision.get("gate_id")):
+    if str(gate.get("status")) != "pending":
         return {}
 
     from backend.core.gates import apply_decision
 
     updated = apply_decision(gate, decision)
-    save_session_gate(session_id, updated)
+    _init_dir()
+    session = _normalize_session(session_id, _read_raw(session_id))
+    _store_gate(session, updated)
+    _write(session_id, session)
     return updated
 
 
 def clear_session_gate(session_id: str) -> None:
     """
-    Drop the stored gate for a session.
+    Drop the stored gates for a session.
 
-    A fresh run means a fresh gate: leaving the old one behind would let a
+    A fresh run means fresh gates: leaving the old ones behind would let a
     stale approval resume a run the user has already replaced.
     """
     _require_valid_session_id(session_id)
     if not _session_file(session_id).exists():
         return
     session = _normalize_session(session_id, _read_raw(session_id))
-    if not session.get("gate"):
+    if not session.get("gate") and not session.get("gates"):
         return
     session["gate"] = {}
+    session["gates"] = {}
     _write(session_id, session)
 
 

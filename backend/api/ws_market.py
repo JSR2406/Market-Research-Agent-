@@ -20,7 +20,16 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.core.config import ALLOWED_ORIGINS, GATES_ENABLED
-from backend.core.gates import GateBroker, validate_decision
+from backend.core.gates import (
+    DECISION_APPROVE,
+    DECISION_REJECT,
+    GATE_KIND_PLAN,
+    GATE_KIND_SCHEME,
+    GATE_REJECTED,
+    GateBroker,
+    selection_allowed,
+    validate_decision,
+)
 from backend.core.intake import normalize_intake
 from backend.core.memory import (
     build_resume_context,
@@ -28,6 +37,9 @@ from backend.core.memory import (
     delete_session,
     is_valid_session_id,
     load_last_session,
+    load_session_gate_by_id,
+    load_session_gate_decisions,
+    load_session_gates,
     record_gate_decision,
 )
 from backend.core.ws import SafeWebSocket
@@ -213,6 +225,26 @@ async def market_research_websocket(websocket: WebSocket):
                     })
                     continue
 
+                # The gate itself is the authority on what may be chosen: the
+                # client may only pick a value the gate offered.
+                pending_gate = load_session_gate_by_id(session_id, decision["gate_id"])
+                if not pending_gate:
+                    await ws.send_json({
+                        "type": "error",
+                        "message": "This approval is no longer waiting. Please start the research again.",
+                    })
+                    continue
+                if (
+                    str(pending_gate.get("kind")) == GATE_KIND_SCHEME
+                    and decision["decision"] == DECISION_APPROVE
+                    and not selection_allowed(pending_gate, decision.get("selection", ""))
+                ):
+                    await ws.send_json({
+                        "type": "error",
+                        "message": "Please choose one of the options before you approve.",
+                    })
+                    continue
+
                 # Record it on disk first — the decision has to survive the
                 # socket even when the run that was waiting for it is gone.
                 stored = record_gate_decision(session_id, decision)
@@ -226,6 +258,15 @@ async def market_research_websocket(websocket: WebSocket):
                 # Wake the run that is parked on this gate.
                 if broker.resolve(decision["gate_id"], decision):
                     await ws.send_json({"type": "gate_decided", "gate": stored})
+                    continue
+
+                # A decline ends the run on purpose — there is nothing to resume.
+                if decision["decision"] == DECISION_REJECT:
+                    await ws.send_json({
+                        "type": "gate_paused",
+                        "gate": stored,
+                        "status": GATE_REJECTED,
+                    })
                     continue
 
                 # Nothing was waiting: the run had already parked (the tab was
@@ -245,6 +286,19 @@ async def market_research_websocket(websocket: WebSocket):
                     workflow_task.cancel()
                 cancel_flag["cancelled"] = False
 
+                # A run can hit more than one gate, so the resume carries every
+                # decision it already earned: approving the plan must not be
+                # asked again just because the run stopped later, at the scheme
+                # gate.
+                decisions = load_session_gate_decisions(session_id)
+                gates = load_session_gates(session_id)
+                plan_gate = next(
+                    (g for g in gates.values() if str(g.get("kind")) == GATE_KIND_PLAN), {},
+                )
+                scheme_gate = next(
+                    (g for g in gates.values() if str(g.get("kind")) == GATE_KIND_SCHEME), {},
+                )
+
                 workflow_task = asyncio.create_task(
                     run_research_workflow(
                         resume_topic,
@@ -256,8 +310,10 @@ async def market_research_websocket(websocket: WebSocket):
                         lang=_as_lang(stored.get("lang")),
                         gates_enabled=True,
                         gate_broker=broker,
-                        gate=stored,
-                        gate_decision=decision,
+                        gate=plan_gate,
+                        gate_decision=decisions.get(GATE_KIND_PLAN, {}),
+                        scheme_gate=scheme_gate,
+                        scheme_gate_decision=decisions.get(GATE_KIND_SCHEME, {}),
                     )
                 )
 

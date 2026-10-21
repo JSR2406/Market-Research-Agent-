@@ -22,6 +22,7 @@ from backend.agentic.events import EventEmitter, GatePaused, WorkflowCancelled
 from backend.agentic.executor import with_postconditions
 from backend.agentic.graph import NODE_FUNCS, REDUCERS, START_NODE, graph_topology
 from backend.agentic.state import AgenticState, initial_state
+from backend.core.gates import GATE_KIND_SCHEME
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,8 @@ async def run_agentic_workflow(
     gate_broker: Any = None,
     gate: Optional[Dict[str, Any]] = None,
     gate_decision: Optional[Dict[str, Any]] = None,
+    scheme_gate: Optional[Dict[str, Any]] = None,
+    scheme_gate_decision: Optional[Dict[str, Any]] = None,
 ) -> Tuple[AgenticState, str]:
     """Run the advisory graph end-to-end via LangGraph. Never raises."""
     state = initial_state(
@@ -81,6 +84,8 @@ async def run_agentic_workflow(
         eligibility_families=eligibility_families,
         gate=gate,
         gate_decision=gate_decision,
+        scheme_gate=scheme_gate,
+        scheme_gate_decision=scheme_gate_decision,
     )
     state["output_lang"] = output_lang
     config: Dict[str, Any] = {
@@ -109,7 +114,10 @@ async def run_agentic_workflow(
         # The run is waiting for a human decision. The gate is already on disk;
         # the caller tells the user and parks the run.
         logger.info("[Agentic] workflow paused at a gate: %s", paused.status)
-        state["gate"] = paused.gate
+        if str((paused.gate or {}).get("kind") or "") == GATE_KIND_SCHEME:
+            state["scheme_gate"] = paused.gate
+        else:
+            state["gate"] = paused.gate
         return state, "paused"
     except WorkflowCancelled:
         logger.info("[Agentic] workflow cancelled by user")

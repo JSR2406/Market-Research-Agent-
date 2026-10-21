@@ -11,6 +11,17 @@ export type GateScheme = {
   last_verified_at: string;
 };
 
+/** One thing the user may pick at the scheme gate. */
+export type GateChoice = {
+  value: string;
+  label: string;
+  status?: string;
+  loan_ceiling?: string;
+  source_url?: string;
+  last_verified_at?: string;
+  recommended?: boolean;
+};
+
 export type GatePayload = {
   gate_id: string;
   kind: string;
@@ -20,12 +31,16 @@ export type GatePayload = {
   options?: Array<{ value: string; label: string }>;
   steps: string[];
   schemes: GateScheme[];
+  choices?: GateChoice[];
 };
 
 type Props = {
   gate: GatePayload;
-  /** Send the user's decision. The card does not decide anything itself. */
-  onDecide: (decision: "approve" | "reject", note: string) => void;
+  /**
+   * Send the user's decision. The card does not decide anything itself.
+   * `selection` carries the option the user picked at a choice gate.
+   */
+  onDecide: (decision: "approve" | "reject", note: string, selection?: string) => void;
   /** A decision is in flight — the buttons are locked until the server answers. */
   busy?: boolean;
   /** The run parked without an answer: the gate can still be decided later. */
@@ -41,9 +56,16 @@ const STATUS_TONE: Record<string, { color: string; bg: string }> = {
 export default function GateCard({ gate, onDecide, busy, parked }: Props) {
   const { t } = useI18n();
   const [note, setNote] = useState("");
+  const choices = gate.choices ?? [];
+  // A choice gate has one obvious default: the scheme the rule engine
+  // recommends. The user can change it, but never has to hunt for a radio.
+  const [selected, setSelected] = useState<string>(
+    choices.find((c) => c.recommended)?.value ?? choices[0]?.value ?? "",
+  );
 
   const tone = STATUS_TONE[gate.status] ?? STATUS_TONE.pending;
   const isPending = gate.status === "pending";
+  const needsChoice = choices.length > 0 && !selected;
 
   // The backend sends the button labels in the user's language; the UI copy is
   // the fallback for an older server that does not.
@@ -210,11 +232,121 @@ export default function GateCard({ gate, onDecide, busy, parked }: Props) {
         </div>
       ) : null}
 
+      {/* The choices — what the user may pick, each with its official source */}
+      {choices.length ? (
+        <div>
+          <p
+            style={{
+              margin: "0 0 6px",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            {t("gate.choose")}
+          </p>
+          <div role="radiogroup" aria-label={t("gate.selectionAria")} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {choices.map((choice) => {
+              const inputId = `gate-choice-${gate.gate_id}-${choice.value}`;
+              const active = selected === choice.value;
+              return (
+                <div
+                  key={choice.value}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    background: active ? "rgba(251,146,60,0.08)" : "var(--bg-surface)",
+                    border: `1px solid ${active ? "rgba(251,146,60,0.4)" : "var(--border)"}`,
+                    fontSize: "0.76rem",
+                  }}
+                >
+                  <label
+                    htmlFor={inputId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                      cursor: busy ? "wait" : "pointer",
+                      flex: "1 1 auto",
+                    }}
+                  >
+                    <input
+                      id={inputId}
+                      type="radio"
+                      name={`gate-choice-${gate.gate_id}`}
+                      value={choice.value}
+                      checked={active}
+                      disabled={busy}
+                      onChange={() => setSelected(choice.value)}
+                    />
+                    <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>{choice.label}</span>
+                    {choice.recommended ? (
+                      <span
+                        style={{
+                          fontSize: "0.62rem",
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          color: "var(--success)",
+                          background: "rgba(37,211,102,0.12)",
+                          padding: "2px 7px",
+                          borderRadius: "999px",
+                        }}
+                      >
+                        {t("gate.recommended")}
+                      </span>
+                    ) : null}
+                    {choice.loan_ceiling ? (
+                      <span style={{ color: "var(--text-muted)" }}>
+                        {t("gate.loanCeiling")} {choice.loan_ceiling}
+                      </span>
+                    ) : null}
+                    {choice.status ? (
+                      <span style={{ color: "var(--text-muted)" }}>{choice.status}</span>
+                    ) : null}
+                  </label>
+                  {choice.source_url ? (
+                    <a
+                      href={choice.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "0.68rem",
+                        color: "var(--accent)",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {t("gate.source")}
+                      {choice.last_verified_at ? ` · ${t("gate.verified")} ${choice.last_verified_at}` : ""}
+                      <ExternalLink size={10} />
+                    </a>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {/* The decision */}
       {isPending ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {parked ? (
             <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--warn)" }}>{t("gate.parked")}</p>
+          ) : null}
+
+          {needsChoice ? (
+            <p style={{ margin: 0, fontSize: "0.76rem", color: "var(--warn)" }}>{t("gate.chooseRequired")}</p>
           ) : null}
 
           <label
@@ -247,8 +379,8 @@ export default function GateCard({ gate, onDecide, busy, parked }: Props) {
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
-              disabled={busy}
-              onClick={() => onDecide("approve", note)}
+              disabled={busy || needsChoice}
+              onClick={() => onDecide("approve", note, selected || undefined)}
               style={{
                 flex: "1 1 150px",
                 display: "flex",
@@ -258,14 +390,15 @@ export default function GateCard({ gate, onDecide, busy, parked }: Props) {
                 padding: "11px 18px",
                 borderRadius: "var(--radius-md)",
                 border: "1px solid transparent",
-                background: busy ? "var(--bg-surface)" : "linear-gradient(135deg, var(--accent), var(--accent2))",
-                color: busy ? "var(--text-muted)" : "#fff",
+                background: busy || needsChoice ? "var(--bg-surface)" : "linear-gradient(135deg, var(--accent), var(--accent2))",
+                color: busy || needsChoice ? "var(--text-muted)" : "#fff",
                 fontSize: "0.86rem",
                 fontWeight: 700,
-                cursor: busy ? "wait" : "pointer",
+                cursor: busy || needsChoice ? "wait" : "pointer",
               }}
             >
-              <BadgeCheck size={15} /> {optionLabel("approve", "gate.approve")}
+              <BadgeCheck size={15} />{" "}
+              {optionLabel("approve", choices.length ? "gate.useScheme" : "gate.approve")}
             </motion.button>
             <motion.button
               type="button"

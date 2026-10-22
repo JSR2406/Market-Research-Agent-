@@ -58,7 +58,7 @@ export default function ResearchPage() {
   const [profile, setProfile] = useState<ProfileInit>({});
   const [resumeNote, setResumeNote] = useState("");
   // The approval gate: off by default, on when the user asks to see the plan.
-  const [gatesOn, setGatesOn] = useState(false);
+  const [gatesOn, setGatesOn] = useState(true);
   const [gate, setGate] = useState<GatePayload | null>(null);
   // A decision is in flight — the card's buttons lock until the server answers.
   const [gateBusy, setGateBusy] = useState(false);

@@ -26,8 +26,10 @@ from backend.api.chat import router as chat_router
 from backend.api.sessions import router as sessions_router
 from backend.api.langchain import router as langchain_router
 from backend.api.ws_market import router as ws_router
+from backend.api.whatsapp import router as whatsapp_router
 from backend.core.memory import cleanup_old_sessions
 from backend.core.analytics import cleanup_analytics
+from backend.core.rate_limit import check_rate_limit
 
 logging.basicConfig(
     level=logging.INFO,
@@ -114,6 +116,20 @@ async def _log_http(request: Request, call_next):
 
 
 @app.middleware("http")
+async def _rate_limit_http(request: Request, call_next):
+    """Protect public endpoints against obvious abuse and burst traffic."""
+    if not request.url.path.startswith("/api") and request.url.path != "/health":
+        return await call_next(request)
+
+    if not check_rate_limit(request.url.path, request):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please wait a moment and try again."},
+        )
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def _security_headers(request: Request, call_next):
     """Tighten browser-side security defaults without impacting the app flow."""
     response = await call_next(request)
@@ -148,6 +164,7 @@ app.include_router(analytics_router)
 app.include_router(tracker_router)
 app.include_router(market_router)
 app.include_router(advisor_router)
+app.include_router(whatsapp_router)
 
 
 @app.get("/health", response_model=HealthResponse)
